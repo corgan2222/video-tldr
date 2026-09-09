@@ -202,8 +202,9 @@ def links_from(info: dict) -> list[dict]:
 
 
 def analyze(
-    url: str, settings: Settings, force: bool = False, language: str = "de"
+    url: str, settings: Settings, force: bool = False, language: str | None = None
 ) -> dict:
+    language = language or settings.config["language"]
     fetched = fetch(url, settings)
     vid = fetched["id"]
     folder = work_folder(settings, vid)
@@ -217,13 +218,16 @@ def analyze(
     head = header(fetched, info)
 
     segments = transcript["segments"]
+    spend: list[dict] = []
     duration = fetched.get("duration") or (segments[-1]["end"] if segments else 0)
     text_size = sum(len(s["text"]) for s in segments)
     if text_size <= PART_LIMIT:
         data = head + "\n\nTranscript:\n" + "\n".join(transcript_lines(segments))
         result = normalize(
-            llm.complete(instruction(language), data, ANALYSIS_SCHEMA), duration
+            llm.complete(instruction(language), data, ANALYSIS_SCHEMA, settings),
+            duration,
         )
+        spend.append(dict(llm.last_cost))
     else:
         parts = split_parts(segments, info.get("chapters") or [])
         partial = []
@@ -235,17 +239,22 @@ def analyze(
             )
             partial.append(
                 normalize(
-                    llm.complete(instruction(language, part=True), data, PART_SCHEMA),
+                    llm.complete(
+                        instruction(language, part=True), data, PART_SCHEMA, settings
+                    ),
                     duration,
                 )
             )
+            spend.append(dict(llm.last_cost))
         stitched = llm.complete(
             instruction(language),
             head
             + "\n\nSummaries of the parts:\n"
             + json.dumps(partial, ensure_ascii=False),
             STITCH_SCHEMA,
+            settings,
         )
+        spend.append(dict(llm.last_cost))
         result = {
             **stitched,
             "sections": [s for p in partial for s in p["sections"]],
@@ -255,8 +264,9 @@ def analyze(
     result = {
         "id": vid,
         "language": language,
-        "model": llm.model_name(),
+        "model": llm.describe(settings),
         "parts": 1 if text_size <= PART_LIMIT else len(parts),
+        "cost": llm.totals(spend),
         **result,
     }
     if not result.get("links"):

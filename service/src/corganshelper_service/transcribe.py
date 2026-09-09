@@ -137,11 +137,59 @@ def whisper_transcribe(audio: Path, models_dir: Path) -> tuple[str, list[dict]]:
     return info.language, result
 
 
+def shrink_for_upload(audio: Path) -> Path:
+    """Mono MP3 at 48 kbit/s: a 25 MB cap sits on the transcription
+    endpoint, and half an hour of m4a is past it. Whisper resamples to
+    16 kHz anyway, so nothing it hears is lost."""
+    target = audio.with_suffix(".upload.mp3")
+    if not target.exists():
+        subprocess.run(
+            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(audio)]
+            + ["-vn", "-ac", "1", "-b:a", "48k", str(target)],
+            check=True,
+        )
+    return target
+
+
+def openai_transcribe(audio: Path, settings: Settings) -> tuple[str, list[dict]]:
+    """whisper-1 at OpenAI, or at any server that speaks its protocol."""
+    import openai
+
+    config = settings.config
+    if not config["openai_api_key"]:
+        raise FetchError(
+            "no OpenAI API key; put it in config.json as openai_api_key "
+            "or set OPENAI_API_KEY"
+        )
+    client = openai.OpenAI(
+        api_key=config["openai_api_key"],
+        base_url=config["openai_base_url"] or None,
+        timeout=600,
+    )
+    try:
+        with shrink_for_upload(audio).open("rb") as handle:
+            result = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=handle,
+                response_format="verbose_json",
+                timestamp_granularities=["segment"],
+            )
+    except openai.OpenAIError as error:
+        raise FetchError(f"openai transcription failed: {error}") from error
+    segments = [
+        {"start": round(s.start, 2), "end": round(s.end, 2), "text": s.text.strip()}
+        for s in result.segments or []
+    ]
+    return result.language, segments
+
+
 def transcribe(
-    url: str, settings: Settings, force: bool = False, engine: str = "auto"
+    url: str, settings: Settings, force: bool = False, engine: str | None = None
 ) -> dict:
     """Write work/<id>/transcript.json and return it. `engine` is `auto`
-    (captions when present, else whisper), `subtitles` or `whisper`."""
+    (captions when present, else local whisper), `subtitles`, `whisper`
+    or `openai`; default from the settings."""
+    engine = engine or settings.config["stt"]
     fetched = fetch(url, settings)
     vid = fetched["id"]
     folder = work_folder(settings, vid)
@@ -154,13 +202,17 @@ def transcribe(
     tracks = fetched.get("subtitles") or []
     if engine == "subtitles" and not tracks:
         raise FetchError("no caption track was fetched; use --engine whisper")
-    if engine != "whisper" and tracks:
+    if engine in ("auto", "subtitles") and tracks:
         # An uploader's own track (`en`) beats the automatic one (`en-orig`).
         track = folder / min(tracks, key=lambda name: "-orig" in name)
         data = json.loads(track.read_text(encoding="utf-8"))
         language = track.name.split(".")[-2].removesuffix("-orig")
         segments = segments_from_json3(data)
         source = "youtube"
+    elif engine == "openai":
+        audio = download_audio(url, folder, settings)
+        language, segments = openai_transcribe(audio, settings)
+        source = "openai"
     else:
         audio = download_audio(url, folder, settings)
         language, segments = whisper_transcribe(audio, settings.home / "models")
