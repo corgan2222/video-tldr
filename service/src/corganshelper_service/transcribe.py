@@ -155,7 +155,8 @@ def transcribe(
     if engine == "subtitles" and not tracks:
         raise FetchError("no caption track was fetched; use --engine whisper")
     if engine != "whisper" and tracks:
-        track = folder / tracks[0]
+        # An uploader's own track (`en`) beats the automatic one (`en-orig`).
+        track = folder / min(tracks, key=lambda name: "-orig" in name)
         data = json.loads(track.read_text(encoding="utf-8"))
         language = track.name.split(".")[-2].removesuffix("-orig")
         segments = segments_from_json3(data)
