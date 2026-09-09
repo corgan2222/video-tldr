@@ -18,7 +18,52 @@ DEFAULT_HOME = "D:/corganshelper"
 CONFIG_NAME = "config.json"
 
 LLM_BACKENDS = ["claude", "anthropic", "openai", "lmstudio", "ollama"]
-STT_ENGINES = ["auto", "subtitles", "whisper", "parakeet", "openai"]
+
+# What `stt` may name besides `auto` and `subtitles`, and how each one runs.
+# The owner asked on 2026-09-09 for a choice between fast and accurate, so
+# every entry carries its speed class and its word error rate: Open ASR
+# Leaderboard, English, mean WER, lower is better, as quoted by Northflank
+# on 2026-01-07 and read again on 2026-09-09. The language counts come from
+# the model cards. OpenAI's whisper-1 is not on the leaderboard.
+STT_MODELS = {
+    "whisper": {
+        "engine": "whisper",
+        "model": "large-v3-turbo",
+        "speed": "fast",
+        "wer": "7.75 %",
+        "languages": "99 languages",
+    },
+    "whisper-large": {
+        "engine": "whisper",
+        "model": "large-v3",
+        "speed": "slow",
+        "wer": "7.4 %",
+        "languages": "99 languages",
+    },
+    "parakeet": {
+        "engine": "onnx",
+        "model": "nemo-parakeet-tdt-0.6b-v3",
+        "speed": "fast",
+        "wer": "6.32 %",
+        "languages": "25 European languages",
+    },
+    "canary": {
+        "engine": "onnx",
+        "model": "nemo-canary-1b-v2",
+        "speed": "slow",
+        "wer": "7.15 %",
+        "languages": "25 European languages",
+    },
+    "openai": {
+        "engine": "openai",
+        "model": "whisper-1",
+        "speed": "cloud",
+        "wer": "",
+        "languages": "99 languages, needs a key",
+    },
+}
+STT_DEFAULT = "whisper"
+STT_ENGINES = ["auto", "subtitles", *STT_MODELS]
 
 # Every key config.json may carry, with the environment variable that
 # overrides it. The vendor variables are the ones their SDKs read anyway.

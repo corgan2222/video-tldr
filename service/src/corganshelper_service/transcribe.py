@@ -14,16 +14,11 @@ import subprocess
 from itertools import pairwise
 from pathlib import Path
 
-from .config import Settings
+from .config import STT_DEFAULT, STT_MODELS, Settings
 from .fetch import RESULT_NAME as FETCH_RESULT
 from .fetch import FetchError, fetch, work_folder
 
 RESULT_NAME = "transcript.json"
-WHISPER_MODEL = "large-v3-turbo"
-# NVIDIA's Parakeet TDT 0.6B v3 (25 European languages) as ONNX, through
-# onnx-asr. Hears 20 to 30 seconds at a time; the Silero VAD cuts the
-# audio into speech segments first, and those become the transcript lines.
-PARAKEET_MODEL = "nemo-parakeet-tdt-0.6b-v3"
 
 
 class Segment(dict):
@@ -119,16 +114,18 @@ def add_nvidia_dll_dirs() -> list[Path]:
     return added
 
 
-def whisper_transcribe(audio: Path, models_dir: Path) -> tuple[str, list[dict]]:
+def whisper_transcribe(
+    audio: Path, models_dir: Path, model_name: str = "large-v3-turbo"
+) -> tuple[str, list[dict]]:
     add_nvidia_dll_dirs()
     from faster_whisper import WhisperModel
 
     device, index, compute = whisper_device()
-    # The model (1.6 GB) lives next to the data, not in the user's cache;
-    # first use downloads it from Hugging Face.
+    # The model (1.6 GB for turbo, 3 GB for large-v3) lives next to the data,
+    # not in the user's cache; first use downloads it from Hugging Face.
     models_dir.mkdir(parents=True, exist_ok=True)
     model = WhisperModel(
-        WHISPER_MODEL,
+        model_name,
         device=device,
         device_index=index,
         compute_type=compute,
@@ -160,7 +157,14 @@ def to_wav16k(audio: Path) -> Path:
     return target
 
 
-def parakeet_transcribe(audio: Path, models_dir: Path) -> list[dict]:
+def onnx_transcribe(
+    audio: Path, models_dir: Path, model_name: str, language: str = "und"
+) -> list[dict]:
+    """Any model onnx-asr knows, NVIDIA's Parakeet and Canary among them.
+    They hear 20 to 30 seconds at a time, so the Silero VAD cuts the audio
+    into speech segments first, and those become the transcript lines.
+    Canary is told the language when one is known; it assumes English
+    otherwise. Parakeet finds it on its own."""
     add_nvidia_dll_dirs()
     import onnx_asr
 
@@ -168,16 +172,22 @@ def parakeet_transcribe(audio: Path, models_dir: Path) -> list[dict]:
     providers: list = ["CPUExecutionProvider"]
     if device == "cuda":
         providers.insert(0, ("CUDAExecutionProvider", {"device_id": index}))
-    # The model (about 2.5 GB as ONNX) lives next to the data, like whisper's.
+    # The model (2 to 4 GB as ONNX) lives next to the data, like whisper's.
     model = onnx_asr.load_model(
-        PARAKEET_MODEL, models_dir / "parakeet-v3", providers=providers
+        model_name, models_dir / model_name, providers=providers
     )
     vad = onnx_asr.load_vad("silero", providers=providers)
-    return [
-        {"start": round(s.start, 2), "end": round(s.end, 2), "text": s.text.strip()}
-        for s in model.with_vad(vad).recognize(str(to_wav16k(audio)))
-        if s.text.strip()
-    ]
+    options = {}
+    if "canary" in model_name and language not in ("", "und"):
+        options["language"] = language
+    try:
+        return [
+            {"start": round(s.start, 2), "end": round(s.end, 2), "text": s.text.strip()}
+            for s in model.with_vad(vad).recognize(str(to_wav16k(audio)), **options)
+            if s.text.strip()
+        ]
+    except KeyError as error:
+        raise FetchError(f"{model_name} does not know the language {error}") from error
 
 
 def track_language(tracks: list[str]) -> str:
@@ -201,7 +211,9 @@ def shrink_for_upload(audio: Path) -> Path:
     return target
 
 
-def openai_transcribe(audio: Path, settings: Settings) -> tuple[str, list[dict]]:
+def openai_transcribe(
+    audio: Path, settings: Settings, model_name: str = "whisper-1"
+) -> tuple[str, list[dict]]:
     """whisper-1 at OpenAI, or at any server that speaks its protocol."""
     import openai
 
@@ -219,7 +231,7 @@ def openai_transcribe(audio: Path, settings: Settings) -> tuple[str, list[dict]]
     try:
         with shrink_for_upload(audio).open("rb") as handle:
             result = client.audio.transcriptions.create(
-                model="whisper-1",
+                model=model_name,
                 file=handle,
                 response_format="verbose_json",
                 timestamp_granularities=["segment"],
@@ -237,8 +249,8 @@ def transcribe(
     url: str, settings: Settings, force: bool = False, engine: str | None = None
 ) -> dict:
     """Write work/<id>/transcript.json and return it. `engine` is `auto`
-    (captions when present, else local whisper), `subtitles`, `whisper`,
-    `parakeet` or `openai`; default from the settings."""
+    (captions when present, else the default model), `subtitles` or a
+    name from STT_MODELS; default from the settings."""
     engine = engine or settings.config["stt"]
     fetched = fetch(url, settings)
     vid = fetched["id"]
@@ -259,20 +271,20 @@ def transcribe(
         language = track.name.split(".")[-2].removesuffix("-orig")
         segments = segments_from_json3(data)
         source = "youtube"
-    elif engine == "openai":
-        audio = download_audio(url, folder, settings)
-        language, segments = openai_transcribe(audio, settings)
-        source = "openai"
-    elif engine == "parakeet":
-        audio = download_audio(url, folder, settings)
-        # Parakeet names no language; the caption track does, when there is one.
-        language = track_language(tracks)
-        segments = parakeet_transcribe(audio, settings.home / "models")
-        source = "parakeet"
     else:
+        source = STT_DEFAULT if engine == "auto" else engine
+        chosen = STT_MODELS[source]
         audio = download_audio(url, folder, settings)
-        language, segments = whisper_transcribe(audio, settings.home / "models")
-        source = "whisper"
+        models_dir = settings.home / "models"
+        if chosen["engine"] == "openai":
+            language, segments = openai_transcribe(audio, settings, chosen["model"])
+        elif chosen["engine"] == "onnx":
+            # These models name no language; the caption track does, when
+            # there is one.
+            language = track_language(tracks)
+            segments = onnx_transcribe(audio, models_dir, chosen["model"], language)
+        else:
+            language, segments = whisper_transcribe(audio, models_dir, chosen["model"])
 
     result = {
         "id": vid,

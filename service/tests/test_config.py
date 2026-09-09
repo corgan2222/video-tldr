@@ -83,3 +83,14 @@ def test_config_set_writes_the_file_and_the_key_is_never_printed(
 
     assert main(["--home", home, "config", "--set", "stt=loud"]) == 1
     assert "stt must be one of" in capsys.readouterr().err
+
+
+def test_models_stt_lists_speed_error_rate_and_languages(tmp_path, monkeypatch, capsys):
+    clean_env(monkeypatch)
+    assert main(["--home", str(tmp_path), "models", "stt"]) == 0
+    out = capsys.readouterr().out
+    assert out.splitlines()[0].startswith("auto")
+    assert "canary" in out and "slow" in out and "%" in out
+    assert "parakeet" in out and "fast" in out
+    assert main(["--home", str(tmp_path), "--stt", "canary", "config"]) == 0
+    assert '"stt": "canary"' in capsys.readouterr().out
