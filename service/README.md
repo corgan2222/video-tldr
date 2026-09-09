@@ -9,7 +9,14 @@ cd service
 uv sync
 uv run corganshelper probe
 uv run corganshelper fetch https://www.youtube.com/watch?v=BT4ywlPr6Pk
+uv run corganshelper transcribe https://www.youtube.com/watch?v=BT4ywlPr6Pk
 ```
+
+`transcribe` reads YouTube's own caption track when `fetch` found one and
+falls back to faster-whisper otherwise; `--engine whisper` forces it. Whisper
+on the GPU needs the CUDA runtime wheels: `uv sync --extra gpu` (about 2 GB).
+`CORGANSHELPER_WHISPER` picks the device, `cuda:0` by default, `cuda:1` for
+the second card, `cpu` for none.
 
 Data lives under `CORGANSHELPER_HOME` (default `D:/corganshelper`): `work/<id>/`
 holds the per-video results, `out/` the rendered documents. Set
