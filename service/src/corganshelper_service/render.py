@@ -94,7 +94,7 @@ def render_markdown(
 
 
 def render(
-    url: str, settings: Settings, force: bool = False, language: str = "de"
+    url: str, settings: Settings, force: bool = False, language: str | None = None
 ) -> Path:
     fetched = fetch(url, settings)
     folder = work_folder(settings, fetched["id"])

@@ -8,9 +8,16 @@ import shutil
 import sys
 from pathlib import Path
 
-from . import __version__
+from . import __version__, llm
 from .analyze import analyze
-from .config import Settings
+from .config import (
+    LLM_BACKENDS,
+    STT_ENGINES,
+    ConfigError,
+    Settings,
+    parse_assignments,
+    store,
+)
 from .fetch import FetchError, fetch
 from .llm import LlmError
 from .render import render
@@ -35,10 +42,13 @@ def probe(settings: Settings) -> list[str]:
         marker.unlink()
     except OSError as error:
         problems.append(f"{settings.work_dir} is not writable: {error}")
+    trouble = llm.check(settings)
+    if trouble:
+        problems.append(f"llm {llm.backend(settings)}: {trouble}")
     return problems
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=PROG)
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {__version__}"
@@ -48,10 +58,28 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="data directory; default CORGANSHELPER_HOME or D:/corganshelper",
     )
+    parser.add_argument(
+        "--llm", choices=LLM_BACKENDS, help="language model backend for this run"
+    )
+    parser.add_argument("--model", help="model name at that backend")
+    parser.add_argument(
+        "--stt", choices=STT_ENGINES, help="speech-to-text engine for this run"
+    )
     commands = parser.add_subparsers(dest="command")
     commands.add_parser(
-        "probe", help="check the tools and the data directory, change nothing"
+        "probe", help="check the tools, the data directory and the backend"
     )
+    config_cmd = commands.add_parser(
+        "config", help="show the settings, or change them with --set"
+    )
+    config_cmd.add_argument(
+        "--set",
+        metavar="KEY=VALUE",
+        action="append",
+        default=[],
+        help="write a setting to config.json; repeatable",
+    )
+    commands.add_parser("models", help="list the models the llm backend offers")
     fetch_cmd = commands.add_parser(
         "fetch", help="store metadata, thumbnail and subtitles of a video"
     )
@@ -65,9 +93,8 @@ def main(argv: list[str] | None = None) -> int:
     transcribe_cmd.add_argument("url")
     transcribe_cmd.add_argument(
         "--engine",
-        choices=["auto", "subtitles", "whisper"],
-        default="auto",
-        help="auto takes the caption track when there is one",
+        choices=STT_ENGINES,
+        help="auto takes the caption track when there is one; default from config",
     )
     transcribe_cmd.add_argument(
         "--force", action="store_true", help="transcribe again although a result exists"
@@ -78,12 +105,27 @@ def main(argv: list[str] | None = None) -> int:
     ):
         cmd = commands.add_parser(name, help=help_text)
         cmd.add_argument("url")
-        cmd.add_argument("--language", default="de", help="language of the note")
+        cmd.add_argument("--language", help="language of the note; default from config")
         cmd.add_argument(
             "--force", action="store_true", help="redo although a result exists"
         )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
-    settings = Settings.load(home=args.home)
+    try:
+        if args.command == "config" and args.set:
+            # Written first, then loaded like any other run reads it.
+            store(args.home, parse_assignments(args.set))
+        settings = Settings.load(
+            home=args.home,
+            overrides={"llm": args.llm, "model": args.model, "stt": args.stt},
+        )
+    except ConfigError as error:
+        print(f"config error: {error}", file=sys.stderr)
+        return 1
 
     if args.command == "probe":
         problems = probe(settings)
@@ -91,6 +133,19 @@ def main(argv: list[str] | None = None) -> int:
             print(problem, file=sys.stderr)
         print("probe failed" if problems else f"probe ok, home {settings.home}")
         return 1 if problems else 0
+
+    if args.command == "config":
+        print(json.dumps(settings.shown(), indent=2))
+        return 0
+
+    if args.command == "models":
+        try:
+            names = llm.models(settings)
+        except LlmError as error:
+            print(f"models failed: {error}", file=sys.stderr)
+            return 1
+        print("\n".join(names))
+        return 0
 
     if args.command == "fetch":
         try:

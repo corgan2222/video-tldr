@@ -92,7 +92,7 @@ def test_one_request_when_the_transcript_is_short(tmp_path, monkeypatch):
     settings, folder = prepare(tmp_path)
     calls = []
 
-    def fake(instruction, data, schema, images=None, max_turns=1):
+    def fake(instruction, data, schema, settings, images=None, max_turns=1):
         calls.append((instruction, data, schema))
         return dict(FAKE_ANALYSIS)
 
@@ -113,7 +113,7 @@ def test_a_long_transcript_is_split_at_chapters_and_stitched(tmp_path, monkeypat
     settings, _ = prepare(tmp_path, text_size=PART_LIMIT // 20)
     schemas = []
 
-    def fake(instruction, data, schema, images=None, max_turns=1):
+    def fake(instruction, data, schema, settings, images=None, max_turns=1):
         schemas.append(schema)
         if schema is analyze_module.PART_SCHEMA:
             return {

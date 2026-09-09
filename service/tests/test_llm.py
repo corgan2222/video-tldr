@@ -1,9 +1,18 @@
 import json
 from types import SimpleNamespace
+from typing import ClassVar
 
 import pytest
 
+from corganshelper_service import llm
+from corganshelper_service.config import Settings
 from corganshelper_service.llm import LlmError, parse_result
+
+
+def settings_for(tmp_path, **config):
+    settings = Settings(home=tmp_path)
+    settings.config.update(config)
+    return settings
 
 
 def test_the_structured_answer_is_taken_from_the_envelope():
@@ -40,9 +49,7 @@ def test_an_error_without_a_reason_still_names_the_subtype():
     assert "error_max_turns" in str(caught.value)
 
 
-def test_a_failed_request_is_tried_once_more(monkeypatch):
-    from corganshelper_service import llm
-
+def test_a_failed_request_is_tried_once_more(monkeypatch, tmp_path):
     answers = [
         SimpleNamespace(stdout="not json", stderr="boom"),
         SimpleNamespace(
@@ -58,8 +65,9 @@ def test_a_failed_request_is_tried_once_more(monkeypatch):
 
     monkeypatch.setattr(llm.subprocess, "run", fake_run)
     monkeypatch.setattr(llm, "claude_binary", lambda: "claude")
-    assert llm.complete("i", "d", {}) == {"kind": "a"}
+    assert llm.complete("i", "d", {}, settings_for(tmp_path)) == {"kind": "a"}
     assert len(calls) == 2
+    assert calls[0][calls[0].index("--model") + 1] == "sonnet"
 
 
 def test_what_a_run_cost_is_read_from_the_envelope_and_added_up():
@@ -87,3 +95,163 @@ def test_what_a_run_cost_is_read_from_the_envelope_and_added_up():
         "output": 14,
         "usd": 0.5,
     }
+
+
+class FakeOpenAI:
+    """Enough of the openai client for one chat request and a model list."""
+
+    made: ClassVar[list] = []
+
+    def __init__(self, api_key=None, base_url=None, timeout=None):
+        self.api_key, self.base_url = api_key, base_url
+        FakeOpenAI.made.append(self)
+        self.requests: list[dict] = []
+        self.answer = json.dumps({"kind": "news"})
+        outer = self
+
+        class Completions:
+            def create(self, **request):
+                outer.requests.append(request)
+                message = SimpleNamespace(content=outer.answer, refusal=None)
+                return SimpleNamespace(
+                    choices=[SimpleNamespace(message=message, finish_reason="stop")],
+                    usage=SimpleNamespace(prompt_tokens=11, completion_tokens=3),
+                )
+
+        self.chat = SimpleNamespace(completions=Completions())
+        self.models = SimpleNamespace(
+            list=lambda: [SimpleNamespace(id="qwen3-8b"), SimpleNamespace(id="gemma")]
+        )
+
+
+@pytest.fixture
+def fake_openai(monkeypatch):
+    import openai
+
+    FakeOpenAI.made = []
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+    return FakeOpenAI
+
+
+def test_a_local_server_gets_the_schema_as_strict_response_format(
+    tmp_path, fake_openai
+):
+    settings = settings_for(tmp_path, llm="lmstudio", model="qwen3-8b")
+    schema = {"type": "object", "properties": {"kind": {"type": "string"}}}
+
+    result = llm.complete("do it", "the data", schema, settings)
+
+    client = fake_openai.made[0]
+    assert result == {"kind": "news"}
+    assert client.base_url == "http://localhost:1234/v1"
+    request = client.requests[0]
+    assert request["model"] == "qwen3-8b"
+    assert request["messages"][0] == {"role": "system", "content": "do it"}
+    assert request["messages"][1]["content"][-1]["text"] == "the data"
+    assert request["response_format"]["json_schema"]["schema"] is schema
+    assert request["response_format"]["json_schema"]["strict"] is True
+    assert llm.last_cost == {"input": 11, "output": 3, "usd": 0.0}
+    assert llm.describe(settings) == "lmstudio:qwen3-8b"
+
+
+def test_a_code_fence_around_the_answer_is_tolerated(tmp_path, fake_openai):
+    settings = settings_for(tmp_path, llm="ollama", model="gemma")
+    llm.complete("i", "d", {}, settings)
+    fake_openai.made[0].answer = '```json\n{"kind": "review"}\n```'
+    # The client is built per request; the next one answers with the fence.
+    original = fake_openai.__init__
+
+    def fenced(self, **kwargs):
+        original(self, **kwargs)
+        self.answer = '```json\n{"kind": "review"}\n```'
+
+    fake_openai.__init__ = fenced
+    try:
+        assert llm.complete("i", "d", {}, settings) == {"kind": "review"}
+    finally:
+        fake_openai.__init__ = original
+
+
+def test_an_empty_answer_points_at_the_context_window(tmp_path, fake_openai):
+    original = fake_openai.__init__
+
+    def silent(self, **kwargs):
+        original(self, **kwargs)
+        self.answer = ""
+
+    fake_openai.__init__ = silent
+    try:
+        with pytest.raises(LlmError) as caught:
+            llm.complete(
+                "i", "d", {}, settings_for(tmp_path, llm="lmstudio", model="q")
+            )
+    finally:
+        fake_openai.__init__ = original
+    assert "empty answer" in str(caught.value)
+    assert "11 prompt tokens" in str(caught.value)
+    assert "32768" in str(caught.value)
+
+
+def test_openai_without_a_key_and_a_local_server_without_a_model_are_named(
+    tmp_path, fake_openai, monkeypatch
+):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(LlmError) as caught:
+        llm.complete("i", "d", {}, settings_for(tmp_path, llm="openai"))
+    assert "openai_api_key" in str(caught.value)
+
+    with pytest.raises(LlmError) as caught:
+        llm.complete("i", "d", {}, settings_for(tmp_path, llm="ollama"))
+    assert "corganshelper models" in str(caught.value)
+
+    assert llm.models(settings_for(tmp_path, llm="lmstudio")) == ["qwen3-8b", "gemma"]
+    assert llm.models(settings_for(tmp_path)) == ["sonnet", "opus", "haiku"]
+
+
+def test_the_anthropic_api_gets_the_schema_as_output_config(tmp_path, monkeypatch):
+    import anthropic
+
+    requests = []
+
+    class FakeAnthropic:
+        def __init__(self, api_key=None, timeout=None):
+            self.api_key = api_key
+            outer = self
+
+            class Messages:
+                def create(self, **request):
+                    requests.append((outer.api_key, request))
+                    return SimpleNamespace(
+                        content=[
+                            SimpleNamespace(type="text", text='{"kind": "explainer"}')
+                        ],
+                        usage=SimpleNamespace(
+                            input_tokens=5,
+                            output_tokens=2,
+                            cache_creation_input_tokens=1,
+                            cache_read_input_tokens=None,
+                        ),
+                    )
+
+            self.messages = Messages()
+
+    monkeypatch.setattr(anthropic, "Anthropic", FakeAnthropic)
+    settings = settings_for(tmp_path, llm="anthropic", anthropic_api_key="sk-fake")
+    schema = {"type": "object"}
+
+    assert llm.complete("do it", "data", schema, settings) == {"kind": "explainer"}
+
+    key, request = requests[0]
+    assert key == "sk-fake"
+    assert request["model"] == "claude-sonnet-5"
+    assert request["system"] == "do it"
+    assert request["output_config"]["format"] == {
+        "type": "json_schema",
+        "schema": schema,
+    }
+    assert llm.last_cost == {"input": 6, "output": 2, "usd": 0.0}
+
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    with pytest.raises(LlmError) as caught:
+        llm.complete("i", "d", {}, settings_for(tmp_path, llm="anthropic"))
+    assert "anthropic_api_key" in str(caught.value)

@@ -1,6 +1,6 @@
 {
   "name": "corganshelper",
-  "version": "0.1.12",
+  "version": "0.1.14",
   "description": "A Manifest V3 browser extension for Firefox and Chrome.",
   "type": "module",
   "license": "MIT",

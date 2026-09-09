@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -70,3 +71,55 @@ def test_asking_for_subtitles_without_a_track_is_an_error(tmp_path):
 
     with pytest.raises(FetchError):
         transcribe("https://youtu.be/BT4ywlPr6Pk", settings, engine="subtitles")
+
+
+def test_the_openai_engine_uploads_shrunk_audio_and_keeps_the_segments(
+    tmp_path, monkeypatch
+):
+    import openai
+
+    from corganshelper_service import transcribe as module
+
+    settings = Settings(home=tmp_path)
+    settings.config.update(stt="openai", openai_api_key="sk-fake")
+    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder.mkdir(parents=True)
+    (folder / "fetch.json").write_text(
+        json.dumps({"id": "BT4ywlPr6Pk", "subtitles": []}), encoding="utf-8"
+    )
+    audio = folder / "BT4ywlPr6Pk.m4a"
+    audio.write_bytes(b"m4a")
+    uploads = []
+
+    class FakeOpenAI:
+        def __init__(self, api_key=None, base_url=None, timeout=None):
+            outer = self
+
+            class Transcriptions:
+                def create(self, file, **request):
+                    uploads.append((file.name, request))
+                    return SimpleNamespace(
+                        language="english",
+                        segments=[
+                            SimpleNamespace(start=0.0, end=2.5, text=" Hello "),
+                            SimpleNamespace(start=2.5, end=4.0, text=" there."),
+                        ],
+                    )
+
+            outer.audio = SimpleNamespace(transcriptions=Transcriptions())
+
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+    monkeypatch.setattr(module, "download_audio", lambda url, folder, settings: audio)
+    monkeypatch.setattr(
+        module, "shrink_for_upload", lambda path: path.with_suffix(".upload.mp3")
+    )
+    audio.with_suffix(".upload.mp3").write_bytes(b"mp3")
+
+    result = transcribe("https://youtu.be/BT4ywlPr6Pk", settings)
+
+    assert result["source"] == "openai" and result["language"] == "english"
+    assert result["text"] == "Hello there."
+    assert result["segments"][1] == {"start": 2.5, "end": 4.0, "text": "there."}
+    assert uploads[0][0].endswith("BT4ywlPr6Pk.upload.mp3")
+    assert uploads[0][1]["response_format"] == "verbose_json"
+    assert uploads[0][1]["timestamp_granularities"] == ["segment"]
