@@ -1,0 +1,21 @@
+{
+  "name": "corganshelper",
+  "version": "0.1.1",
+  "description": "A Manifest V3 browser extension for Firefox and Chrome.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node -e \"require('fs').cpSync('src','dist',{recursive:true,filter:f=>f.endsWith('.ts')===false})\"",
+    "test": "vitest run --passWithNoTests",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.2.9",
+    "@types/node": "^22.0.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0",
+    "web-ext": "^10.6.0"
+  }
+}

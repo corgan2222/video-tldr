@@ -1,0 +1,11 @@
+# Blank issues stay enabled on purpose: a feature request or a question does
+# not fit a fixed set of fields, and forcing one on it only produces empty
+# fields.
+blank_issues_enabled: true
+
+contact_links:
+  - name: Security vulnerability
+    url: 'https://github.com/corgan2222/corganshelper/security/policy'
+    about: >-
+      Please report vulnerabilities privately, through GitHub's security
+      advisories -- not in a public issue.

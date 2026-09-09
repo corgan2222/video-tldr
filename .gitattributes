@@ -1,0 +1,4 @@
+# Prettier expects LF. Without this line a clone made with core.autocrlf=true
+# checks out CRLF and fails the format check before anything was edited.
+* text=auto eol=lf
+*.png binary

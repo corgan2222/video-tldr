@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>corganshelper</title>
+    <style>
+      body {
+        font: 13px sans-serif;
+        margin: 0;
+        padding: 8px;
+        min-width: 200px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">Loading...</div>
+    <!-- type="module": tsc emits ES modules (package.json "type": "module"),
+         and a classic script tag chokes on the "export {}" they carry. -->
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

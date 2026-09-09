@@ -1,0 +1,13 @@
+# Language-specific entries -- build artefacts, caches, the compiled binary --
+# are appended by the project setup; nothing is guessed here in advance.
+# Whatever CI builds from the tag is attached to the release there and never
+# travels through a commit.
+
+# TypeScript
+/node_modules
+/dist
+npm-debug.log*
+website/node_modules
+website/.next
+website/out
+website/.source

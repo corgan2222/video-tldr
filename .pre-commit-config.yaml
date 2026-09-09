@@ -1,0 +1,124 @@
+# Hooks so that what leaves this machine has already been checked.
+#
+# Two stages, split by what they cost:
+#
+#   commit  the cheap and the dangerous -- secrets, binaries, broken YAML,
+#           formatting. Seconds.
+#   push    the slow gate -- the linter and the test suite. Not something to
+#           run on every save.
+#
+# Install both, once per clone:
+#
+#   pre-commit install --install-hooks
+#   pre-commit install --hook-type pre-push
+#
+# These hooks run on the developer's machine and can be skipped with
+# `--no-verify`. That is why ci.yml runs the same checks again on every pull
+# request: the hook is the fast feedback, CI is the one that decides.
+
+minimum_pre_commit_version: '3.2.0'
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  # ---------------------------------------------------------------- secrets
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        name: no credentials in the staged change
+        stages: [pre-commit]
+
+  # ------------------------------------------------------ the usual suspects
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: detect-private-key
+        stages: [pre-commit]
+      - id: check-added-large-files
+        # Raise this deliberately when the repository legitimately needs a
+        # bigger file, not because a build artefact slipped in.
+        args: ['--maxkb=1024']
+        stages: [pre-commit]
+      - id: check-merge-conflict
+        stages: [pre-commit]
+      - id: check-yaml
+        # The workflows and the drafter config: a typo here is invisible until
+        # a release does not happen.
+        stages: [pre-commit]
+      - id: check-toml
+        stages: [pre-commit]
+      - id: end-of-file-fixer
+        # Add an exclude: pattern here for recorded test fixtures that must
+        # stay byte for byte as they were captured.
+        exclude: '(?i)\.(png|ico|jpg|gif)$'
+        stages: [pre-commit]
+      - id: trailing-whitespace
+        # Two trailing spaces are a line break in Markdown; keep them.
+        args: ['--markdown-linebreak-ext=md']
+        exclude: '(?i)\.(png|ico|jpg|gif)$'
+        stages: [pre-commit]
+
+  - repo: local
+    hooks:
+      # ---------------------------------------------- version tracks the commit
+      # pre-commit decides "files were modified" by diffing the unstaged tree
+      # before and after a hook runs. This hook writes the bump and stages it
+      # itself (scripts/bump_version.py --stage), so that diff stays empty and
+      # the commit goes through instead of failing on its own change.
+      - id: bump-version
+        name: bump the patch version until the first release tag
+        language: system
+        entry: python scripts/bump_version.py
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]
+
+      # ------------------------------------------------- main is read-only
+      # If main is protected on the server as well, this hook adds nothing to
+      # that -- it only fails a second earlier and says what to do instead,
+      # rather than letting the push travel to GitHub to be rejected there.
+      - id: no-push-to-main
+        name: main only ever moves through a pull request
+        language: system
+        entry: >-
+          bash -c 'test "$PRE_COMMIT_REMOTE_BRANCH" != "refs/heads/main" ||
+          { echo "main takes merges, not pushes. Branch it:";
+          echo "    git switch -c feature/<name>   (or fix/, docs/, test/, chore/)";
+          echo "    git push -u origin HEAD && gh pr create";
+          exit 1; }'
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]
+
+  - repo: local
+    hooks:
+      # ------------------------------------------------------- TypeScript
+      # Only the staged files, not the tree: that keeps the hook to a second,
+      # and the whole tree is what ci.yml checks anyway.
+      - id: prettier
+        name: prettier --check
+        language: system
+        entry: npx prettier --check
+        types_or: [ts, tsx, json, yaml, markdown, css, html]
+        stages: [pre-commit]
+
+      # `files` rather than a type filter: a dependency bump touches
+      # package.json and no source file at all, and that is exactly the change
+      # worth checking before it leaves. A push that touches none of these
+      # skips both hooks, which is the point -- editing the README should not
+      # cost a minute.
+      - id: typecheck
+        name: tsc --noEmit
+        language: system
+        entry: npm run typecheck
+        files: '(\.tsx?$|(^|/)package(-lock)?\.json$|^tsconfig\.json$)'
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: vitest
+        name: vitest run
+        language: system
+        entry: npm test
+        files: '(\.tsx?$|(^|/)package(-lock)?\.json$|^tsconfig\.json$)'
+        pass_filenames: false
+        stages: [pre-push]

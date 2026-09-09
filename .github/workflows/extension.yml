@@ -1,0 +1,47 @@
+name: Extension
+
+# Builds the packed extension and runs the same linter a Firefox add-on
+# reviewer runs before publishing an update.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The compiler (or, for the plain-JS variant, the copy step alone)
+      # writes the runnable scripts into dist/. manifest.json and popup.html
+      # are not compiled, so they are copied in beside them.
+      - name: Build
+        run: |
+          npm run build
+          cp src/manifest.json src/popup.html dist/
+
+      # web-ext is Mozilla's own linter. It checks the manifest against the
+      # WebExtensions schema both browsers share, so a Chrome-only mistake
+      # (a key Firefox does not know, for example) surfaces here too.
+      - name: Lint the packed extension
+        run: npx web-ext lint --source-dir dist
+
+      - name: Zip the extension
+        run: cd dist && zip -r ../corganshelper.zip .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corganshelper
+          path: corganshelper.zip

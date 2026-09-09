@@ -1,0 +1,69 @@
+# Dependabot keeps the dependency graph moving without anybody remembering to
+# look. Two ecosystems are in play, and the second one is the one that
+# actually rots: a pinned action tag goes stale in silence -- no build error,
+# no failing test, nothing to announce it -- which makes it the likelier
+# supply-chain problem of the two.
+#
+# Nothing here can land unchecked. Every pull request runs the `check` job in
+# .github/workflows/ci.yml, and the ruleset on main (.github/ruleset-main.json)
+# requires that job green before a merge, so a bump reaches main only after
+# the same gate a human change passes.
+#
+# There is deliberately no `labels:` key below. Dependabot's default
+# "dependencies" label is what .github/release-drafter.yml collects into its
+# own changelog category; overriding the label would drop these pull requests
+# out of the release notes.
+
+version: 2
+
+updates:
+  # --------------------------------------------------------- npm
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      # Weekly, not daily. One person reviews these. A daily bot fills the
+      # list faster than one person can empty it, and a pull request nobody
+      # has time to read is noise -- noise trains you to skip the bot's next
+      # one, including the one that mattered. Weekly leaves a backlog of at
+      # most one.
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'Europe/Berlin'
+    groups:
+      minor-and-patch:
+        patterns: ['*']
+        # Majors are held out of the group on purpose. A major bump can
+        # change behaviour or break a build, so it needs its own review, and
+        # it must stay rejectable without also holding back the patches it
+        # would otherwise travel with. Excluded here, it arrives alone.
+        update-types: ['minor', 'patch']
+    commit-message:
+      # Produces: chore(deps): bump the minor-and-patch group with 3 updates
+      prefix: 'chore'
+      include: 'scope'
+    # main enforces status checks up to date, so an open pull request goes
+    # stale the moment something else merges. "auto" lets Dependabot rebase
+    # its own branches instead of leaving them stuck un-mergeable.
+    rebase-strategy: 'auto'
+
+  # ----------------------------------------------------------- GitHub Actions
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'Europe/Berlin'
+    groups:
+      github-actions:
+        patterns: ['*']
+        # No update-types filter here, unlike the block above. Every action a
+        # workflow pins is pinned to a floating major tag (actions/checkout@v4
+        # and the rest), so minor and patch fixes already arrive by
+        # themselves and the only bump Dependabot can see at all is a major
+        # one. Excluding majors would leave this group matching nothing.
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    rebase-strategy: 'auto'

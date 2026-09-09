@@ -1,0 +1,53 @@
+name: Bug report
+description: Something behaves wrongly, shows the wrong thing, or crashes.
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. Search the existing issues for the same
+        problem first. Before pasting a log or a config snippet, check it for
+        API keys, tokens, and internal hostnames.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: >-
+        The released version, or a build identifier if you built it
+        yourself -- a `--version` flag or an About screen usually has it.
+      placeholder: '1.2.3'
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+      placeholder: 'Windows 11 24H2, build 26100'
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Steps to get there, what you expected, what you saw instead.
+      placeholder: |
+        1. ...
+        2. ...
+        Expected: ...
+        Instead: ...
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log excerpt
+      description: >-
+        The relevant lines, not the whole file. Check them for secrets first
+        -- a token, a password, an internal address -- and black those out
+        before pasting.
+      render: text
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Screenshots, related issues, whatever else helps.
