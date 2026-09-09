@@ -104,10 +104,20 @@ def prepare(tmp_path):
     (folder / "analysis.json").write_text(json.dumps(ANALYSIS), encoding="utf-8")
     kept = {"file": "Zvc5QkrWgAU-1.png", "time": 130, "caption": "Bild", "chosen": True}
     gone = {"file": "Zvc5QkrWgAU-2.png", "time": 140, "caption": "weg", "chosen": False}
+    diagram = {
+        "file": "Zvc5QkrWgAU-diagram.png",
+        "mermaid": 'flowchart LR\n  A["a"] --> B["b"]',
+        "caption": "Gezeichnet",
+    }
     (folder / "frames.json").write_text(
-        json.dumps({"frames": [kept, gone]}), encoding="utf-8"
+        json.dumps({"frames": [kept, gone], "diagram": diagram}), encoding="utf-8"
     )
-    for name in ("Zvc5QkrWgAU-1.png", "Zvc5QkrWgAU-2.png", "Zvc5QkrWgAU.jpg"):
+    for name in (
+        "Zvc5QkrWgAU-1.png",
+        "Zvc5QkrWgAU-2.png",
+        "Zvc5QkrWgAU-diagram.png",
+        "Zvc5QkrWgAU.jpg",
+    ):
         (folder / name).write_bytes(b"picture")
     repo = {
         "repo": "a/b",
@@ -132,6 +142,18 @@ def test_render_places_what_frames_and_enrich_wrote(tmp_path, monkeypatch):
     assert written["summary"] == folder / "summary.md"
     assert "![Bild](Zvc5QkrWgAU-1.png)" in note and "weg" not in note
     assert "### [a/b](https://github.com/a/b)" in note and "1. `x`" in note
+    # The drawn diagram follows the summary, its source below it.
+    summary_at = note.index("## Kurzfassung")
+    diagram_at = note.index("![Gezeichnet](Zvc5QkrWgAU-diagram.png)\n\n*Gezeichnet*")
+    assert summary_at < diagram_at < note.index("## Abschnitte")
+    assert '```mermaid\nflowchart LR\n  A["a"] --> B["b"]\n```' in note
+
+    # A diagram Mermaid could not draw stays out of the note.
+    stored = json.loads((folder / "frames.json").read_text(encoding="utf-8"))
+    stored["diagram"]["file"] = None
+    (folder / "frames.json").write_text(json.dumps(stored), encoding="utf-8")
+    written = render("https://youtu.be/Zvc5QkrWgAU", settings, formats=[])
+    assert "Gezeichnet" not in written["summary"].read_text(encoding="utf-8")
 
 
 def test_a_channel_with_quotes_or_backslashes_stays_valid_yaml():
@@ -162,7 +184,10 @@ def test_the_copy_under_out_and_the_obsidian_note_carry_their_own_pictures(
 
     copy = written["md"]
     assert copy == settings.out_dir / "2026_09_10_Docker vs Podman.md"
-    assert "![Bild](2026_09_10_Zvc5QkrWgAU-1.png)" in copy.read_text(encoding="utf-8")
+    text = copy.read_text(encoding="utf-8")
+    assert "![Bild](2026_09_10_Zvc5QkrWgAU-1.png)" in text
+    assert "![Gezeichnet](2026_09_10_Zvc5QkrWgAU-diagram.png)" in text
+    assert (settings.out_dir / "2026_09_10_Zvc5QkrWgAU-diagram.png").exists()
     assert (
         settings.out_dir / "2026_09_10_Zvc5QkrWgAU-1.png"
     ).read_bytes() == b"picture"
@@ -217,14 +242,17 @@ def test_the_word_file_gets_a_thumbnail_python_docx_accepts(tmp_path, monkeypatc
     (folder / "Zvc5QkrWgAU.jpg").write_bytes(bytes.fromhex("ffd8fffe0010") + b"Lavc")
     calls = []
     monkeypatch.setattr(
-        render_module, "write_docx", lambda *args: calls.append(args) or args[-1]
+        render_module, "write_docx", lambda *args: calls.append(args) or args[6]
     )
 
     written = render("https://youtu.be/Zvc5QkrWgAU", settings, formats=["docx"])
 
     assert written["docx"] == settings.out_dir / f"{written['docx'].name}"
     assert (folder / "Zvc5QkrWgAU.jpg").read_bytes()[6:10] == b"JFIF"
-    _fetched, _analysis, placed, repositories, labels, source, target = calls[0]
+    _fetched, _analysis, placed, repositories, labels, source, target, diagram = calls[
+        0
+    ]
     assert source == folder and target.suffix == ".docx"
     assert [i["file"] for i in placed[1]] == ["Zvc5QkrWgAU-1.png"]
     assert repositories[0]["repo"] == "a/b" and labels["summary"] == "Kurzfassung"
+    assert diagram["file"] == "Zvc5QkrWgAU-diagram.png"

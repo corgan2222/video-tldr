@@ -21,7 +21,9 @@ uv run corganshelper render --format obsidian --format pdf https://youtu.be/BT4y
 description links to and stores their installation steps. `frames` fetches
 a short clip around every moment `analyze` marked, keeps the sharpest
 second of each, has the model label the pictures and keeps at most eight,
-none of them a speaker. `render` places both into `work/<id>/summary.md`
+none of them a speaker. When none of them is a diagram, the model may
+draw one as Mermaid, and Chrome renders it to PNG with the Mermaid script
+that ships in the package. `render` places all of it into `work/<id>/summary.md`
 when they exist; it does not run them. `--format`, or `formats` in the
 settings, adds outputs named `YYYY_MM_DD_<title>` after the day of
 processing: `md` copies the note and its pictures to `out/`, `obsidian`

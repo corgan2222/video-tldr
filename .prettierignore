@@ -2,3 +2,5 @@
 website/
 # A standard text, kept as published.
 CODE_OF_CONDUCT.md
+# A minified library shipped as published, see its LICENSE next to it.
+service/src/corganshelper_service/assets/

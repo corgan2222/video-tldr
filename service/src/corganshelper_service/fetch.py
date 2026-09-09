@@ -111,6 +111,21 @@ class _Log:
         self.errors.append(message)
 
 
+def ffmpeg(*args: str) -> bytes:
+    """Run ffmpeg quietly; what it wrote to stdout, or a FetchError with
+    its complaint. Shared by every step that cuts, converts or measures."""
+    try:
+        run = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error", *args],
+            capture_output=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as error:
+        complaint = error.stderr.decode("utf-8", "replace").strip()[:300]
+        raise FetchError(f"ffmpeg failed: {complaint}") from error
+    return run.stdout
+
+
 # The APP0 segment of a JFIF file: version 1.1, no density, no thumbnail.
 JFIF = bytes.fromhex("ffe00010") + b"JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
 

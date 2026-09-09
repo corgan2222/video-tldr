@@ -24,7 +24,7 @@ from .documents import html as to_html
 from .documents import pdf as write_pdf
 from .enrich import installations
 from .fetch import FetchError, convert_thumbnail, fetch, work_folder
-from .frames import chosen_images
+from .frames import chosen_images, diagram_of
 
 RESULT_NAME = "summary.md"
 PICTURES_FOLDER = "_bilder"
@@ -116,10 +116,14 @@ def render_markdown(
     images: list[dict] | None = None,
     repositories: list[dict] | None = None,
     embed: Embed = plain,
+    diagram: dict | None = None,
+    with_source: bool = True,
 ) -> str:
     """The note. `images` are the chosen frames (file, time, caption),
     `repositories` what enrich read out of the READMEs, `embed` writes a
-    picture file into the text."""
+    picture file into the text, `diagram` the drawn one after the summary,
+    its Mermaid source below it when `with_source` (the printed formats
+    show the picture only)."""
     vid = fetched["id"]
     labels = LABELS.get(analysis.get("language", "de"), LABELS["en"])
     date = fetched.get("upload_date") or ""
@@ -136,6 +140,11 @@ def render_markdown(
         f"{labels['kind']}: {labels['kinds'].get(analysis.get('kind'), analysis.get('kind'))}"
     )
     lines += ["", f"## {labels['summary']}", "", analysis.get("summary", "").strip()]
+    if diagram:
+        caption = diagram.get("caption", "")
+        lines += ["", embed(diagram["file"], caption), "", f"*{caption}*"]
+        if with_source:
+            lines += ["", "```mermaid", diagram["mermaid"].strip(), "```"]
     lines += ["", f"## {labels['sections']}"]
     sections = analysis.get("sections", [])
     placed = by_section(sections, images or [])
@@ -218,15 +227,21 @@ def render(
     analysis = analyze(url, settings, language=language)
     images = chosen_images(settings, vid)
     repositories = installations(settings, vid)
+    diagram = diagram_of(settings, vid)
+    if diagram and not (folder / diagram["file"]).exists():
+        diagram = None
     # The day on this machine's clock: the file name is for its owner.
     today = today or datetime.now(UTC).astimezone().date()
     name = note_name(fetched, today)
     prefix = f"{today:%Y_%m_%d}_"
     pictures = [fetched["thumbnail"]] if fetched.get("thumbnail") else []
     pictures += [image["file"] for image in images]
+    pictures += [diagram["file"]] if diagram else []
 
-    def note(embed: Embed = plain) -> str:
-        return render_markdown(fetched, analysis, images, repositories, embed)
+    def note(embed: Embed = plain, with_source: bool = True) -> str:
+        return render_markdown(
+            fetched, analysis, images, repositories, embed, diagram, with_source
+        )
 
     written = {"summary": folder / RESULT_NAME}
     written["summary"].write_text(note(), encoding="utf-8")
@@ -266,7 +281,7 @@ def render(
         out.mkdir(parents=True, exist_ok=True)
         page = to_html(
             fetched.get("title") or vid,
-            note(lambda file, alt: plain((folder / file).as_uri(), alt)),
+            note(lambda file, alt: plain((folder / file).as_uri(), alt), False),
         )
         written["pdf"] = write_pdf(
             page, out / f"{name}.pdf", settings.config["browser"]
@@ -285,5 +300,6 @@ def render(
             labels,
             folder,
             out / f"{name}.docx",
+            diagram,
         )
     return written
