@@ -6,7 +6,15 @@ from types import SimpleNamespace
 import pytest
 
 from corganshelper_service import documents
-from corganshelper_service.documents import browser, docx, html, pdf
+from corganshelper_service.documents import (
+    browser,
+    content_box,
+    docx,
+    html,
+    mermaid_page,
+    mermaid_png,
+    pdf,
+)
 from corganshelper_service.fetch import FetchError
 from corganshelper_service.render import LABELS, by_section
 
@@ -61,7 +69,7 @@ def test_printing_writes_the_html_and_calls_the_browser_with_the_flags(
     def fake_run(command, **kwargs):
         commands.append(command)
         tmp_path.joinpath("note.pdf").write_bytes(b"%PDF-1.7")
-        return SimpleNamespace(returncode=0, stderr="")
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
 
     monkeypatch.setattr(documents.subprocess, "run", fake_run)
     chrome = tmp_path / "chrome.exe"
@@ -77,7 +85,7 @@ def test_printing_writes_the_html_and_calls_the_browser_with_the_flags(
     assert command[-1] == (tmp_path / "note.html").as_uri()
 
     def failing_run(command, **kwargs):
-        return SimpleNamespace(returncode=1, stderr="boom")
+        return SimpleNamespace(returncode=1, stderr="boom", stdout="")
 
     monkeypatch.setattr(documents.subprocess, "run", failing_run)
     with pytest.raises(FetchError) as caught:
@@ -86,7 +94,7 @@ def test_printing_writes_the_html_and_calls_the_browser_with_the_flags(
 
     # Exit 0 without a file is a failure too, and so is running out of time.
     def silent_run(command, **kwargs):
-        return SimpleNamespace(returncode=0, stderr="")
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
 
     monkeypatch.setattr(documents.subprocess, "run", silent_run)
     with pytest.raises(FetchError):
@@ -99,6 +107,66 @@ def test_printing_writes_the_html_and_calls_the_browser_with_the_flags(
     with pytest.raises(FetchError) as caught:
         pdf("<html>x</html>", tmp_path / "other.pdf", str(chrome))
     assert "within" in str(caught.value)
+
+
+def test_the_diagram_page_ships_its_own_script_and_escapes_the_source():
+    page = mermaid_page('flowchart LR\n  A["a"] --> B["<b>"]')
+    assert documents.MERMAID_JS.exists() and documents.MERMAID_JS.as_uri() in page
+    assert "A[&quot;a&quot;] --&gt; B[&quot;&lt;b&gt;&quot;]" in page
+    assert "startOnLoad: true" in page
+
+
+def test_the_content_box_hugs_the_drawing():
+    width, height = 100, 50
+    frame = bytearray(b"\xff" * width * height)
+    for y in range(10, 20):
+        for x in range(30, 40):
+            frame[y * width + x] = 0
+    assert content_box(bytes(frame), width, height, margin=4) == (26, 6, 18, 18)
+    assert content_box(b"\xff" * width * height, width, height) == (0, 0, 100, 50)
+
+
+def test_the_diagram_is_checked_in_the_dom_and_cut_from_a_screenshot(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(documents, "DIAGRAM_WINDOW", (50, 25))
+    calls = []
+
+    def fake_chromium(arguments, page, configured_browser="", task=""):
+        calls.append(arguments)
+        assert page.exists() and page.suffix == ".html"
+        if "--dump-dom" in arguments:
+            return '<html><svg viewBox="0 0 10 10"></svg></html>'
+        shot = next(a for a in arguments if a.startswith("--screenshot=")).split("=")[1]
+        tmp_path.joinpath(shot).write_bytes(b"shot")
+        return ""
+
+    def fake_ffmpeg(*args):
+        if "rawvideo" in args:
+            frame = bytearray(b"\xff" * 100 * 50)
+            frame[20 * 100 + 40] = 0
+            return bytes(frame)
+        tmp_path.joinpath(args[-1]).write_bytes(b"png")
+        return b""
+
+    monkeypatch.setattr(documents, "chromium", fake_chromium)
+    monkeypatch.setattr(documents, "ffmpeg", fake_ffmpeg)
+    target = mermaid_png("flowchart LR", tmp_path / "v-diagram.png", "C:/c.exe")
+
+    assert target.read_bytes() == b"png"
+    assert calls[0] == ["--dump-dom"]
+    assert "--force-device-scale-factor=2" in calls[1]
+    assert "--window-size=50,25" in calls[1]
+    assert not list(tmp_path.glob("*.html")) and not list(tmp_path.glob("*-shot.png"))
+
+    def error_dom(arguments, page, configured_browser="", task=""):
+        return '<svg aria-roledescription="error"></svg>'
+
+    monkeypatch.setattr(documents, "chromium", error_dom)
+    with pytest.raises(FetchError) as caught:
+        mermaid_png("flowchart LR\n  A[", tmp_path / "bad-diagram.png", "C:/c.exe")
+    assert "could not read" in str(caught.value)
+    assert not list(tmp_path.glob("bad-*"))
 
 
 def test_the_word_file_carries_every_chosen_picture_and_the_steps(tmp_path):

@@ -117,7 +117,7 @@ def test_frames_end_to_end_keeps_the_chosen_pictures_only(tmp_path, monkeypatch)
     def fake_complete(instruction, data, schema, settings, images=None, max_turns=1):
         requests.append((instruction, data, schema, images, max_turns))
         index = int(images[0].stem.rsplit("-", 1)[1])
-        label = "speaker" if index in (1, 4) else "code"
+        label = {1: "speaker", 4: "speaker", 3: "diagram"}.get(index, "code")
         llm.last_cost.update(input=100, output=10, usd=0.01)
         return {"label": label, "caption": f"c{index - 1}"}
 
@@ -146,23 +146,121 @@ def test_frames_end_to_end_keeps_the_chosen_pictures_only(tmp_path, monkeypatch)
     assert not list(folder.glob("*-clip-*"))
     assert json.loads((folder / "frames.json").read_text(encoding="utf-8")) == result
     assert frames_module.chosen_images(settings, VID) == chosen
+    # A chosen diagram picture: no drawn one, and no request for it.
+    assert result["diagram"] is None and frames_module.diagram_of(settings, VID) is None
 
 
-def test_a_clip_ffmpeg_cannot_read_is_removed_with_the_others(tmp_path, monkeypatch):
+def test_without_a_diagram_picture_the_model_may_draw_one(tmp_path, monkeypatch):
+    settings, folder = prepare(tmp_path, [{"time": 40.0, "kind": "code", "why": "w"}])
+    source = 'flowchart LR\n  A["Docker CLI"] --> B["dockerd"]'
+    drawn = []
+
+    def fake_download(url, folder, vid, times, settings):
+        clip = frames_module.clip_path(folder, vid, 32.0)
+        clip.write_bytes(b"clip")
+        return {40.0: clip}
+
+    def fake_ffmpeg(*args):
+        if args[0] == "-y":
+            tmp_path.joinpath(args[-1]).write_bytes(b"png")
+            return b""
+        return bytes(PROBE_WIDTH * PROBE_HEIGHT)
+
+    def fake_complete(instruction, data, schema, settings, images=None, max_turns=1):
+        llm.last_cost.update(input=100, output=10, usd=0.01)
+        if schema is frames_module.DIAGRAM_SCHEMA:
+            assert "Summary:" in data and images is None
+            return {"mermaid": source, "caption": "Zwei Wege"}
+        return {"label": "code", "caption": "c"}
+
+    def fake_mermaid_png(mermaid, target, configured_browser=""):
+        drawn.append((mermaid, configured_browser))
+        target.write_bytes(b"diagram")
+        return target
+
+    monkeypatch.setattr(frames_module, "download_clips", fake_download)
+    monkeypatch.setattr(frames_module, "ffmpeg", fake_ffmpeg)
+    monkeypatch.setattr(frames_module, "mermaid_png", fake_mermaid_png)
+    monkeypatch.setattr(llm, "complete", fake_complete)
+
+    result = frames(f"https://youtu.be/{VID}", settings)
+
+    assert drawn == [(source, "")]
+    assert result["diagram"] == {
+        "file": f"{VID}-diagram.png",
+        "mermaid": source,
+        "caption": "Zwei Wege",
+    }
+    assert result["cost"]["requests"] == 2
+    assert frames_module.diagram_of(settings, VID) == result["diagram"]
+    assert (folder / f"{VID}-diagram.png").exists()
+
+    # A source Mermaid cannot read is dropped now, with a warning.
+    def broken_png(mermaid, target, configured_browser=""):
+        raise frames_module.FetchError("diagram: Mermaid could not read the source")
+
+    monkeypatch.setattr(frames_module, "mermaid_png", broken_png)
+    result = frames(f"https://youtu.be/{VID}", settings, force=True)
+    # The source stays readable in the result, the note gets no picture.
+    assert result["diagram"] == {
+        "file": None,
+        "mermaid": source,
+        "caption": "Zwei Wege",
+    }
+    assert result["warnings"] == [
+        "diagram dropped: diagram: Mermaid could not read the source"
+    ]
+    assert not (folder / f"{VID}-diagram.png").exists()
+    assert frames_module.diagram_of(settings, VID) is None
+
+
+def test_clips_are_cut_from_direct_https_formats_only(tmp_path, monkeypatch):
+    import yt_dlp
+
+    seen = {}
+
+    class Recording:
+        def __init__(self, options):
+            seen.update(options)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def download(self, urls):
+            seen["urls"] = urls
+
+    monkeypatch.setattr(yt_dlp, "YoutubeDL", Recording)
+    clips = frames_module.download_clips(
+        "https://youtu.be/x", tmp_path, "x", [3.0, 40.0], Settings(home=tmp_path)
+    )
+    assert seen["urls"] == ["https://youtu.be/x"]
+    assert seen["format"].count("[protocol=https]") == 3
+    assert "%(section_start)d" in seen["outtmpl"]
+    assert [c.name for c in clips.values()] == ["x-clip-0.mp4", "x-clip-32.mp4"]
+
+
+def test_a_clip_ffmpeg_cannot_read_is_skipped_with_a_warning(tmp_path, monkeypatch):
     settings, folder = prepare(tmp_path, [{"time": 40.0, "kind": "ui", "why": "w"}])
 
     def fake_download(url, folder, vid, times, settings):
         clip = folder / f"{vid}-clip-32.webm"
-        clip.write_bytes(b"clip")
+        clip.write_bytes(b"")
         return {40.0: frames_module.clip_path(folder, vid, 32.0)}
 
     def broken_ffmpeg(*args):
-        raise frames_module.FetchError("ffmpeg failed: moov atom not found")
+        raise frames_module.FetchError("ffmpeg failed: does not contain any stream")
 
     monkeypatch.setattr(frames_module, "download_clips", fake_download)
     monkeypatch.setattr(frames_module, "ffmpeg", broken_ffmpeg)
-    with pytest.raises(frames_module.FetchError):
-        frames(f"https://youtu.be/{VID}", settings)
+    monkeypatch.setattr(llm, "complete", lambda *a, **k: pytest.fail("no request"))
+    result = frames(f"https://youtu.be/{VID}", settings)
+    assert result["frames"] == []
+    assert result["warnings"] == [
+        "no picture at 0:40, clip of 0 bytes: ffmpeg failed: does not contain any stream"
+    ]
     assert not list(folder.glob("*-clip-*"))
 
 
