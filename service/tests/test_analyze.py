@@ -139,3 +139,25 @@ def test_parts_are_cut_only_at_chapter_starts_when_there_are_chapters():
     parts = split_parts(segments, chapters)
     assert len(parts) == 2
     assert parts[1][0]["start"] == 700
+
+
+def test_stamps_from_the_model_become_seconds_inside_the_video():
+    result = analyze_module.normalize(
+        {
+            "sections": [
+                {"title": "b", "start": "2:05", "end": "[4:30]", "summary": "s"},
+                {"title": "a", "start": "0:00", "end": "2:05", "summary": "s"},
+            ],
+            "key_points": [
+                {"time": "7:10", "text": "past the end"},
+                {"time": "0:33", "text": "first"},
+            ],
+            "frame_candidates": [{"time": 45, "kind": "code", "why": "w"}],
+        },
+        300,
+    )
+    assert [s["title"] for s in result["sections"]] == ["a", "b"]
+    assert result["sections"][1]["start"] == 125 and result["sections"][1]["end"] == 270
+    assert [k["time"] for k in result["key_points"]] == [33, 300]
+    assert result["frame_candidates"][0]["time"] == 45
+    assert analyze_module.seconds("1:02:05") == 3725

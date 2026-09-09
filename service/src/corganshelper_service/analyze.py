@@ -36,18 +36,23 @@ def _obj(properties: dict, required: list[str] | None = None) -> dict:
     }
 
 
+# A moment travels as the stamp the transcript already carries. Asked for
+# seconds, the model converts, and on 2026-09-09 that put key points at 7:10
+# of a 5:00 video; `seconds()` does the arithmetic instead.
+STAMP = {"type": "string"}
+
 SECTION = _obj(
     {
         "title": {"type": "string"},
-        "start": {"type": "number"},
-        "end": {"type": "number"},
+        "start": STAMP,
+        "end": STAMP,
         "summary": {"type": "string"},
     }
 )
-KEY_POINT = _obj({"time": {"type": "number"}, "text": {"type": "string"}})
+KEY_POINT = _obj({"time": STAMP, "text": {"type": "string"}})
 FRAME = _obj(
     {
-        "time": {"type": "number"},
+        "time": STAMP,
         "kind": {"type": "string", "enum": FRAME_KINDS},
         "why": {"type": "string"},
     }
@@ -87,6 +92,38 @@ def stamp(seconds: float) -> str:
     return f"{seconds // 60}:{seconds % 60:02d}"
 
 
+def seconds(value: object) -> float:
+    """A `[m:ss]` or `[h:mm:ss]` stamp as seconds; a number stays itself."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    total = 0.0
+    try:
+        for part in str(value).strip().strip("[]").split(":"):
+            total = total * 60 + float(part)
+    except ValueError:
+        return 0.0
+    return total
+
+
+def normalize(result: dict, duration: float) -> dict:
+    """Every moment as seconds inside the video, in the order it is said."""
+    limit = float(duration) if duration else float("inf")
+
+    def at(value: object) -> float:
+        return max(0.0, min(seconds(value), limit))
+
+    sections = result.get("sections") or []
+    key_points = result.get("key_points") or []
+    for section in sections:
+        section["start"] = at(section.get("start"))
+        section["end"] = at(section.get("end"))
+    for moment in key_points + (result.get("frame_candidates") or []):
+        moment["time"] = at(moment.get("time"))
+    sections.sort(key=lambda s: s["start"])
+    key_points.sort(key=lambda k: k["time"])
+    return result
+
+
 def transcript_lines(segments: list[dict]) -> list[str]:
     return [f"[{stamp(s['start'])}] {s['text']}" for s in segments]
 
@@ -117,7 +154,9 @@ def instruction(language: str, part: bool = False) -> str:
         f"every text field in {name}; keep product names and technical terms "
         "in English and quote wording verbatim where the wording matters. "
         "Timestamps in the transcript are [m:ss] or [h:mm:ss]; every start, "
-        "end and time field is that moment in seconds. "
+        "end and time field is such a stamp, copied from the line it belongs "
+        "to. Copy the digits, never convert them and never estimate a moment "
+        "that no line carries. "
         "sections: the video's own structure, 4 to 12 entries, each with a "
         "two- to four-sentence summary. key_points: the claims, numbers and "
         "recommendations worth remembering, each at the second it is said. "
@@ -178,10 +217,13 @@ def analyze(
     head = header(fetched, info)
 
     segments = transcript["segments"]
+    duration = fetched.get("duration") or (segments[-1]["end"] if segments else 0)
     text_size = sum(len(s["text"]) for s in segments)
     if text_size <= PART_LIMIT:
         data = head + "\n\nTranscript:\n" + "\n".join(transcript_lines(segments))
-        result = llm.complete(instruction(language), data, ANALYSIS_SCHEMA)
+        result = normalize(
+            llm.complete(instruction(language), data, ANALYSIS_SCHEMA), duration
+        )
     else:
         parts = split_parts(segments, info.get("chapters") or [])
         partial = []
@@ -192,7 +234,10 @@ def analyze(
                 + "\n".join(transcript_lines(part))
             )
             partial.append(
-                llm.complete(instruction(language, part=True), data, PART_SCHEMA)
+                normalize(
+                    llm.complete(instruction(language, part=True), data, PART_SCHEMA),
+                    duration,
+                )
             )
         stitched = llm.complete(
             instruction(language),
