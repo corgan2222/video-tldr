@@ -122,3 +122,33 @@ repos:
         files: '(\.tsx?$|(^|/)package(-lock)?\.json$|^tsconfig\.json$)'
         pass_filenames: false
         stages: [pre-push]
+
+  - repo: local
+    hooks:
+      # ------------------------------------------------- Python, service/
+      # Through uv, so the hook uses the service's own ruff and pytest. The
+      # paths are explicit: a bare `.` would pull every Python file on the
+      # machine's checkout into the check, not just the project's.
+      - id: ruff-format
+        name: ruff format --check
+        language: system
+        entry: uv run --project service ruff format --check service scripts
+        types: [python]
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: ruff-check
+        name: ruff check
+        language: system
+        entry: uv run --project service ruff check service scripts
+        files: '(\.py$|^service/pyproject\.toml$|^service/uv\.lock$)'
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: pytest
+        name: pytest
+        language: system
+        entry: uv run --project service pytest service
+        files: '(\.py$|^service/pyproject\.toml$|^service/uv\.lock$)'
+        pass_filenames: false
+        stages: [pre-push]

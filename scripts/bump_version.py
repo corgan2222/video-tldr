@@ -37,9 +37,7 @@ VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 _TOML_VERSION = re.compile(r'^version\s*=\s*"(\d+\.\d+\.\d+)"', re.MULTILINE)
 _PACKAGE_JSON_VERSION = re.compile(r'"version"\s*:\s*"(\d+\.\d+\.\d+)"')
 # project() can wrap across lines, so DOTALL over the parenthesised part.
-_CMAKE_VERSION = re.compile(
-    r"project\s*\([^)]*?\bVERSION\s+(\d+\.\d+\.\d+)", re.DOTALL
-)
+_CMAKE_VERSION = re.compile(r"project\s*\([^)]*?\bVERSION\s+(\d+\.\d+\.\d+)", re.DOTALL)
 _GO_VERSION = re.compile(r'^version\s*=\s*"(\d+\.\d+\.\d+)"', re.MULTILINE)
 _VERSION_FILE = re.compile(r"^\s*(\d+\.\d+\.\d+)\s*$")
 
@@ -48,7 +46,7 @@ _VERSION_FILE = re.compile(r"^\s*(\d+\.\d+\.\d+)\s*$")
 class Manifest:
     path: Path
     text: str
-    match: "re.Match[str]"
+    match: re.Match[str]
 
     @property
     def version(self) -> str:
@@ -60,7 +58,9 @@ def repo_root() -> Path:
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
         return Path(out.stdout.strip())
     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -122,10 +122,14 @@ def stage(root: Path, path: Path) -> None:
 
 
 # Files that repeat the version and must move with it. The stores read
-# src/manifest.json, npm and the release workflow read package.json; a number
-# that moves in one place only ships a mislabelled build. tests/version.test.ts
-# fails when the two drift.
-MIRRORS = (("src/manifest.json", _PACKAGE_JSON_VERSION),)
+# src/manifest.json, npm and the release workflow read package.json, hatchling
+# reads the service's __init__.py; a number that moves in one place only ships
+# a mislabelled build. tests/version.test.ts fails when they drift.
+_DUNDER_VERSION = re.compile(r'^__version__ = "(\d+\.\d+\.\d+)"', re.MULTILINE)
+MIRRORS = (
+    ("src/manifest.json", _PACKAGE_JSON_VERSION),
+    ("service/src/corganshelper_service/__init__.py", _DUNDER_VERSION),
+)
 
 
 def write_mirrors(root: Path, new_version: str, do_stage: bool) -> None:
@@ -141,26 +145,37 @@ def write_mirrors(root: Path, new_version: str, do_stage: bool) -> None:
 
 def has_tags(root: Path) -> bool:
     out = subprocess.run(
-        ["git", "tag", "--list"], cwd=root,
-        capture_output=True, text=True, check=True,
+        ["git", "tag", "--list"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return bool(out.stdout.strip())
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--show", action="store_true",
-                         help="print the current version and exit")
-    parser.add_argument("--set", metavar="X.Y.Z",
-                         help="set the version to exactly this value")
-    parser.add_argument("--patch", action="store_true",
-                         help="bump the last version component")
-    parser.add_argument("--stage", action="store_true",
-                         help="git add the manifest after writing it")
-    parser.add_argument("--force", action="store_true",
-                         help="bump even though the repository already carries a tag")
+    parser.add_argument(
+        "--show", action="store_true", help="print the current version and exit"
+    )
+    parser.add_argument(
+        "--set", metavar="X.Y.Z", help="set the version to exactly this value"
+    )
+    parser.add_argument(
+        "--patch", action="store_true", help="bump the last version component"
+    )
+    parser.add_argument(
+        "--stage", action="store_true", help="git add the manifest after writing it"
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="bump even though the repository already carries a tag",
+    )
     args = parser.parse_args(argv)
 
     if args.set is not None and not VERSION_RE.match(args.set):
@@ -186,7 +201,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.set is not None:
         manifest = find_manifest(root)
-        path = create_version_file(root, args.set) if manifest is None else manifest.path
+        path = (
+            create_version_file(root, args.set) if manifest is None else manifest.path
+        )
         if manifest is not None:
             write_version(manifest, args.set)
         if args.stage:

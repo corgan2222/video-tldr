@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "corganshelper-service"
+# The number lives in src/corganshelper_service/__init__.py, mirrored from
+# package.json by scripts/bump_version.py. Not here: uv.lock records the
+# project's own version, and a bump in this file would date the lock.
+dynamic = ["version"]
+description = "The local service behind the corganshelper extension: fetches, transcribes and summarises YouTube videos."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Stefan Knaak", email = "stefan@knaak.org" }]
+dependencies = ["yt-dlp>=2026.8.19"]
+
+[project.scripts]
+corganshelper = "corganshelper_service.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.12"]
+
+[tool.hatch.version]
+path = "src/corganshelper_service/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/corganshelper_service"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
