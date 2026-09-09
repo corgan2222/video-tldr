@@ -55,6 +55,9 @@ jobs:
       # never quietly use a different version than the one committed.
       - run: npm ci
 
+      # biome, not prettier: the site formats itself, see website/biome.json.
+      - run: npm run lint
+
       - run: npm run build
 
       # The artefact is only worth uploading from main; on a pull request the

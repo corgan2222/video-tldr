@@ -1,20 +1,28 @@
-import type { Viewport } from 'next';
-import { Inter } from 'next/font/google';
-import { Provider } from '@/components/provider';
-import './global.css';
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
+import { Provider } from "@/components/provider";
+import { siteUrl } from "@/lib/shared";
+import "./global.css";
 
 const inter = Inter({
-  subsets: ['latin'],
+  subsets: ["latin"],
 });
+
+// Without a base, Next resolves the relative og:image paths of the docs
+// pages against localhost and bakes that into the static export. The base
+// carries the /corganshelper path, and Next joins the page paths onto it.
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+};
 
 // `colorScheme` renders as <meta name="color-scheme" content="dark">. It is
 // what tells a browser to draw form controls and scrollbars dark, and what a
 // page-darkening extension reads before deciding the page needs its help.
 export const viewport: Viewport = {
-  colorScheme: 'dark',
+  colorScheme: "dark",
 };
 
-export default function Layout({ children }: LayoutProps<'/'>) {
+export default function Layout({ children }: LayoutProps<"/">) {
   return (
     // `dark` written into the markup rather than left to the provider: the
     // site is a static export, so this file is the first frame a reader gets,
@@ -22,7 +30,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
     <html
       lang="en"
       className={`dark ${inter.className}`}
-      style={{ colorScheme: 'dark' }}
+      style={{ colorScheme: "dark" }}
       suppressHydrationWarning
     >
       <body className="flex flex-col min-h-screen">

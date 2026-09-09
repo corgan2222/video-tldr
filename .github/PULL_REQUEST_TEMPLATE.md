@@ -12,8 +12,10 @@ wrong, or what was missing?
 
 ## How it was verified
 
-- [ ] `npm test` is green
+- [ ] `npx prettier --check .` is green
 - [ ] `npm run lint` is green
+- [ ] `npm test` is green
+- [ ] `npm run build` is green
 
 ## Invariants
 

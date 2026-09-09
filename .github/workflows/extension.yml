@@ -1,13 +1,19 @@
 name: Extension
 
 # Builds the packed extension and runs the same linter a Firefox add-on
-# reviewer runs before publishing an update.
+# reviewer runs before publishing an update. Every pull request and every
+# push to main; release.yml builds the one that ships.
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
+
+concurrency:
+  group: extension-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
@@ -24,13 +30,9 @@ jobs:
 
       - run: npm ci
 
-      # The compiler (or, for the plain-JS variant, the copy step alone)
-      # writes the runnable scripts into dist/. manifest.json and popup.html
-      # are not compiled, so they are copied in beside them.
-      - name: Build
-        run: |
-          npm run build
-          cp src/manifest.json src/popup.html dist/
+      # Compiles src/*.ts and copies manifest, popup and icons beside the
+      # output, so dist/ is the directory a browser loads.
+      - run: npm run build
 
       # web-ext is Mozilla's own linter. It checks the manifest against the
       # WebExtensions schema both browsers share, so a Chrome-only mistake
