@@ -85,6 +85,7 @@ KEYS = {
     "obsidian_vault": "CORGANSHELPER_OBSIDIAN_VAULT",
     "obsidian_folder": "CORGANSHELPER_OBSIDIAN_FOLDER",
     "browser": "CORGANSHELPER_BROWSER",
+    "token": "CORGANSHELPER_TOKEN",
 }
 DEFAULTS = {
     "llm": "claude",
@@ -104,8 +105,12 @@ DEFAULTS = {
     "obsidian_folder": "Videos",
     # Chrome or Edge for the PDF; empty means the usual places are searched.
     "browser": "",
+    # What the extension sends with every request; `serve` makes one up
+    # when this is empty and prints it.
+    "token": "",
 }
-SECRETS = ("openai_api_key", "anthropic_api_key")
+SECRETS = ("openai_api_key", "anthropic_api_key", "token")
+MASK = "*" * 8
 CHOICES = {"llm": LLM_BACKENDS, "stt": STT_ENGINES}
 
 
@@ -153,9 +158,7 @@ class Settings:
 
     def shown(self) -> dict:
         """The knobs for printing: a key is masked, never printed."""
-        return {
-            k: ("*" * 8 if k in SECRETS and v else v) for k, v in self.config.items()
-        }
+        return {k: (MASK if k in SECRETS and v else v) for k, v in self.config.items()}
 
 
 def resolve_home(home: Path | None) -> Path:

@@ -10,12 +10,22 @@
         padding: 12px;
         min-width: 420px;
       }
+      h2 {
+        font-size: 14px;
+        margin: 18px 0 4px;
+        padding-bottom: 2px;
+        border-bottom: 1px solid #ccc;
+      }
       label {
         display: block;
         margin: 12px 0 4px;
         font-weight: bold;
       }
-      textarea {
+      textarea,
+      input[type='text'],
+      input[type='url'],
+      input[type='password'],
+      select {
         width: 100%;
         box-sizing: border-box;
         font: 12px monospace;
@@ -26,12 +36,47 @@
         gap: 8px;
         align-items: center;
       }
-      #status {
+      #formats label {
+        display: inline;
+        font-weight: normal;
+        margin-right: 12px;
+      }
+      .note {
         color: #555;
       }
     </style>
   </head>
   <body>
+    <h2>Video summary</h2>
+    <p class="note">
+      The toolbar icon hands the active YouTube tab to the local service,
+      <code>corganshelper serve</code>, which prints its token when it starts.
+    </p>
+    <label for="service-url">Service URL</label>
+    <input id="service-url" type="url" placeholder="http://127.0.0.1:8765" />
+    <label for="token">Token</label>
+    <input id="token" type="password" autocomplete="off" />
+    <div class="row">
+      <button id="connect">Connect</button>
+      <span id="service-status" class="note"></span>
+    </div>
+
+    <div id="service-settings" hidden>
+      <label for="language">Language of the note</label>
+      <select id="language"></select>
+      <label>Outputs besides the summary</label>
+      <div id="formats"></div>
+      <label for="obsidian-vault">Obsidian vault (path)</label>
+      <input id="obsidian-vault" type="text" />
+      <label for="llm">Language model</label>
+      <select id="llm"></select>
+      <label for="model">Model name (empty for the backend's default)</label>
+      <input id="model" type="text" />
+      <label for="stt">Speech to text</label>
+      <select id="stt"></select>
+    </div>
+
+    <h2>Open all links</h2>
     <label for="blocklist"
       >Blocked hosts, one per line (subdomains included)</label
     >
