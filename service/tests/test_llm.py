@@ -60,3 +60,30 @@ def test_a_failed_request_is_tried_once_more(monkeypatch):
     monkeypatch.setattr(llm, "claude_binary", lambda: "claude")
     assert llm.complete("i", "d", {}) == {"kind": "a"}
     assert len(calls) == 2
+
+
+def test_what_a_run_cost_is_read_from_the_envelope_and_added_up():
+    from corganshelper_service.llm import last_cost, totals
+
+    parse_result(
+        json.dumps(
+            {
+                "is_error": False,
+                "structured_output": {"kind": "a"},
+                "usage": {
+                    "input_tokens": 2,
+                    "cache_creation_input_tokens": 10,
+                    "cache_read_input_tokens": 5,
+                    "output_tokens": 7,
+                },
+                "total_cost_usd": 0.25,
+            }
+        )
+    )
+    assert last_cost == {"input": 17, "output": 7, "usd": 0.25}
+    assert totals([dict(last_cost), dict(last_cost)]) == {
+        "requests": 2,
+        "input": 34,
+        "output": 14,
+        "usd": 0.5,
+    }

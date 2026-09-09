@@ -217,6 +217,7 @@ def analyze(
     head = header(fetched, info)
 
     segments = transcript["segments"]
+    spend: list[dict] = []
     duration = fetched.get("duration") or (segments[-1]["end"] if segments else 0)
     text_size = sum(len(s["text"]) for s in segments)
     if text_size <= PART_LIMIT:
@@ -224,6 +225,7 @@ def analyze(
         result = normalize(
             llm.complete(instruction(language), data, ANALYSIS_SCHEMA), duration
         )
+        spend.append(dict(llm.last_cost))
     else:
         parts = split_parts(segments, info.get("chapters") or [])
         partial = []
@@ -239,6 +241,7 @@ def analyze(
                     duration,
                 )
             )
+            spend.append(dict(llm.last_cost))
         stitched = llm.complete(
             instruction(language),
             head
@@ -246,6 +249,7 @@ def analyze(
             + json.dumps(partial, ensure_ascii=False),
             STITCH_SCHEMA,
         )
+        spend.append(dict(llm.last_cost))
         result = {
             **stitched,
             "sections": [s for p in partial for s in p["sections"]],
@@ -257,6 +261,7 @@ def analyze(
         "language": language,
         "model": llm.model_name(),
         "parts": 1 if text_size <= PART_LIMIT else len(parts),
+        "cost": llm.totals(spend),
         **result,
     }
     if not result.get("links"):

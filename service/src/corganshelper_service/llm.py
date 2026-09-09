@@ -19,6 +19,12 @@ TIMEOUT_SECONDS = 600
 ATTEMPTS = 2
 
 
+# What the last answer cost. The CLI reports it per request and the
+# milestone asks what a video costs, so `analyze` reads it after each
+# call. ponytail: one slot, the service runs one request at a time.
+last_cost: dict = {}
+
+
 class LlmError(Exception):
     """The CLI did not return a usable answer; the message says why."""
 
@@ -104,6 +110,19 @@ def parse_result(stdout: str, stderr: str = "") -> dict:
         hint = " Run `claude login` in a terminal." if "authenticate" in text else ""
         noise = f" ({stderr.strip()})" if stderr.strip() else ""
         raise LlmError(f"claude reported an error: {text}{hint}{noise}")
+    usage = envelope.get("usage") or {}
+    last_cost.update(
+        input=sum(
+            usage.get(key, 0)
+            for key in (
+                "input_tokens",
+                "cache_creation_input_tokens",
+                "cache_read_input_tokens",
+            )
+        ),
+        output=usage.get("output_tokens", 0),
+        usd=envelope.get("total_cost_usd", 0.0),
+    )
     structured = envelope.get("structured_output")
     if isinstance(structured, dict):
         return structured
@@ -116,3 +135,13 @@ def parse_result(stdout: str, stderr: str = "") -> dict:
         except json.JSONDecodeError:
             pass
     raise LlmError("claude returned no structured output")
+
+
+def totals(entries: list[dict]) -> dict:
+    """What a video cost: the requests of one run added up."""
+    return {
+        "requests": len(entries),
+        "input": sum(e.get("input", 0) for e in entries),
+        "output": sum(e.get("output", 0) for e in entries),
+        "usd": round(sum(e.get("usd", 0.0) for e in entries), 4),
+    }
