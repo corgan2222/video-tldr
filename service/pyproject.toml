@@ -16,6 +16,7 @@ authors = [{ name = "Stefan Knaak", email = "stefan@knaak.org" }]
 dependencies = [
     "anthropic>=1.4.0",
     "faster-whisper>=1.2.1",
+    "onnx-asr[hub]>=0.12.0",
     "openai>=3.11.0",
     "yt-dlp>=2026.8.19",
 ]
@@ -23,14 +24,25 @@ dependencies = [
 [project.scripts]
 corganshelper = "corganshelper_service.__main__:main"
 
+# One of the two extras is needed to transcribe: they carry the ONNX
+# runtime for parakeet and, in gpu, the CUDA libraries whisper needs too.
 [project.optional-dependencies]
+cpu = ["onnxruntime>=1.20"]
 gpu = [
     "nvidia-cublas-cu12>=12.9.2.10",
     "nvidia-cudnn-cu12>=9",
+    "onnxruntime-gpu[cuda,cudnn]<1.27",
 ]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.12"]
+
+[tool.uv]
+# faster-whisper asks for the CPU onnxruntime for its VAD. Installed next
+# to onnxruntime-gpu the two packages overwrite each other's files, so the
+# runtime comes from the cpu or the gpu extra and from nowhere else.
+override-dependencies = ["onnxruntime ; python_version < '3'"]
+conflicts = [[{ extra = "cpu" }, { extra = "gpu" }]]
 
 [tool.hatch.version]
 path = "src/corganshelper_service/__init__.py"

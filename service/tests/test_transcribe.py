@@ -123,3 +123,56 @@ def test_the_openai_engine_uploads_shrunk_audio_and_keeps_the_segments(
     assert uploads[0][0].endswith("BT4ywlPr6Pk.upload.mp3")
     assert uploads[0][1]["response_format"] == "verbose_json"
     assert uploads[0][1]["timestamp_granularities"] == ["segment"]
+
+
+def test_the_parakeet_engine_turns_vad_segments_into_lines(tmp_path, monkeypatch):
+    import sys
+    import types
+
+    from corganshelper_service import transcribe as module
+
+    settings = Settings(home=tmp_path)
+    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder.mkdir(parents=True)
+    (folder / "fetch.json").write_text(
+        json.dumps({"id": "BT4ywlPr6Pk", "subtitles": ["BT4ywlPr6Pk.de-orig.json3"]}),
+        encoding="utf-8",
+    )
+    audio = folder / "BT4ywlPr6Pk.m4a"
+    audio.write_bytes(b"m4a")
+    loaded = {}
+
+    class Recognizer:
+        def with_vad(self, vad, **options):
+            loaded["vad"] = vad
+            return self
+
+        def recognize(self, path):
+            loaded["path"] = path
+            yield SimpleNamespace(start=0.0, end=2.5, text=" Hallo ")
+            yield SimpleNamespace(start=2.5, end=3.0, text="   ")
+            yield SimpleNamespace(start=3.0, end=4.0, text="Welt.")
+
+    fake = types.SimpleNamespace(
+        load_model=lambda name, path, providers: (
+            loaded.update(model=name, models=path, providers=providers) or Recognizer()
+        ),
+        load_vad=lambda name, providers: name,
+    )
+    monkeypatch.setitem(sys.modules, "onnx_asr", fake)
+    monkeypatch.setattr(module, "download_audio", lambda url, folder, settings: audio)
+    monkeypatch.setattr(module, "to_wav16k", lambda path: path.with_suffix(".16k.wav"))
+    monkeypatch.setenv("CORGANSHELPER_WHISPER", "cuda:1")
+
+    result = transcribe("https://youtu.be/BT4ywlPr6Pk", settings, engine="parakeet")
+
+    assert result["source"] == "parakeet" and result["language"] == "de"
+    assert result["segments"] == [
+        {"start": 0.0, "end": 2.5, "text": "Hallo"},
+        {"start": 3.0, "end": 4.0, "text": "Welt."},
+    ]
+    assert loaded["model"] == "nemo-parakeet-tdt-0.6b-v3"
+    assert loaded["models"] == tmp_path / "models" / "parakeet-v3"
+    assert loaded["providers"][0] == ("CUDAExecutionProvider", {"device_id": 1})
+    assert loaded["vad"] == "silero"
+    assert loaded["path"].endswith("BT4ywlPr6Pk.16k.wav")
