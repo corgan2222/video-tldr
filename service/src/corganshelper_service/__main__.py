@@ -12,7 +12,9 @@ from . import __version__, llm
 from .analyze import analyze
 from .config import (
     LLM_BACKENDS,
+    STT_DEFAULT,
     STT_ENGINES,
+    STT_MODELS,
     ConfigError,
     Settings,
     parse_assignments,
@@ -79,7 +81,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="write a setting to config.json; repeatable",
     )
-    commands.add_parser("models", help="list the models the llm backend offers")
+    models_cmd = commands.add_parser(
+        "models", help="list the models the llm backend offers, or the stt ones"
+    )
+    models_cmd.add_argument("kind", nargs="?", choices=["llm", "stt"], default="llm")
     fetch_cmd = commands.add_parser(
         "fetch", help="store metadata, thumbnail and subtitles of a video"
     )
@@ -136,6 +141,17 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "config":
         print(json.dumps(settings.shown(), indent=2))
+        return 0
+
+    if args.command == "models" and args.kind == "stt":
+        print(f"{'auto':14} caption track when there is one, else {STT_DEFAULT}")
+        print(f"{'subtitles':14} caption track only")
+        print(f"{'':14} {'speed':6} {'WER':7} {'languages':26} engine:model")
+        for name, spec in STT_MODELS.items():
+            print(
+                f"{name:14} {spec['speed']:6} {spec['wer'] or '-':7} "
+                f"{spec['languages']:26} {spec['engine']}:{spec['model']}"
+            )
         return 0
 
     if args.command == "models":
