@@ -4,7 +4,9 @@ import pytest
 
 from corganshelper_service.config import Settings
 from corganshelper_service.fetch import (
+    JFIF,
     FetchError,
+    ensure_jfif,
     fetch,
     subtitle_languages,
     summarise,
@@ -89,6 +91,21 @@ def test_the_summary_counts_links_chapters_and_lists_subtitle_files(tmp_path):
     assert summary["description_links"] == 2
     assert summary["subtitles"] == ["BT4ywlPr6Pk.en.json3"]
     assert summary["thumbnail"] == "BT4ywlPr6Pk.jpg"
+
+
+def test_a_jpeg_without_a_jfif_segment_gets_one_and_one_with_it_stays(tmp_path):
+    # As ffmpeg writes it: the start marker, then a quantisation table.
+    raw = tmp_path / "raw.jpg"
+    raw.write_bytes(bytes.fromhex("ffd8ffdb0043") + b"tables" + bytes.fromhex("ffd9"))
+    fixed = ensure_jfif(raw).read_bytes()
+    assert fixed[:2] == bytes.fromhex("ffd8") and fixed[2:20] == JFIF
+    assert fixed[6:10] == b"JFIF" and fixed.endswith(b"tables" + bytes.fromhex("ffd9"))
+    assert ensure_jfif(raw).read_bytes() == fixed
+    exif = tmp_path / "exif.jpg"
+    exif.write_bytes(
+        bytes.fromhex("ffd8ffe10010") + b"Exif" + bytes.fromhex("0000ffd9")
+    )
+    assert ensure_jfif(exif).read_bytes()[6:10] == b"Exif"
 
 
 def test_settings_default_to_the_data_drive(monkeypatch):

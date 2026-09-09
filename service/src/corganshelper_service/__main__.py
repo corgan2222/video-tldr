@@ -11,6 +11,7 @@ from pathlib import Path
 from . import __version__, llm
 from .analyze import analyze
 from .config import (
+    FORMATS,
     LLM_BACKENDS,
     STT_DEFAULT,
     STT_ENGINES,
@@ -118,6 +119,13 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument(
             "--force", action="store_true", help="redo although a result exists"
         )
+        if name == "render":
+            cmd.add_argument(
+                "--format",
+                action="append",
+                choices=FORMATS,
+                help="an output besides summary.md; repeatable; default from config",
+            )
     return parser
 
 
@@ -208,13 +216,18 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "render":
         try:
-            target = render(
-                args.url, settings, force=args.force, language=args.language
+            written = render(
+                args.url,
+                settings,
+                force=args.force,
+                language=args.language,
+                formats=args.format,
             )
         except (FetchError, LlmError) as error:
             print(f"render failed: {error}", file=sys.stderr)
             return 1
-        print(target)
+        for kind, path in written.items():
+            print(f"{kind:9} {path}")
         return 0
 
     parser.print_help()
