@@ -11,8 +11,17 @@ uv run corganshelper probe
 uv run corganshelper fetch https://www.youtube.com/watch?v=BT4ywlPr6Pk
 uv run corganshelper transcribe https://www.youtube.com/watch?v=BT4ywlPr6Pk
 uv run corganshelper analyze https://www.youtube.com/watch?v=BT4ywlPr6Pk
+uv run corganshelper enrich https://www.youtube.com/watch?v=BT4ywlPr6Pk
+uv run corganshelper frames https://www.youtube.com/watch?v=BT4ywlPr6Pk
 uv run corganshelper render https://www.youtube.com/watch?v=BT4ywlPr6Pk
 ```
+
+`enrich` reads the README of up to three GitHub repositories the
+description links to and stores their installation steps. `frames` fetches
+a short clip around every moment `analyze` marked, keeps the sharpest
+second of each, has the model label the pictures and keeps at most eight,
+none of them a speaker. `render` places both into the note when they
+exist; it does not run them.
 
 One of the two extras is needed to transcribe: `gpu` brings the CUDA
 libraries for faster-whisper and the ONNX runtime for Parakeet (about 2 GB

@@ -70,6 +70,33 @@ def test_a_failed_request_is_tried_once_more(monkeypatch, tmp_path):
     assert calls[0][calls[0].index("--model") + 1] == "sonnet"
 
 
+def test_the_cli_gets_no_tools_without_pictures_and_only_read_with_them(
+    monkeypatch, tmp_path
+):
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(
+            stdout=json.dumps({"structured_output": {"kind": "a"}}), stderr=""
+        )
+
+    monkeypatch.setattr(llm.subprocess, "run", fake_run)
+    monkeypatch.setattr(llm, "claude_binary", lambda: "claude")
+    picture = tmp_path / "x.png"
+    picture.write_bytes(b"png")
+
+    llm.complete("i", "d", {}, settings_for(tmp_path))
+    llm.complete("i", "d", {}, settings_for(tmp_path), images=[picture])
+
+    assert calls[0][calls[0].index("--tools") + 1] == ""
+    assert calls[0][calls[0].index("--max-turns") + 1] == "1"
+    assert calls[1][calls[1].index("--tools") + 1] == "Read"
+    assert calls[1][calls[1].index("--allowedTools") + 1] == "Read"
+    assert int(calls[1][calls[1].index("--max-turns") + 1]) >= 4
+    assert calls[1][calls[1].index("--add-dir") + 1] == str(tmp_path)
+
+
 def test_what_a_run_cost_is_read_from_the_envelope_and_added_up():
     from corganshelper_service.llm import last_cost, totals
 
