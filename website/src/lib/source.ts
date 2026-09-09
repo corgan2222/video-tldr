@@ -1,10 +1,15 @@
-import { loader } from 'fumadocs-core/source';
-import { docsContentRoute, docsImageRoute, docsRoute } from './shared';
-import { defineDocs } from 'fumadocs-mdx/macro';
-import { metaSchema, pageSchema } from 'fumadocs-core/source/schema';
+import { loader } from "fumadocs-core/source";
+import { metaSchema, pageSchema } from "fumadocs-core/source/schema";
+import { defineDocs } from "fumadocs-mdx/macro";
+import {
+  basePath,
+  docsContentRoute,
+  docsImageRoute,
+  docsRoute,
+} from "./shared";
 
 const docs = defineDocs({
-  dir: 'content/docs',
+  dir: "content/docs",
   docs: {
     schema: pageSchema,
     // Read from git, per file, at build time. The workflow has to check out
@@ -26,28 +31,38 @@ export const source = loader({
   source: docs.toFumadocsSource(),
 });
 
-export function getPageImageUrl(page: (typeof source)['$inferPage']) {
-  const segments = [...page.slugs, 'image.png'];
+export function getPageImageUrl(page: (typeof source)["$inferPage"]) {
+  const segments = [...page.slugs, "image.png"];
 
   return {
     segments,
-    url: '/' + [page.locale, ...docsImageRoute.split('/'), ...segments].filter(Boolean).join('/'),
+    url:
+      "/" +
+      [page.locale, ...docsImageRoute.split("/"), ...segments]
+        .filter(Boolean)
+        .join("/"),
   };
 }
 
-export function getPageMarkdownUrl(page: (typeof source)['$inferPage']) {
-  const segments = [...page.slugs, 'content.md'];
+export function getPageMarkdownUrl(page: (typeof source)["$inferPage"]) {
+  const segments = [...page.slugs, "content.md"];
 
   return {
     segments,
-    url: '/' + [page.locale, ...docsContentRoute.split('/'), ...segments].filter(Boolean).join('/'),
+    url:
+      "/" +
+      [page.locale, ...docsContentRoute.split("/"), ...segments]
+        .filter(Boolean)
+        .join("/"),
   };
 }
 
-export async function getLLMText(page: (typeof source)['$inferPage']) {
-  const processed = await page.data.getText('processed');
+export async function getLLMText(page: (typeof source)["$inferPage"]) {
+  const processed = await page.data.getText("processed");
 
-  return `# ${page.data.title} (${page.url})
+  // page.url knows nothing of Next's basePath; a reader of the plain-text
+  // files follows the link from outside the app, so it needs the full path.
+  return `# ${page.data.title} (${basePath}${page.url})
 
 ${processed}`;
 }

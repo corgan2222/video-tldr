@@ -1,5 +1,5 @@
-import Link from 'next/link';
-import { appName } from '@/lib/shared';
+import Link from "next/link";
+import { appName } from "@/lib/shared";
 
 export default function HomePage() {
   return (

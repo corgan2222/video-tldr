@@ -13,9 +13,19 @@ body:
     attributes:
       label: Version
       description: >-
-        The released version, or a build identifier if you built it
-        yourself -- a `--version` flag or an About screen usually has it.
+        As shown at about:addons in Firefox or chrome://extensions in
+        Chrome.
       placeholder: '1.2.3'
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      description: >-
+        Firefox and Chrome load the same package through different code, so
+        a bug often lives in one of them only.
+      placeholder: 'Firefox 155.0.1'
     validations:
       required: true
   - type: input
@@ -23,8 +33,6 @@ body:
     attributes:
       label: Operating system and version
       placeholder: 'Windows 11 24H2, build 26100'
-    validations:
-      required: true
   - type: textarea
     id: what
     attributes:

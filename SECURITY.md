@@ -1,8 +1,10 @@
 # Security Policy
 
-TODO: two or three sentences on what this program touches that makes it
-security-relevant. What it reads, what it writes, what it sends, and with
-whose privileges.
+corganshelper is a browser extension. It runs with the permissions its
+manifest declares and nothing more: what it may read on a page, what it
+stores, and where it may send anything is bounded by `src/manifest.json`,
+and that file is the authoritative list. Today it declares no permission
+and runs no content script; this document grows with the features.
 
 ## Supported versions
 
@@ -33,40 +35,51 @@ Two private channels, either is fine:
   detail is too sensitive for plain mail, send a short note asking for
   another channel.
 
-What makes a report quick to act on: the version you run, the platform, and
-the steps to trigger it.
+What makes a report quick to act on: the version you run, the browser with
+its version, and the steps to trigger it.
 
 ## What counts as a vulnerability
 
-TODO: list the promises this program makes, one sentence each. A
-vulnerability is a way to break one of them.
+Three promises, and a vulnerability is a way to break one of them:
+
+- The extension reads only what its manifest permissions allow, on the
+  pages they name.
+- Everything it runs ships inside the package. No code is fetched at
+  runtime.
+- It sends data nowhere the documentation does not name.
+
+A page the extension runs on, or another extension, that can make it break
+one of these is the report this policy is for.
 
 ## What is explicitly not a vulnerability
 
 - Reports from a vulnerability scanner **without a path showing how this
   applies here**. A dependency with a CVE in a code path this program does
   not use is not a vulnerability of this program.
-- TODO: add the trade-offs this project makes deliberately, so nobody has to
-  guess whether they are known.
+- A permission the manifest declares and the documentation explains. That
+  is a decision, not a leak. Argue against the decision in an issue.
 
 ## What's worth looking at
 
-TODO: name the parts of this program an attacker would target first, and
-what each already does about it, in the shape of the section above.
-<!-- The pattern, one part per subsection, from the project this template
-     came from: a settings interface, a listener bound to a network
-     address, stored credentials, a self-updater, an optional elevated
-     component. Say what is checked already, so a report tells you
-     something the file does not already say. -->
+- **The manifest.** Every permission and host permission is the first thing
+  a store reviewer reads and the first thing worth a second look here. A
+  change to it is reviewed as a change to what the extension may do.
+- **Message passing.** There is no message handler yet. Once popup,
+  background and content scripts talk to each other, that seam is where a
+  page could try to reach in, and a handler checks who sent a message
+  before it acts on it.
+- **Storage.** Nothing is stored yet. Settings, once there are any, belong
+  in the browser's extension storage, which the browser isolates per
+  extension and does not encrypt beyond what the profile does. No secret
+  belongs there.
 
 ## Out of scope
 
-TODO: list the things that are not a vulnerability because they are a
-documented, deliberate trade-off, so nobody has to guess whether they are
-known.
-<!-- The pattern: a setting that is off by default and named for what it
-     does, a warning a code-signing certificate would remove, a scanner
-     finding with no path that reaches this program. -->
+- The warning a browser shows for an extension installed from a file. The
+  zip attached to a GitHub release is for testing; the store listings are
+  the supported way in.
+- Anything a page can do to itself. The extension is not a sandbox for the
+  pages it runs on.
 
 ## What you can expect
 

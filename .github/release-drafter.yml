@@ -12,7 +12,7 @@
 # before this schema was settled on.
 #
 # The version below is a suggestion, not a decision. Keep the project manifest
-# (Cargo.toml, package.json, pyproject.toml, ...) as the single source of
+# (package.json, mirrored into src/manifest.json) as the single source of
 # truth, and let the release workflow refuse to build when the tag and the
 # manifest disagree. A wrong guess here then cannot ship a mislabelled
 # artifact; it fails loudly instead. Bump the manifest first, then publish the
@@ -123,22 +123,23 @@ autolabeler:
       - '.pre-commit-config.yaml'
   - label: 'dependencies'
     files:
-      # TODO: name this project's manifest and lock file. The pair below is the
-      # Rust one; package.json/package-lock.json or pyproject.toml and its lock
-      # file take its place elsewhere. An entry that names no existing file
-      # simply never matches, so a wrong guess here is harmless.
-      - 'Cargo.toml'
-      - 'Cargo.lock'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'website/package.json'
+      - 'website/package-lock.json'
   - label: 'chore'
     branch:
       - '/chore\/.+/'
 
-# TODO: between $CHANGES and the changelog link is where project-specific
-# download notes belong: what the artifact is called, what it runs on, and how
-# a download can be verified before it is run.
+# release.yml attaches the packed extension to the published release; the
+# line below tells a reader what that file is for.
 template: |
   ## Changes
 
   $CHANGES
+
+  `corganshelper-$RESOLVED_VERSION.zip` is the packed extension, for a
+  manual install or a store upload. The store listings are the supported
+  way to install it.
 
   **Full changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION

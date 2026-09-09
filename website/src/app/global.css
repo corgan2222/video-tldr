@@ -1,6 +1,6 @@
-@import 'tailwindcss';
-@import 'fumadocs-ui/css/neutral.css';
-@import 'fumadocs-ui/css/preset.css';
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
 
 /* HeroUI-flavoured palette.
  *
@@ -49,6 +49,14 @@ html > body[data-scroll-locked] {
  * colour instead. */
 .hero-wash {
   background:
-    radial-gradient(60rem 30rem at 50% -10%, color-mix(in oklab, #006fee 18%, transparent), transparent),
-    radial-gradient(40rem 20rem at 80% 0%, color-mix(in oklab, #7828c8 12%, transparent), transparent);
+    radial-gradient(
+      60rem 30rem at 50% -10%,
+      color-mix(in oklab, #006fee 18%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      40rem 20rem at 80% 0%,
+      color-mix(in oklab, #7828c8 12%, transparent),
+      transparent
+    );
 }

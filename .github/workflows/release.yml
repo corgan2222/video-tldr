@@ -1,0 +1,55 @@
+name: Release
+
+# Runs when the draft that release-drafter.yml keeps is published. It builds
+# from the commit the tag points at, not from main, refuses when the tag and
+# package.json disagree, and attaches the packed extension to the release.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      # Uploading the asset is the one write this workflow does.
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The version lives in package.json; the tag is a label for it. A tag
+      # that names another number would ship a build under the wrong name,
+      # so the run stops here instead.
+      - name: The tag must match package.json
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "v$version" ]; then
+            echo "release tag is $TAG, package.json says $version."
+            echo "Bump package.json (scripts/bump_version.py --set), merge, then publish."
+            exit 1
+          fi
+
+      - run: npm run build
+
+      - run: npx web-ext lint --source-dir dist
+
+      - name: Pack
+        run: cd dist && zip -r "../corganshelper-${GITHUB_REF_NAME#v}.zip" .
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" corganshelper-*.zip

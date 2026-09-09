@@ -17,7 +17,7 @@ Everything else follows from that.
 
 ## Setup
 
-TODO: name the toolchain and its minimum version. Then:
+Node 22 or newer with npm; CI runs on 22. Then `npm ci`, and:
 
 ```
 npx prettier --check .
@@ -40,8 +40,9 @@ pre-commit install --hook-type pre-push
 The hooks live on your machine, and `--no-verify` skips them. CI runs the
 same checks again and is the one that decides.
 
-The release build ends up at `dist/`. That binary never travels
-through a commit: the released one is built by CI from the tag.
+The release build ends up at `dist/`, and a release packs that directory
+into a zip. Neither travels through a commit: the released zip is built by
+CI from the tag.
 
 ## Branches and main
 
@@ -99,13 +100,16 @@ to date for you, but it does that with a merge commit.
 
 ## About changes to the delicate part
 
-TODO: name the part of this program where a mistake costs the user data or
-trust, and the rules that protect it.
-<!-- The pattern, one rule per line, from the project this template came from:
-- Never delete without a backup. Not a request; the type system checks it.
-- Destructive write attempts belong in a throwaway VM, not on the
-  development machine.
--->
+The delicate part is `src/manifest.json`: its `permissions` and
+`host_permissions` reach every user with the next update, and they are the
+first thing a store reviewer reads.
+
+- A permission arrives in the same pull request as the code that needs it,
+  never ahead of it, and the pull request says what the code does with it.
+- A content script touches the pages it was written for and nothing else.
+  A host permission for `<all_urls>` needs a reason in writing.
+- Nothing the extension runs is fetched at runtime. Both stores reject that,
+  and so does this project.
 
 ## What tends to get rejected
 
@@ -121,7 +125,7 @@ trust, and the rules that protect it.
 Open an issue at `https://github.com/corgan2222/corganshelper/issues`. What makes a report quick to act
 on:
 
-- The version you run and the platform it runs on.
+- The version you run, and the browser with its version.
 - The shortest path to trigger the bug.
 - What happened, and what you expected instead.
 
