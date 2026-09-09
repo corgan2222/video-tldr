@@ -65,6 +65,10 @@ STT_MODELS = {
 STT_DEFAULT = "whisper"
 STT_ENGINES = ["auto", "subtitles", *STT_MODELS]
 
+# What `render` can write besides work/<id>/summary.md. `formats` in
+# config.json is a comma list of these; the options page will edit it.
+FORMATS = ["md", "obsidian", "pdf", "docx"]
+
 # Every key config.json may carry, with the environment variable that
 # overrides it. The vendor variables are the ones their SDKs read anyway.
 KEYS = {
@@ -77,6 +81,10 @@ KEYS = {
     "anthropic_api_key": "ANTHROPIC_API_KEY",
     "lmstudio_url": "LMSTUDIO_URL",
     "ollama_url": "OLLAMA_URL",
+    "formats": "CORGANSHELPER_FORMATS",
+    "obsidian_vault": "CORGANSHELPER_OBSIDIAN_VAULT",
+    "obsidian_folder": "CORGANSHELPER_OBSIDIAN_FOLDER",
+    "browser": "CORGANSHELPER_BROWSER",
 }
 DEFAULTS = {
     "llm": "claude",
@@ -88,6 +96,14 @@ DEFAULTS = {
     "anthropic_api_key": "",
     "lmstudio_url": "http://localhost:1234/v1",
     "ollama_url": "http://localhost:11434/v1",
+    "formats": "md",
+    # The vault the Obsidian note goes to; empty means that format fails
+    # with a hint. The folder inside it holds the notes, `_bilder` below
+    # it the pictures.
+    "obsidian_vault": "",
+    "obsidian_folder": "Videos",
+    # Chrome or Edge for the PDF; empty means the usual places are searched.
+    "browser": "",
 }
 SECRETS = ("openai_api_key", "anthropic_api_key")
 CHOICES = {"llm": LLM_BACKENDS, "stt": STT_ENGINES}
@@ -143,7 +159,8 @@ class Settings:
 
 
 def resolve_home(home: Path | None) -> Path:
-    return Path(home or os.environ.get("CORGANSHELPER_HOME", DEFAULT_HOME))
+    # Absolute: the PDF step turns paths below it into file URLs.
+    return Path(home or os.environ.get("CORGANSHELPER_HOME", DEFAULT_HOME)).resolve()
 
 
 def store(home: Path | None, values: dict) -> Path:
@@ -181,7 +198,18 @@ def validate(values: dict) -> dict:
     for key, allowed in CHOICES.items():
         if key in values and values[key] not in allowed:
             raise ConfigError(f"{key} must be one of {', '.join(allowed)}")
+    if "formats" in values:
+        unknown = [f for f in split_formats(values["formats"]) if f not in FORMATS]
+        if unknown:
+            raise ConfigError(
+                f"formats must name only {', '.join(FORMATS)}, not {', '.join(unknown)}"
+            )
     return values
+
+
+def split_formats(text: str) -> list[str]:
+    """`md, pdf` as a list, empty entries dropped."""
+    return [f.strip() for f in str(text).split(",") if f.strip()]
 
 
 def parse_assignments(pairs: list[str]) -> dict:

@@ -11,6 +11,10 @@ def clean_env(monkeypatch):
         "CORGANSHELPER_LLM",
         "CORGANSHELPER_MODEL",
         "CORGANSHELPER_STT",
+        "CORGANSHELPER_FORMATS",
+        "CORGANSHELPER_OBSIDIAN_VAULT",
+        "CORGANSHELPER_OBSIDIAN_FOLDER",
+        "CORGANSHELPER_BROWSER",
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
     ):
@@ -83,6 +87,21 @@ def test_config_set_writes_the_file_and_the_key_is_never_printed(
 
     assert main(["--home", home, "config", "--set", "stt=loud"]) == 1
     assert "stt must be one of" in capsys.readouterr().err
+
+
+def test_formats_are_a_comma_list_of_known_names(tmp_path, monkeypatch, capsys):
+    from corganshelper_service.config import split_formats
+
+    clean_env(monkeypatch)
+    home = str(tmp_path)
+    assert main(["--home", home, "config", "--set", "formats=md, pdf"]) == 0
+    stored = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+    assert split_formats(stored["formats"]) == ["md", "pdf"]
+    assert stored["obsidian_folder"] == "Videos"
+
+    assert main(["--home", home, "config", "--set", "formats=md,xls"]) == 1
+    assert "formats must name only" in capsys.readouterr().err
+    assert split_formats(" md ,,pdf, ") == ["md", "pdf"]
 
 
 def test_models_stt_lists_speed_error_rate_and_languages(tmp_path, monkeypatch, capsys):

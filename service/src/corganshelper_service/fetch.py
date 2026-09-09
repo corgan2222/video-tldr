@@ -111,6 +111,20 @@ class _Log:
         self.errors.append(message)
 
 
+# The APP0 segment of a JFIF file: version 1.1, no density, no thumbnail.
+JFIF = bytes.fromhex("ffe00010") + b"JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+
+
+def ensure_jfif(path: Path) -> Path:
+    """ffmpeg's JPEG opens with a comment or a table, and python-docx
+    accepts only JFIF or Exif at byte 6 (no flag changes that, tried on
+    2026-09-10). So the segment goes in after the start marker."""
+    data = path.read_bytes()
+    if data[:2] == b"\xff\xd8" and data[6:10] not in (b"JFIF", b"Exif"):
+        path.write_bytes(data[:2] + JFIF + data[2:])
+    return path
+
+
 def convert_thumbnail(folder: Path, vid: str) -> Path | None:
     """YouTube serves webp; python-docx cannot embed that, so jpg it is.
 
@@ -119,7 +133,7 @@ def convert_thumbnail(folder: Path, vid: str) -> Path | None:
     """
     target = folder / f"{vid}.jpg"
     if target.exists():
-        return target
+        return ensure_jfif(target)
     source = next(
         (p for p in folder.glob(f"{vid}.*") if p.suffix in (".webp", ".png")), None
     )
@@ -130,7 +144,7 @@ def convert_thumbnail(folder: Path, vid: str) -> Path | None:
         check=True,
     )
     source.unlink()
-    return target
+    return ensure_jfif(target)
 
 
 def summarise(info: dict, folder: Path, vid: str, url: str) -> dict:
