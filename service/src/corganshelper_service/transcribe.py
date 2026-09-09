@@ -20,6 +20,10 @@ from .fetch import FetchError, fetch, work_folder
 
 RESULT_NAME = "transcript.json"
 WHISPER_MODEL = "large-v3-turbo"
+# NVIDIA's Parakeet TDT 0.6B v3 (25 European languages) as ONNX, through
+# onnx-asr. Hears 20 to 30 seconds at a time; the Silero VAD cuts the
+# audio into speech segments first, and those become the transcript lines.
+PARAKEET_MODEL = "nemo-parakeet-tdt-0.6b-v3"
 
 
 class Segment(dict):
@@ -83,7 +87,8 @@ def video_id_of(folder: Path) -> str:
 
 def whisper_device() -> tuple[str, int, str]:
     """(device, index, compute_type) from CORGANSHELPER_WHISPER, default the
-    first CUDA device in float16. `cpu` means int8 on the CPU."""
+    first CUDA device in float16. `cpu` means int8 on the CPU. Parakeet
+    reads the same variable, so one setting moves both local models."""
     spec = os.environ.get("CORGANSHELPER_WHISPER", "cuda:0")
     if spec == "cpu":
         return "cpu", 0, "int8"
@@ -129,12 +134,57 @@ def whisper_transcribe(audio: Path, models_dir: Path) -> tuple[str, list[dict]]:
         compute_type=compute,
         download_root=str(models_dir),
     )
-    segments, info = model.transcribe(str(audio), beam_size=5, vad_filter=True)
+    # Without the previous window as prompt the model cannot fall into a
+    # loop of its own words: on 2026-09-09 one run of the 5-minute test
+    # video carried 210 repeated six-word runs, and the run without the
+    # prompt none, in half the time.
+    segments, info = model.transcribe(
+        str(audio), beam_size=5, vad_filter=True, condition_on_previous_text=False
+    )
     result = [
         {"start": round(s.start, 2), "end": round(s.end, 2), "text": s.text.strip()}
         for s in segments
     ]
     return info.language, result
+
+
+def to_wav16k(audio: Path) -> Path:
+    """Mono 16 kHz WAV, the one format every ONNX speech model reads."""
+    target = audio.with_suffix(".16k.wav")
+    if not target.exists():
+        subprocess.run(
+            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(audio)]
+            + ["-ac", "1", "-ar", "16000", str(target)],
+            check=True,
+        )
+    return target
+
+
+def parakeet_transcribe(audio: Path, models_dir: Path) -> list[dict]:
+    add_nvidia_dll_dirs()
+    import onnx_asr
+
+    device, index, _ = whisper_device()
+    providers: list = ["CPUExecutionProvider"]
+    if device == "cuda":
+        providers.insert(0, ("CUDAExecutionProvider", {"device_id": index}))
+    # The model (about 2.5 GB as ONNX) lives next to the data, like whisper's.
+    model = onnx_asr.load_model(
+        PARAKEET_MODEL, models_dir / "parakeet-v3", providers=providers
+    )
+    vad = onnx_asr.load_vad("silero", providers=providers)
+    return [
+        {"start": round(s.start, 2), "end": round(s.end, 2), "text": s.text.strip()}
+        for s in model.with_vad(vad).recognize(str(to_wav16k(audio)))
+        if s.text.strip()
+    ]
+
+
+def track_language(tracks: list[str]) -> str:
+    """`en` from `<id>.en-orig.json3`; `und` when no track says."""
+    if not tracks:
+        return "und"
+    return Path(tracks[0]).name.split(".")[-2].removesuffix("-orig")
 
 
 def shrink_for_upload(audio: Path) -> Path:
@@ -187,8 +237,8 @@ def transcribe(
     url: str, settings: Settings, force: bool = False, engine: str | None = None
 ) -> dict:
     """Write work/<id>/transcript.json and return it. `engine` is `auto`
-    (captions when present, else local whisper), `subtitles`, `whisper`
-    or `openai`; default from the settings."""
+    (captions when present, else local whisper), `subtitles`, `whisper`,
+    `parakeet` or `openai`; default from the settings."""
     engine = engine or settings.config["stt"]
     fetched = fetch(url, settings)
     vid = fetched["id"]
@@ -213,6 +263,12 @@ def transcribe(
         audio = download_audio(url, folder, settings)
         language, segments = openai_transcribe(audio, settings)
         source = "openai"
+    elif engine == "parakeet":
+        audio = download_audio(url, folder, settings)
+        # Parakeet names no language; the caption track does, when there is one.
+        language = track_language(tracks)
+        segments = parakeet_transcribe(audio, settings.home / "models")
+        source = "parakeet"
     else:
         audio = download_audio(url, folder, settings)
         language, segments = whisper_transcribe(audio, settings.home / "models")

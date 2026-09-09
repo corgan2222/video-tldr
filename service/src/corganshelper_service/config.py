@@ -18,7 +18,7 @@ DEFAULT_HOME = "D:/corganshelper"
 CONFIG_NAME = "config.json"
 
 LLM_BACKENDS = ["claude", "anthropic", "openai", "lmstudio", "ollama"]
-STT_ENGINES = ["auto", "subtitles", "whisper", "openai"]
+STT_ENGINES = ["auto", "subtitles", "whisper", "parakeet", "openai"]
 
 # Every key config.json may carry, with the environment variable that
 # overrides it. The vendor variables are the ones their SDKs read anyway.
