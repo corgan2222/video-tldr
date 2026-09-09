@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -30,3 +31,32 @@ def test_no_json_at_all_is_an_error_with_stderr_in_it():
     with pytest.raises(LlmError) as caught:
         parse_result("", "boom")
     assert "boom" in str(caught.value)
+
+
+def test_an_error_without_a_reason_still_names_the_subtype():
+    out = json.dumps({"is_error": True, "result": "", "subtype": "error_max_turns"})
+    with pytest.raises(LlmError) as caught:
+        parse_result(out)
+    assert "error_max_turns" in str(caught.value)
+
+
+def test_a_failed_request_is_tried_once_more(monkeypatch):
+    from corganshelper_service import llm
+
+    answers = [
+        SimpleNamespace(stdout="not json", stderr="boom"),
+        SimpleNamespace(
+            stdout=json.dumps({"is_error": False, "structured_output": {"kind": "a"}}),
+            stderr="",
+        ),
+    ]
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return answers[len(calls) - 1]
+
+    monkeypatch.setattr(llm.subprocess, "run", fake_run)
+    monkeypatch.setattr(llm, "claude_binary", lambda: "claude")
+    assert llm.complete("i", "d", {}) == {"kind": "a"}
+    assert len(calls) == 2

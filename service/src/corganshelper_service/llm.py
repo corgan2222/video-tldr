@@ -16,6 +16,7 @@ from pathlib import Path
 
 DEFAULT_MODEL = "sonnet"
 TIMEOUT_SECONDS = 600
+ATTEMPTS = 2
 
 
 class LlmError(Exception):
@@ -63,19 +64,28 @@ def complete(
             command += ["--add-dir", folder]
     else:
         command += ["--max-turns", str(max_turns)]
-    try:
-        run = subprocess.run(
-            command,
-            input=data,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            timeout=TIMEOUT_SECONDS,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as error:
-        raise LlmError(f"claude gave no answer within {TIMEOUT_SECONDS}s") from error
-    return parse_result(run.stdout, run.stderr)
+    # A part of a long transcript failed once with an empty error while the
+    # parts around it went through (2026-09-09), and one lost part throws
+    # away every other request of that video. So: one more try.
+    for attempt in range(ATTEMPTS):
+        try:
+            run = subprocess.run(
+                command,
+                input=data,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=TIMEOUT_SECONDS,
+                check=False,
+            )
+            return parse_result(run.stdout, run.stderr)
+        except subprocess.TimeoutExpired as error:
+            raise LlmError(
+                f"claude gave no answer within {TIMEOUT_SECONDS}s"
+            ) from error
+        except LlmError:
+            if attempt == ATTEMPTS - 1:
+                raise
 
 
 def parse_result(stdout: str, stderr: str = "") -> dict:
@@ -89,8 +99,11 @@ def parse_result(stdout: str, stderr: str = "") -> dict:
         ) from error
     if envelope.get("is_error"):
         text = str(envelope.get("result", ""))
+        # An empty `result` happens; then only `subtype` says what went wrong.
+        text = text.strip() or str(envelope.get("subtype") or "no reason given")
         hint = " Run `claude login` in a terminal." if "authenticate" in text else ""
-        raise LlmError(f"claude reported an error: {text}{hint}")
+        noise = f" ({stderr.strip()})" if stderr.strip() else ""
+        raise LlmError(f"claude reported an error: {text}{hint}{noise}")
     structured = envelope.get("structured_output")
     if isinstance(structured, dict):
         return structured
