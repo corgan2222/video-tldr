@@ -1,0 +1,20 @@
+# corganshelper service
+
+The local service the browser extension talks to. Every pipeline step is a
+command line entry point that runs the same code the HTTP service will run;
+`serve` is the last step to land.
+
+```
+cd service
+uv sync
+uv run corganshelper probe
+uv run corganshelper fetch https://www.youtube.com/watch?v=BT4ywlPr6Pk
+```
+
+Data lives under `CORGANSHELPER_HOME` (default `D:/corganshelper`): `work/<id>/`
+holds the per-video results, `out/` the rendered documents. Set
+`CORGANSHELPER_COOKIES` to a cookies file only when YouTube answers with a
+sign-in check; the yt-dlp wiki explains the export and warns that an account
+used this way can be locked.
+
+Checks: `uv run ruff format --check .`, `uv run ruff check .`, `uv run pytest`.

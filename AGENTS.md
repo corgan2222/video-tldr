@@ -19,7 +19,8 @@ Written in TypeScript, tsc, vitest, prettier.
 | `docs/`        | Documentation and the German user guide             |
 | `scripts/`     | The version bump                                    |
 | `tests/`       | vitest tests                                        |
-| `src/`         | Source code                                         |
+| `src/`         | The extension                                       |
+| `service/`     | The local Python service the extension talks to     |
 | `website/`     | Documentation site (fumadocs), deployed by docs.yml |
 | `package.json` | Node manifest, holds the version                    |
 

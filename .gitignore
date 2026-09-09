@@ -11,3 +11,12 @@ website/node_modules
 website/.next
 website/out
 website/.source
+
+# Python (service/)
+__pycache__/
+*.pyc
+.venv/
+service/dist
+*.egg-info/
+.pytest_cache/
+.ruff_cache/

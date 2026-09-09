@@ -47,6 +47,23 @@ updates:
     # its own branches instead of leaving them stuck un-mergeable.
     rebase-strategy: 'auto'
 
+  # --------------------------------------------------------- service (uv)
+  - package-ecosystem: 'uv'
+    directory: '/service'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'Europe/Berlin'
+    groups:
+      minor-and-patch:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    rebase-strategy: 'auto'
+
   # ----------------------------------------------------------- GitHub Actions
   - package-ecosystem: 'github-actions'
     directory: '/'
