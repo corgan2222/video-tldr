@@ -15,6 +15,9 @@ export const DEFAULT_BLOCKLIST = [
   'buymeacoffee.com',
   'paypal.me',
   'paypal.com',
+  // Ad click-through hosts: a "select all" on a watch page sweeps them in.
+  'googleadservices.com',
+  'doubleclick.net',
 ];
 
 const REDIRECT_HOPS = 3;
