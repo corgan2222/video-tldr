@@ -16,6 +16,7 @@ authors = [{ name = "Stefan Knaak", email = "stefan@knaak.org" }]
 dependencies = [
     "anthropic>=1.4.0",
     "faster-whisper>=1.2.1",
+    "numpy>=2.5.3",
     "onnx-asr[hub]>=0.12.0",
     "openai>=3.11.0",
     "yt-dlp>=2026.8.19",

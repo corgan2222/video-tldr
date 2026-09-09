@@ -108,6 +108,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "faster-whisper" },
+    { name = "numpy" },
     { name = "onnx-asr", extra = ["hub"] },
     { name = "openai" },
     { name = "yt-dlp" },
@@ -130,6 +131,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", specifier = ">=1.4.0" },
     { name = "faster-whisper", specifier = ">=1.2.1" },
+    { name = "numpy", specifier = ">=2.5.3" },
     { name = "nvidia-cublas-cu12", marker = "extra == 'gpu'", specifier = ">=12.9.2.10" },
     { name = "nvidia-cudnn-cu12", marker = "extra == 'gpu'", specifier = ">=9" },
     { name = "onnx-asr", extras = ["hub"], specifier = ">=0.12.0" },

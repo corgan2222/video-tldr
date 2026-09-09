@@ -194,13 +194,18 @@ def complete_claude(
         json.dumps(schema),
         "--no-session-persistence",
     ]
+    # `--tools` names what exists at all; without it the model reached for a
+    # tool when a prompt read like "read the README" and the one turn was
+    # gone with `error_max_turns` (2026-09-09). `--allowedTools` only skips
+    # the permission prompt for the tool that is there.
     if images:
         folders = sorted({str(p.parent) for p in images})
-        command += ["--allowedTools", "Read", "--max-turns", str(max(max_turns, 4))]
+        command += ["--tools", "Read", "--allowedTools", "Read"]
+        command += ["--max-turns", str(max(max_turns, 4))]
         for folder in folders:
             command += ["--add-dir", folder]
     else:
-        command += ["--max-turns", str(max_turns)]
+        command += ["--tools", "", "--max-turns", str(max_turns)]
     try:
         run = subprocess.run(
             command,

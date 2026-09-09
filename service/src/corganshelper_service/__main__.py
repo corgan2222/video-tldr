@@ -20,7 +20,9 @@ from .config import (
     parse_assignments,
     store,
 )
+from .enrich import enrich
 from .fetch import FetchError, fetch
+from .frames import frames
 from .llm import LlmError
 from .render import render
 from .transcribe import transcribe
@@ -106,7 +108,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     for name, help_text in (
         ("analyze", "ask the model what the video is about, as JSON"),
-        ("render", "write summary.md from the analysis"),
+        ("enrich", "read the installation steps out of the linked repositories"),
+        ("frames", "fetch, pick and label the pictures worth keeping"),
+        ("render", "write summary.md from the analysis, pictures and steps"),
     ):
         cmd = commands.add_parser(name, help=help_text)
         cmd.add_argument("url")
@@ -118,6 +122,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # A caption with a heart character crashed the print of frames.json on
+    # a cp1252 pipe (2026-09-10). The output is UTF-8, and a console that
+    # cannot show a character shows a question mark instead of a traceback.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
@@ -185,13 +194,14 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(shown, indent=2, ensure_ascii=False))
         return 0
 
-    if args.command == "analyze":
+    steps = {"analyze": analyze, "enrich": enrich, "frames": frames}
+    if args.command in steps:
         try:
-            result = analyze(
+            result = steps[args.command](
                 args.url, settings, force=args.force, language=args.language
             )
         except (FetchError, LlmError) as error:
-            print(f"analyze failed: {error}", file=sys.stderr)
+            print(f"{args.command} failed: {error}", file=sys.stderr)
             return 1
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0
