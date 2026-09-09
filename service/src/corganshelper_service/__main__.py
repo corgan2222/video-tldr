@@ -11,6 +11,7 @@ from pathlib import Path
 from . import __version__
 from .config import Settings
 from .fetch import FetchError, fetch
+from .transcribe import transcribe
 
 PROG = "corganshelper"
 
@@ -55,6 +56,19 @@ def main(argv: list[str] | None = None) -> int:
     fetch_cmd.add_argument(
         "--force", action="store_true", help="fetch again although a result exists"
     )
+    transcribe_cmd = commands.add_parser(
+        "transcribe", help="turn the caption track, or whisper, into segments"
+    )
+    transcribe_cmd.add_argument("url")
+    transcribe_cmd.add_argument(
+        "--engine",
+        choices=["auto", "subtitles", "whisper"],
+        default="auto",
+        help="auto takes the caption track when there is one",
+    )
+    transcribe_cmd.add_argument(
+        "--force", action="store_true", help="transcribe again although a result exists"
+    )
     args = parser.parse_args(argv)
     settings = Settings.load(home=args.home)
 
@@ -72,6 +86,19 @@ def main(argv: list[str] | None = None) -> int:
             print(f"fetch failed: {error}", file=sys.stderr)
             return 1
         print(json.dumps(result, indent=2))
+        return 0
+
+    if args.command == "transcribe":
+        try:
+            result = transcribe(
+                args.url, settings, force=args.force, engine=args.engine
+            )
+        except FetchError as error:
+            print(f"transcribe failed: {error}", file=sys.stderr)
+            return 1
+        shown = {**result, "segments": f"{len(result['segments'])} segments"}
+        shown["text"] = result["text"][:200] + "…"
+        print(json.dumps(shown, indent=2, ensure_ascii=False))
         return 0
 
     parser.print_help()
