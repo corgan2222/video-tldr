@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "corganshelper",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "A Manifest V3 browser extension for Firefox and Chrome.",
   "icons": {
     "16": "icons/16.png",
@@ -21,9 +21,12 @@
       "strict_min_version": "142.0"
     }
   },
+  "permissions": ["contextMenus", "storage", "scripting", "activeTab"],
   "action": {
-    "default_popup": "popup.html",
     "default_title": "corganshelper"
+  },
+  "options_ui": {
+    "page": "options.html"
   },
   "background": {
     "service_worker": "background.js",

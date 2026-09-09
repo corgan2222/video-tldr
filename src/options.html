@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>corganshelper options</title>
+    <style>
+      body {
+        font: 13px sans-serif;
+        margin: 0;
+        padding: 12px;
+        min-width: 420px;
+      }
+      label {
+        display: block;
+        margin: 12px 0 4px;
+        font-weight: bold;
+      }
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        font: 12px monospace;
+      }
+      .row {
+        margin-top: 8px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      #status {
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <label for="blocklist"
+      >Blocked hosts, one per line (subdomains included)</label
+    >
+    <textarea id="blocklist" rows="10"></textarea>
+
+    <label for="seen">Links already opened</label>
+    <textarea id="seen" rows="8" readonly></textarea>
+    <div class="row">
+      <span id="seen-count">0 links</span>
+      <button id="clear">Forget all</button>
+    </div>
+
+    <div class="row">
+      <button id="save">Save</button>
+      <span id="status"></span>
+    </div>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
