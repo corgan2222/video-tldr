@@ -9,8 +9,11 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .analyze import analyze
 from .config import Settings
 from .fetch import FetchError, fetch
+from .llm import LlmError
+from .render import render
 from .transcribe import transcribe
 
 PROG = "corganshelper"
@@ -69,6 +72,16 @@ def main(argv: list[str] | None = None) -> int:
     transcribe_cmd.add_argument(
         "--force", action="store_true", help="transcribe again although a result exists"
     )
+    for name, help_text in (
+        ("analyze", "ask the model what the video is about, as JSON"),
+        ("render", "write summary.md from the analysis"),
+    ):
+        cmd = commands.add_parser(name, help=help_text)
+        cmd.add_argument("url")
+        cmd.add_argument("--language", default="de", help="language of the note")
+        cmd.add_argument(
+            "--force", action="store_true", help="redo although a result exists"
+        )
     args = parser.parse_args(argv)
     settings = Settings.load(home=args.home)
 
@@ -99,6 +112,28 @@ def main(argv: list[str] | None = None) -> int:
         shown = {**result, "segments": f"{len(result['segments'])} segments"}
         shown["text"] = result["text"][:200] + "…"
         print(json.dumps(shown, indent=2, ensure_ascii=False))
+        return 0
+
+    if args.command == "analyze":
+        try:
+            result = analyze(
+                args.url, settings, force=args.force, language=args.language
+            )
+        except (FetchError, LlmError) as error:
+            print(f"analyze failed: {error}", file=sys.stderr)
+            return 1
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 0
+
+    if args.command == "render":
+        try:
+            target = render(
+                args.url, settings, force=args.force, language=args.language
+            )
+        except (FetchError, LlmError) as error:
+            print(f"render failed: {error}", file=sys.stderr)
+            return 1
+        print(target)
         return 0
 
     parser.print_help()
