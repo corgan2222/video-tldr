@@ -4,13 +4,12 @@
 // and opening go through the background worker, because this page dies
 // when it closes; reading is done here, every two seconds while it is
 // open.
-import { api } from './api.js';
+import { api, askAccess, hasAccess } from './api.js';
 import { t, translate } from './i18n.js';
 import {
   DEFAULT_CHOICES,
   DEFAULT_CONNECTION,
   formatSeconds,
-  HOST_PATTERN,
   NoServiceError,
   progress,
   remainingSeconds,
@@ -40,6 +39,7 @@ const logDetails = pick<HTMLDetailsElement>('#log-box');
 const statsDetails = pick<HTMLDetailsElement>('#stats-box');
 const statsBox = pick<HTMLElement>('#stats');
 const noService = pick<HTMLElement>('#no-service');
+const noAccess = pick<HTMLElement>('#no-access');
 const status = pick<HTMLElement>('#status');
 const buttons = {
   fast: pick<HTMLButtonElement>('#fast'),
@@ -331,7 +331,7 @@ function offline(yes: boolean): void {
 async function start(profile: Profile): Promise<void> {
   // First thing on purpose: Firefox counts the request as user input only
   // until the first await, so nothing may run before it.
-  const granted = await api.permissions.request({ origins: [HOST_PATTERN] });
+  const granted = await askAccess();
   if (!granted) {
     say('No permission to reach 127.0.0.1.', 'bad');
     return;
@@ -404,6 +404,17 @@ async function load(): Promise<void> {
     say(t('popupOpenVideo'));
   }
 
+  // Without the permission every request fails exactly as a stopped
+  // service does, and "start the service" would send the user to the
+  // wrong fix. So ask this before talking to it at all.
+  if (!(await hasAccess())) {
+    noAccess.hidden = false;
+    buttons.fast.disabled = true;
+    buttons.thorough.disabled = true;
+    return;
+  }
+  noAccess.hidden = true;
+
   try {
     config = await request<Config>(connection, 'GET', '/config');
     stats = await request<Stats>(connection, 'GET', '/stats');
@@ -438,6 +449,10 @@ statsDetails.addEventListener('toggle', showStats);
 pick('#copy-command').addEventListener('click', async () => {
   await navigator.clipboard.writeText(t('noServiceCommand'));
   say(t('copied'), 'ok');
+});
+pick('#grant-access').addEventListener('click', async () => {
+  // askAccess first, before any other await: see the note in start().
+  if (await askAccess()) await load();
 });
 // The language of the note is changed often, so it is saved right here.
 languageBox.addEventListener('change', () => {

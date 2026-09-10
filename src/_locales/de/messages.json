@@ -137,6 +137,15 @@
   "noServiceHelp": {
     "message": "Starte ihn in einem Terminal, dann in den Einstellungen auf Verbinden drücken:"
   },
+  "noAccess": {
+    "message": "Noch kein Zugriff auf den lokalen Dienst."
+  },
+  "noAccessHelp": {
+    "message": "video-tldr spricht mit einem Dienst auf deinem eigenen Rechner, unter 127.0.0.1. Mehr wird nicht erreicht. Einmal erlauben, dann arbeitet dieses Fenster."
+  },
+  "grantAccess": {
+    "message": "Zugriff erlauben"
+  },
   "noServiceCommand": {
     "message": "video-tldr serve"
   },
