@@ -1,17 +1,20 @@
+import copy
 import json
 
-from corganshelper_service import analyze as analyze_module
-from corganshelper_service import llm
-from corganshelper_service.analyze import (
+from video_tldr_service import analyze as analyze_module
+from video_tldr_service import llm
+from video_tldr_service.analyze import (
     ANALYSIS_SCHEMA,
     PART_LIMIT,
+    STYLE_INSTRUCTIONS,
     analyze,
     header,
     split_parts,
     stamp,
     transcript_lines,
 )
-from corganshelper_service.config import Settings
+from video_tldr_service.config import Settings
+from video_tldr_service.fetch import work_folder
 
 FAKE_ANALYSIS = {
     "kind": "explainer",
@@ -27,7 +30,7 @@ FAKE_ANALYSIS = {
 
 def prepare(tmp_path, text_size=100):
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / "Zvc5QkrWgAU"
+    folder = work_folder(settings, "Zvc5QkrWgAU")
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(
         json.dumps(
@@ -131,6 +134,79 @@ def test_a_long_transcript_is_split_at_chapters_and_stitched(tmp_path, monkeypat
     assert len(result["sections"]) == result["parts"]
     # No links from the model, so the description's own are kept.
     assert result["links"] == [{"url": "https://github.com/a/b", "role": "other"}]
+
+
+def test_a_style_and_condensed_reach_the_prompt_and_the_result(tmp_path, monkeypatch):
+    settings, folder = prepare(tmp_path)
+    settings.config["style"] = "caveman"
+    settings.config["condensed"] = "on"
+    prompts = []
+
+    def fake(instruction, data, schema, settings, images=None, max_turns=1):
+        prompts.append(instruction)
+        return copy.deepcopy(FAKE_ANALYSIS)
+
+    monkeypatch.setattr(llm, "complete", fake)
+    result = analyze("https://youtu.be/Zvc5QkrWgAU", settings)
+
+    # The voice leads the prompt and stands again at its end, and it
+    # writes the lengths of the fields rather than trailing behind them.
+    assert prompts[0].startswith(STYLE_INSTRUCTIONS["caveman"]["voice"])
+    assert prompts[0].rstrip().endswith(STYLE_INSTRUCTIONS["caveman"]["voice"])
+    assert STYLE_INSTRUCTIONS["caveman"]["section"] in prompts[0]
+    assert "two- to four-sentence" not in prompts[0]
+    assert "two-minute read" in prompts[0] and "under 120 words" in prompts[0]
+    assert result["style"] == "caveman" and result["condensed"] is True
+    # One wording, one file, and it keeps the name every other step reads.
+    assert not list(folder.glob("analysis-*.json"))
+    assert (folder / "analysis.json").exists()
+
+
+def test_the_plain_wording_adds_nothing_to_the_prompt(tmp_path, monkeypatch):
+    settings, _ = prepare(tmp_path)
+    prompts = []
+
+    def fake(instruction, data, schema, settings, images=None, max_turns=1):
+        prompts.append(instruction)
+        return copy.deepcopy(FAKE_ANALYSIS)
+
+    monkeypatch.setattr(llm, "complete", fake)
+    result = analyze("https://youtu.be/Zvc5QkrWgAU", settings)
+
+    # No wording, so nothing leads or follows the plain instruction.
+    assert prompts[0].endswith("with its role.")
+    assert prompts[0].startswith("You summarise")
+    assert "two- to four-sentence summary" in prompts[0]
+    assert result["style"] == "normal" and result["condensed"] is False
+
+
+def test_style_all_writes_one_note_per_wording_and_one_bill(tmp_path, monkeypatch):
+    settings, folder = prepare(tmp_path)
+    settings.config["style"] = "all"
+    prompts = []
+
+    def fake(instruction, data, schema, settings, images=None, max_turns=1):
+        prompts.append(instruction)
+        llm.last_cost.update(input=100, output=10, usd=0.01)
+        return copy.deepcopy(FAKE_ANALYSIS)
+
+    monkeypatch.setattr(llm, "complete", fake)
+    result = analyze("https://youtu.be/Zvc5QkrWgAU", settings)
+
+    assert len(prompts) == 5
+    assert prompts[-1].startswith(STYLE_INSTRUCTIONS["human"]["voice"])
+    assert sorted(p.name for p in folder.glob("analysis*.json")) == [
+        "analysis-caveman.json",
+        "analysis-engineer.json",
+        "analysis-human.json",
+        "analysis-noslop.json",
+        "analysis.json",
+    ]
+    # The normal wording comes back, and every file carries the whole bill.
+    assert result["style"] == "normal"
+    assert result["cost"] == {"requests": 5, "input": 500, "output": 50, "usd": 0.05}
+    other = json.loads((folder / "analysis-engineer.json").read_text(encoding="utf-8"))
+    assert other["style"] == "engineer" and other["cost"] == result["cost"]
 
 
 def test_parts_are_cut_only_at_chapter_starts_when_there_are_chapters():

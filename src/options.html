@@ -1,191 +1,262 @@
 <!doctype html>
-<html lang="en">
+<html>
   <head>
     <meta charset="utf-8" />
-    <title>corganshelper options</title>
+    <title>video-tldr</title>
+    <link rel="stylesheet" href="ui.css" />
     <style>
-      /* The browser's own scheme: about:addons embeds this page, and a
-         white box inside a dark browser is what the owner saw first. */
-      :root {
-        color-scheme: light dark;
-      }
       body {
-        font: 13px sans-serif;
-        margin: 0;
-        padding: 12px;
-        min-width: 420px;
-        background: Canvas;
-        color: CanvasText;
+        max-width: 720px;
+        margin: 0 auto;
       }
-      h2 {
-        font-size: 14px;
-        margin: 18px 0 4px;
-        padding-bottom: 2px;
-        border-bottom: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+      .brand img {
+        width: auto;
+        height: 40px;
       }
-      h3 {
-        font-size: 13px;
-        margin: 16px 0 0;
+      /* The logo comes in two versions; the browser's scheme picks one. */
+      .brand .dark {
+        display: none;
       }
-      fieldset {
-        border: 0;
-        padding: 0;
-        margin: 0;
+      @media (prefers-color-scheme: dark) {
+        .brand .light {
+          display: none;
+        }
+        .brand .dark {
+          display: block;
+        }
       }
-      label {
-        display: block;
-        margin: 12px 0 4px;
-        font-weight: bold;
+      .side-by-side {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 var(--gap-l);
       }
-      textarea,
-      input[type='text'],
-      input[type='url'],
-      input[type='password'],
-      select {
-        width: 100%;
-        box-sizing: border-box;
-        font: 12px monospace;
-      }
-      .row {
-        margin-top: 8px;
-        display: flex;
-        gap: 8px;
-        align-items: center;
-      }
-      #formats label {
-        display: inline;
-        font-weight: normal;
-        margin-right: 12px;
-      }
-      .note {
-        opacity: 0.75;
+      @media (max-width: 560px) {
+        .side-by-side {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
   <body>
-    <h2>Video summary</h2>
-    <p class="note">
-      The toolbar icon hands the active YouTube tab to the local service,
-      <code>corganshelper serve</code>, which prints its token when it starts.
-      The settings below live in the service's <code>config.json</code>; grey
-      text shows the default.
-    </p>
-    <label for="service-url">Service URL</label>
-    <input id="service-url" type="url" placeholder="http://127.0.0.1:8765" />
-    <label for="token">Token</label>
-    <input
-      id="token"
-      type="password"
-      autocomplete="off"
-      placeholder="printed by corganshelper serve"
-    />
-    <div class="row">
-      <button id="connect">Connect</button>
-      <span id="service-status" class="note">Not connected.</span>
+    <div class="brand">
+      <img class="light" src="logo-light.png" alt="video-tldr" />
+      <img class="dark" src="logo-dark.png" alt="video-tldr" />
+      <div>
+        <p class="tagline" data-i18n="tagline"></p>
+      </div>
     </div>
+
+    <h2 data-i18n="connect"></h2>
+    <div class="side-by-side">
+      <div class="field">
+        <label for="service-url" data-i18n="serviceUrl"></label>
+        <input
+          id="service-url"
+          type="url"
+          placeholder="http://127.0.0.1:8765"
+        />
+      </div>
+      <div class="field">
+        <label for="token" data-i18n="token"></label>
+        <input
+          id="token"
+          type="password"
+          autocomplete="off"
+          data-i18n-placeholder="tokenPlaceholder"
+        />
+      </div>
+    </div>
+    <div class="row">
+      <button id="connect" data-i18n="connect"></button>
+      <button id="restart" type="button" data-i18n="restartService"></button>
+      <span id="service-status" class="status" data-i18n="notConnected"></span>
+    </div>
+    <p class="help" data-i18n="restartServiceHelp"></p>
+
+    <div id="no-service" class="box bad" hidden style="margin-top: 12px">
+      <strong data-i18n="noService"></strong>
+      <p class="help" data-i18n="noServiceHelp"></p>
+      <div class="row" style="margin-top: 8px">
+        <code id="start-command"></code>
+        <button id="copy-command" data-i18n="copyCommand"></button>
+      </div>
+    </div>
+
+    <ul class="lights" style="margin-top: 12px">
+      <li id="light-service" class="light unknown"></li>
+      <li id="light-llm" class="light unknown"></li>
+      <li id="light-stt" class="light unknown"></li>
+      <li id="light-capabilities" class="light unknown"></li>
+    </ul>
 
     <fieldset id="service-settings">
-      <h3>Note</h3>
-      <label for="language">Language of the note</label>
-      <select id="language"></select>
-      <label>Outputs besides the summary (none chosen falls back to md)</label>
-      <div id="formats"></div>
-      <label for="obsidian-vault">Obsidian vault (path)</label>
-      <input
-        id="obsidian-vault"
-        type="text"
-        placeholder="D:\Vaults\Notes; empty means no Obsidian note"
-      />
-      <label for="obsidian-folder">Folder in the vault for the notes</label>
-      <input id="obsidian-folder" type="text" placeholder="Videos" />
-      <label for="browser">Chrome or Edge for the PDF</label>
-      <input
-        id="browser"
-        type="text"
-        placeholder="path to chrome.exe; empty searches the usual places"
-      />
+      <h2 data-i18n="summaryHeading"></h2>
+      <div class="side-by-side">
+        <div class="field">
+          <label for="language" data-i18n="languageOfNote"></label>
+          <select id="language"></select>
+          <p class="help" data-i18n="languageHelp"></p>
+        </div>
+        <div class="field">
+          <label for="style" data-i18n="style"></label>
+          <select id="style"></select>
+          <p class="help" data-i18n="styleHelp"></p>
+        </div>
+      </div>
+      <div class="field">
+        <label data-i18n="outputs"></label>
+        <div id="formats" class="checks"></div>
+      </div>
+      <div class="field">
+        <label for="download-dir" data-i18n="downloadDir"></label>
+        <div class="row">
+          <input id="download-dir" type="text" />
+          <button id="pick-download" type="button" data-i18n="browse"></button>
+        </div>
+        <p class="help" data-i18n="downloadDirHelp"></p>
+      </div>
+      <div class="side-by-side">
+        <div class="field">
+          <label for="obsidian-vault" data-i18n="obsidianVault"></label>
+          <div class="row">
+            <input id="obsidian-vault" type="text" />
+            <button id="pick-vault" type="button" data-i18n="browse"></button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="obsidian-folder" data-i18n="obsidianFolder"></label>
+          <input id="obsidian-folder" type="text" placeholder="Videos" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="browser" data-i18n="browserForPdf"></label>
+        <div class="row">
+          <input id="browser" type="text" />
+          <button id="pick-browser" type="button" data-i18n="browse"></button>
+        </div>
+        <p class="help" data-i18n="browserHelp"></p>
+      </div>
+      <div class="field">
+        <label for="pdf-template" data-i18n="pdfTemplate"></label>
+        <div class="row">
+          <input id="pdf-template" type="text" />
+          <button id="pick-template" type="button" data-i18n="browse"></button>
+        </div>
+        <p class="help" data-i18n="pdfTemplateHelp"></p>
+      </div>
 
-      <h3>Summary: the language model</h3>
-      <p class="note">
-        Reads the transcript and writes the note. Two things to choose: where it
-        runs (the backend) and which model there.
-      </p>
-      <label for="llm">Backend</label>
-      <select id="llm"></select>
-      <label for="model">Model</label>
-      <input
-        id="model"
-        type="text"
-        list="models"
-        autocomplete="off"
-        placeholder="empty means the backend's default"
-      />
-      <datalist id="models"></datalist>
-      <span id="model-hint" class="note"></span>
-      <label for="anthropic-api-key">Anthropic API key</label>
-      <input
-        id="anthropic-api-key"
-        type="password"
-        autocomplete="off"
-        placeholder="only for the anthropic backend"
-      />
-      <label for="openai-api-key">OpenAI API key</label>
-      <input
-        id="openai-api-key"
-        type="password"
-        autocomplete="off"
-        placeholder="only for the openai backend, or openai speech to text"
-      />
-      <p class="note">
-        Stars stand for a stored key; leave them to keep it, clear the field to
-        remove it.
-      </p>
-      <label for="openai-base-url">OpenAI base URL</label>
-      <input
-        id="openai-base-url"
-        type="text"
-        placeholder="empty for api.openai.com"
-      />
-      <label for="lmstudio-url">LM Studio URL</label>
-      <input
-        id="lmstudio-url"
-        type="text"
-        placeholder="http://localhost:1234/v1"
-      />
-      <label for="ollama-url">Ollama URL</label>
-      <input
-        id="ollama-url"
-        type="text"
-        placeholder="http://localhost:11434/v1"
-      />
+      <h2 data-i18n="modelHeading"></h2>
+      <p class="help" data-i18n="modelHelp"></p>
+      <div class="field" style="margin-top: 12px">
+        <label for="llm" data-i18n="backend"></label>
+        <select id="llm"></select>
+        <p class="help" id="backend-info"></p>
+      </div>
+      <div class="field" data-field="anthropic_api_key">
+        <label for="anthropic-api-key">Anthropic API key</label>
+        <input id="anthropic-api-key" type="password" autocomplete="off" />
+        <p class="help" data-i18n="keyNote"></p>
+      </div>
+      <div class="field" data-field="openai_api_key">
+        <label for="openai-api-key">OpenAI API key</label>
+        <input id="openai-api-key" type="password" autocomplete="off" />
+        <p class="help" data-i18n="keyNote"></p>
+      </div>
+      <div class="field" data-field="openai_base_url">
+        <label for="openai-base-url">OpenAI base URL</label>
+        <input
+          id="openai-base-url"
+          type="text"
+          placeholder="https://api.openai.com/v1"
+        />
+        <p class="help" data-i18n="openaiBaseUrlHelp"></p>
+      </div>
+      <div class="field" data-field="lmstudio_url">
+        <label for="lmstudio-url">LM Studio URL</label>
+        <input
+          id="lmstudio-url"
+          type="text"
+          placeholder="http://localhost:1234/v1"
+        />
+      </div>
+      <div class="field" data-field="ollama_url">
+        <label for="ollama-url">Ollama URL</label>
+        <input
+          id="ollama-url"
+          type="text"
+          placeholder="http://localhost:11434/v1"
+        />
+      </div>
+      <div class="field">
+        <label for="model-choice" data-i18n="model"></label>
+        <select id="model-choice"></select>
+        <input id="model" type="text" hidden autocomplete="off" />
+        <p class="help" id="model-hint"></p>
+        <p class="help" data-i18n="modelAdvice"></p>
+      </div>
+      <div class="field">
+        <div class="row">
+          <button
+            id="check-backend"
+            type="button"
+            data-i18n="checkModel"
+          ></button>
+          <span id="check-result" class="status"></span>
+        </div>
+        <p class="help" data-i18n="checkModelHelp"></p>
+      </div>
 
-      <h3>Transcription: speech to text</h3>
-      <p class="note">
-        Turns the audio into text, and only runs when YouTube has no captions or
-        when a model is chosen here instead of auto. These models run on this
-        machine (whisper is Whisper large-v3-turbo on the GPU) or at OpenAI;
-        they are not language models and cannot write the note.
-      </p>
-      <label for="stt">Transcriber</label>
-      <select id="stt"></select>
+      <h2 data-i18n="sttHeading"></h2>
+      <div class="field">
+        <label for="stt" data-i18n="transcriber"></label>
+        <select id="stt"></select>
+        <p class="help" data-i18n="sttHelp"></p>
+      </div>
     </fieldset>
 
-    <h2>Open all links</h2>
-    <label for="blocklist"
-      >Blocked hosts, one per line (subdomains included)</label
-    >
-    <textarea id="blocklist" rows="10"></textarea>
+    <h2 data-i18n="history"></h2>
+    <p class="help" id="stats-note" data-i18n="historyHelp"></p>
+    <div id="stats"></div>
 
-    <label for="seen">Links already opened</label>
-    <textarea id="seen" rows="8" readonly></textarea>
+    <h2 data-i18n="benchHeading"></h2>
+    <p class="help" data-i18n="benchHelp"></p>
+    <div class="field" style="margin-top: 12px">
+      <label for="bench-url" data-i18n="benchUrl"></label>
+      <input id="bench-url" type="url" placeholder="https://youtu.be/…" />
+    </div>
+    <div class="field">
+      <label data-i18n="benchModels"></label>
+      <div id="bench-models" class="checks"></div>
+    </div>
+    <div class="side-by-side">
+      <div class="field">
+        <label for="bench-repeat" data-i18n="benchRepeat"></label>
+        <input id="bench-repeat" type="number" min="1" max="5" value="1" />
+      </div>
+    </div>
     <div class="row">
-      <span id="seen-count">0 links</span>
-      <button id="clear">Forget all</button>
+      <button id="bench-start" data-i18n="benchStart"></button>
+      <span id="bench-status" class="status"></span>
+    </div>
+    <div id="bench-result"></div>
+
+    <h2 data-i18n="linksHeading"></h2>
+    <div class="field">
+      <label for="blocklist" data-i18n="blocklist"></label>
+      <textarea id="blocklist" rows="8"></textarea>
+    </div>
+    <div class="field">
+      <label for="seen" data-i18n="seen"></label>
+      <textarea id="seen" rows="6" readonly></textarea>
+      <div class="row" style="margin-top: 8px">
+        <span id="seen-count" class="help" style="border: 0; padding: 0"></span>
+        <button id="clear" data-i18n="forgetAll"></button>
+      </div>
     </div>
 
-    <div class="row">
-      <button id="save">Save</button>
-      <span id="status"></span>
+    <div class="row" style="margin: 24px 0 8px">
+      <button id="save" class="primary" data-i18n="save"></button>
+      <span id="status" class="status"></span>
     </div>
     <script type="module" src="options.js"></script>
   </body>

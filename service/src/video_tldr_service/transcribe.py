@@ -81,14 +81,24 @@ def video_id_of(folder: Path) -> str:
 
 
 def whisper_device() -> tuple[str, int, str]:
-    """(device, index, compute_type) from CORGANSHELPER_WHISPER, default the
+    """(device, index, compute_type) from VIDEO_TLDR_WHISPER, default the
     first CUDA device in float16. `cpu` means int8 on the CPU. Parakeet
     reads the same variable, so one setting moves both local models."""
-    spec = os.environ.get("CORGANSHELPER_WHISPER", "cuda:0")
+    spec = os.environ.get("VIDEO_TLDR_WHISPER", "cuda:0")
     if spec == "cpu":
         return "cpu", 0, "int8"
     device, _, index = spec.partition(":")
     return device, int(index or 0), "float16"
+
+
+# Once per process, and the answer is kept. `stt_status` calls this on
+# every GET /health, and the popup asks every two seconds: adding the
+# same directories again and again grew PATH without end and filled the
+# process's list of DLL directories, until Windows answered WinError 206
+# ("the filename or extension is too long"). numpy then failed to load in
+# the middle of a run, and ctranslate2 counted no CUDA device at all
+# (owner, 2026-09-10).
+_DLL_DIRS: list[Path] | None = None
 
 
 def add_nvidia_dll_dirs() -> list[Path]:
@@ -96,8 +106,12 @@ def add_nvidia_dll_dirs() -> list[Path]:
     wheels (`nvidia-cublas-cu12`, `nvidia-cudnn-cu12`, the `gpu` extra) put
     them under site-packages/nvidia/*/bin, so those go on the path here
     before ctranslate2 loads. A no-op elsewhere."""
+    global _DLL_DIRS
+    if _DLL_DIRS is not None:
+        return _DLL_DIRS
     if os.name != "nt" or not hasattr(os, "add_dll_directory"):
-        return []
+        _DLL_DIRS = []
+        return _DLL_DIRS
     import sysconfig
 
     added = []
@@ -111,7 +125,8 @@ def add_nvidia_dll_dirs() -> list[Path]:
         os.environ["PATH"] = os.pathsep.join(
             [str(p) for p in added] + [os.environ.get("PATH", "")]
         )
-    return added
+    _DLL_DIRS = added
+    return _DLL_DIRS
 
 
 def whisper_transcribe(
@@ -243,6 +258,57 @@ def openai_transcribe(
         for s in result.segments or []
     ]
     return result.language, segments
+
+
+def stt_status(settings: Settings) -> dict:
+    """Whether the chosen transcriber can run here, in one line for the
+    popup: the model on disk or still to download, the device it would
+    use; for OpenAI, whether the key is there. A missing model is no
+    error, the first use downloads it."""
+    name = settings.config["stt"]
+    if name == "subtitles":
+        return {"ok": True, "detail": "captions only, no model needed"}
+    chosen = STT_DEFAULT if name == "auto" else name
+    spec = STT_MODELS[chosen]
+    prefix = "captions first, else " if name == "auto" else ""
+    if spec["engine"] == "openai":
+        ok = bool(settings.config["openai_api_key"])
+        key = "key set" if ok else "needs openai_api_key"
+        return {"ok": ok, "detail": f"{prefix}openai {spec['model']}, {key}"}
+    models_dir = settings.home / "models"
+    if spec["engine"] == "whisper":
+        present = any(models_dir.glob(f"*{spec['model']}*"))
+    else:
+        present = (models_dir / spec["model"]).is_dir()
+    disk = "downloaded" if present else "downloads on first use, gigabytes"
+    device, index, compute = whisper_device()
+    ok = True
+    where = f"{device} {compute}"
+    if device == "cuda":
+        try:
+            add_nvidia_dll_dirs()
+            import ctranslate2
+
+            count = ctranslate2.get_cuda_device_count()
+        except Exception as error:  # noqa: BLE001 - any failure means no GPU here
+            count, where = 0, f"no CUDA ({error})"
+        else:
+            where = f"GPU cuda:{index} of {count}, {compute}"
+        if count <= index:
+            ok = False
+            where = f"GPU cuda:{index} not found ({count} CUDA devices)"
+            if count == 0:
+                # CUDA keeps a failed start for the life of the process: a
+                # driver busy with another program at the wrong moment
+                # leaves this one blind until it is restarted, while a
+                # fresh process sees every card (owner, 2026-09-10).
+                where += (
+                    "; this process lost CUDA, restart the service. Only if "
+                    "it stays away, set VIDEO_TLDR_WHISPER=cpu"
+                )
+            else:
+                where += "; set VIDEO_TLDR_WHISPER=cuda:0 or =cpu"
+    return {"ok": ok, "detail": f"{prefix}{chosen} ({spec['model']}), {disk}, {where}"}
 
 
 def transcribe(

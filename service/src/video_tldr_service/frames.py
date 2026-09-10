@@ -11,6 +11,7 @@ pictures do.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 from . import llm
@@ -25,9 +26,17 @@ LIMIT = 8
 MARGIN = 8
 CANDIDATES = 12
 LABELS = [*FRAME_KINDS, "speaker"]
+NO_VISION = "the model takes no images: pictures kept unlabelled"
+# One yt-dlp run failed with "ffmpeg exited with code 3436169992" while
+# every other run of the same video went through (2026-09-10).
+RETRY_PAUSE = 2
 
 LABEL_SCHEMA = _obj(
-    {"label": {"type": "string", "enum": LABELS}, "caption": {"type": "string"}}
+    {
+        "label": {"type": "string", "enum": LABELS},
+        "caption": {"type": "string"},
+        "commands": {"type": "array", "items": {"type": "string"}},
+    }
 )
 DIAGRAM_SCHEMA = _obj({"mermaid": {"type": "string"}, "caption": {"type": "string"}})
 
@@ -85,11 +94,17 @@ def download_clips(
     }
     if settings.cookies_file:
         options["cookiefile"] = str(settings.cookies_file)
-    try:
-        with yt_dlp.YoutubeDL(options) as ydl:
-            ydl.download([url])
-    except yt_dlp.utils.DownloadError as error:
-        raise FetchError(f"clip download failed: {error}") from error
+    for attempt in range(2):
+        try:
+            with yt_dlp.YoutubeDL(options) as ydl:
+                ydl.download([url])
+            break
+        except yt_dlp.utils.DownloadError as error:
+            # One more try: the failure was a one-off on 2026-09-10, and a
+            # lost download costs every picture of the video.
+            if attempt:
+                raise FetchError(f"clip download failed: {error}") from error
+            time.sleep(RETRY_PAUSE)
     return {t: clip_path(folder, vid, start) for t, (start, _) in zip(times, ranges)}
 
 
@@ -138,6 +153,31 @@ def extract(clip: Path, at: float, target: Path) -> Path:
     return target
 
 
+# A 1080p screenshot costs a model four times the tokens of one at this
+# width, and no caption needs the pixels. Only the request is shrunk; the
+# PNG the outputs place stays as ffmpeg wrote it.
+SEND_WIDTH = 1280
+
+
+def png_width(image: Path) -> int:
+    """The width in a PNG's IHDR chunk, 0 when the file is no PNG."""
+    head = image.read_bytes()[:24]
+    return int.from_bytes(head[16:20], "big") if head[1:4] == b"PNG" else 0
+
+
+def shrink(image: Path) -> Path:
+    """A JPEG copy at SEND_WIDTH to send instead of `image`; `image`
+    itself when it is no wider, or when ffmpeg will not convert it."""
+    if png_width(image) <= SEND_WIDTH:
+        return image
+    target = image.with_suffix(".jpg")
+    try:
+        ffmpeg("-y", "-i", str(image), "-vf", f"scale={SEND_WIDTH}:-2", str(target))
+    except FetchError:
+        return image
+    return target
+
+
 def instruction(language: str, image: Path) -> str:
     return (
         f"You label one screenshot from a YouTube video for a note: "
@@ -148,7 +188,10 @@ def instruction(language: str, image: Path) -> str:
         "features, speaker when a person fills the picture and nothing else "
         f"matters, else other. caption: one sentence in "
         f"{LANGUAGES.get(language, language)} on what the picture shows, with "
-        "the names and numbers that are visible."
+        "the names and numbers that are visible. commands: the exact shell or "
+        "code commands the picture shows, in a terminal, on a slide or in an "
+        "editor, one command per string, copied character by character; an "
+        "empty list when there is none."
     )
 
 
@@ -165,25 +208,31 @@ def label(
     confuse."""
     labeled: list[dict] = []
     for image, candidate in zip(images, candidates):
+        sent = shrink(image)
         data = (
-            f"{image.name}: at {stamp(candidate['time'])}, analyze expected "
+            f"{sent.name}: at {stamp(candidate['time'])}, analyze expected "
             f"{candidate['kind']}: {candidate['why']}"
         )
-        answer = llm.complete(
-            instruction(language, image),
-            data,
-            LABEL_SCHEMA,
-            settings,
-            images=[image],
-            # With `claude` the Read is one turn, the answer another.
-            max_turns=4,
-        )
+        try:
+            answer = llm.complete(
+                instruction(language, sent),
+                data,
+                LABEL_SCHEMA,
+                settings,
+                images=[sent],
+                # With `claude` the Read is one turn, the answer another.
+                max_turns=4,
+            )
+        finally:
+            if sent != image:
+                sent.unlink(missing_ok=True)
         spend.append(dict(llm.last_cost))
         labeled.append(
             {
                 "file": image.name,
                 "label": answer.get("label", "other"),
                 "caption": answer.get("caption", ""),
+                "commands": answer.get("commands") or [],
             }
         )
     return labeled
@@ -240,6 +289,27 @@ def draw_diagram(
         warnings.append(f"diagram dropped: {error}")
         drawn["file"] = None
     return drawn
+
+
+def unlabelled(images: list[Path], candidates: list[dict]) -> list[dict]:
+    """What a model without eyes leaves behind: the pictures as they are,
+    the first LIMIT of them by time kept, so the note still shows
+    something. An empty caption, because render places it as text."""
+    entries = [
+        {
+            "file": image.name,
+            "label": "unknown",
+            "caption": "",
+            "commands": [],
+            "time": candidate["time"],
+            "expected": candidate["kind"],
+            "chosen": False,
+        }
+        for image, candidate in zip(images, candidates)
+    ]
+    for entry in sorted(entries, key=lambda e: e["time"])[:LIMIT]:
+        entry["chosen"] = True
+    return entries
 
 
 def choose(labeled: list[dict], kind: str | None, limit: int = LIMIT) -> list[dict]:
@@ -315,19 +385,35 @@ def frames(
         return result
 
     spend: list[dict] = []
-    labeled = label(images, taken, settings, language, spend)
-    for entry, candidate in zip(labeled, taken):
-        entry.update(time=candidate["time"], expected=candidate["kind"])
-    chosen = {f["file"] for f in choose(labeled, analysis.get("kind"))}
+    try:
+        # Asked before the first request, not learned from its error: a
+        # local server answers a picture to a text model after minutes,
+        # and once per picture (2026-09-10).
+        if llm.capabilities(settings).get("vision") is False:
+            raise llm.NoVisionError(llm.describe(settings))
+        labeled = label(images, taken, settings, language, spend)
+        for entry, candidate in zip(labeled, taken):
+            entry.update(time=candidate["time"], expected=candidate["kind"])
+        chosen = {f["file"] for f in choose(labeled, analysis.get("kind"))}
+    except llm.NoVisionError:
+        # A blind model must not cost the whole run: the pictures stay,
+        # the note carries them without a caption.
+        result["warnings"].append(NO_VISION)
+        labeled = unlabelled(images, taken)
+        chosen = {f["file"] for f in labeled if f["chosen"]}
     for entry in labeled:
         entry["chosen"] = entry["file"] in chosen
         if not entry["chosen"]:
             (folder / entry["file"]).unlink(missing_ok=True)
     result["frames"] = labeled
     if not any(f["label"] == "diagram" and f["chosen"] for f in labeled):
-        result["diagram"] = draw_diagram(
-            analysis, folder, vid, settings, language, spend, result["warnings"]
-        )
+        try:
+            result["diagram"] = draw_diagram(
+                analysis, folder, vid, settings, language, spend, result["warnings"]
+            )
+        except llm.NoVisionError:
+            if NO_VISION not in result["warnings"]:
+                result["warnings"].append(NO_VISION)
     result["cost"] = llm.totals(spend)
     result_path.write_text(
         json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"

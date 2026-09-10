@@ -1,7 +1,7 @@
 {
-  "name": "corganshelper",
-  "version": "0.1.29",
-  "description": "A Manifest V3 browser extension for Firefox and Chrome.",
+  "name": "video-tldr",
+  "version": "0.1.59",
+  "description": "Watch it. Vault it. One click turns the YouTube video in the active tab into a summary with pictures, as a note, PDF or Word file.",
   "type": "module",
   "license": "MIT",
   "engines": {

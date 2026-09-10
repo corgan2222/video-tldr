@@ -1,11 +1,11 @@
-export const appName = "corganshelper";
+export const appName = "video-tldr";
 export const docsRoute = "/docs";
 export const docsImageRoute = "/og/docs";
 export const docsContentRoute = "/llms.mdx/docs";
 
 export const gitConfig = {
   user: "corgan2222",
-  repo: "corganshelper",
+  repo: "video-tldr",
   branch: "main",
 };
 

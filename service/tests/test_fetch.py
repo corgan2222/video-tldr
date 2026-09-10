@@ -1,9 +1,10 @@
 import json
+from pathlib import Path
 
 import pytest
 
-from corganshelper_service.config import Settings
-from corganshelper_service.fetch import (
+from video_tldr_service.config import Settings
+from video_tldr_service.fetch import (
     JFIF,
     FetchError,
     ensure_jfif,
@@ -11,6 +12,7 @@ from corganshelper_service.fetch import (
     subtitle_languages,
     summarise,
     video_id,
+    work_folder,
 )
 
 
@@ -64,7 +66,7 @@ def test_anything_that_is_not_a_youtube_video_is_refused(url):
 
 def test_a_stored_result_is_returned_without_touching_the_network(tmp_path):
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder = work_folder(settings, "BT4ywlPr6Pk")
     folder.mkdir(parents=True)
     stored = {"id": "BT4ywlPr6Pk", "title": "stored"}
     (folder / "fetch.json").write_text(json.dumps(stored), encoding="utf-8")
@@ -108,9 +110,9 @@ def test_a_jpeg_without_a_jfif_segment_gets_one_and_one_with_it_stays(tmp_path):
     assert ensure_jfif(exif).read_bytes()[6:10] == b"Exif"
 
 
-def test_settings_default_to_the_data_drive(monkeypatch):
-    monkeypatch.delenv("CORGANSHELPER_HOME", raising=False)
-    monkeypatch.delenv("CORGANSHELPER_COOKIES", raising=False)
+def test_settings_default_to_the_home_folder(monkeypatch):
+    monkeypatch.delenv("VIDEO_TLDR_HOME", raising=False)
+    monkeypatch.delenv("VIDEO_TLDR_COOKIES", raising=False)
     settings = Settings.load()
-    assert settings.work_dir.as_posix() == "D:/corganshelper/work"
+    assert settings.work_dir == Path.home() / ".video-tldr" / "work"
     assert settings.cookies_file is None

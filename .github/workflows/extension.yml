@@ -41,9 +41,9 @@ jobs:
         run: npx web-ext lint --source-dir dist
 
       - name: Zip the extension
-        run: cd dist && zip -r ../corganshelper.zip .
+        run: cd dist && zip -r ../video-tldr.zip .
 
       - uses: actions/upload-artifact@v4
         with:
-          name: corganshelper
-          path: corganshelper.zip
+          name: video-tldr
+          path: video-tldr.zip

@@ -1,11 +1,12 @@
 import json
+import os
 from types import SimpleNamespace
 
 import pytest
 
-from corganshelper_service.config import Settings
-from corganshelper_service.fetch import FetchError
-from corganshelper_service.transcribe import segments_from_json3, transcribe
+from video_tldr_service.config import Settings
+from video_tldr_service.fetch import FetchError, work_folder
+from video_tldr_service.transcribe import segments_from_json3, transcribe
 
 # Three caption lines as YouTube writes them, with the scrolling line breaks
 # between them and durations that overlap the following line.
@@ -43,7 +44,7 @@ def test_caption_lines_become_segments_that_end_where_the_next_begins():
 
 def test_the_youtube_track_is_used_when_it_was_fetched(tmp_path):
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder = work_folder(settings, "BT4ywlPr6Pk")
     folder.mkdir(parents=True)
     (folder / "BT4ywlPr6Pk.en-orig.json3").write_text(
         json.dumps(JSON3), encoding="utf-8"
@@ -63,7 +64,7 @@ def test_the_youtube_track_is_used_when_it_was_fetched(tmp_path):
 
 def test_asking_for_subtitles_without_a_track_is_an_error(tmp_path):
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder = work_folder(settings, "BT4ywlPr6Pk")
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(
         json.dumps({"id": "BT4ywlPr6Pk", "subtitles": []}), encoding="utf-8"
@@ -78,11 +79,11 @@ def test_the_openai_engine_uploads_shrunk_audio_and_keeps_the_segments(
 ):
     import openai
 
-    from corganshelper_service import transcribe as module
+    from video_tldr_service import transcribe as module
 
     settings = Settings(home=tmp_path)
     settings.config.update(stt="openai", openai_api_key="sk-fake")
-    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder = work_folder(settings, "BT4ywlPr6Pk")
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(
         json.dumps({"id": "BT4ywlPr6Pk", "subtitles": []}), encoding="utf-8"
@@ -129,10 +130,10 @@ def test_the_parakeet_engine_turns_vad_segments_into_lines(tmp_path, monkeypatch
     import sys
     import types
 
-    from corganshelper_service import transcribe as module
+    from video_tldr_service import transcribe as module
 
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder = work_folder(settings, "BT4ywlPr6Pk")
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(
         json.dumps({"id": "BT4ywlPr6Pk", "subtitles": ["BT4ywlPr6Pk.de-orig.json3"]}),
@@ -162,7 +163,7 @@ def test_the_parakeet_engine_turns_vad_segments_into_lines(tmp_path, monkeypatch
     monkeypatch.setitem(sys.modules, "onnx_asr", fake)
     monkeypatch.setattr(module, "download_audio", lambda url, folder, settings: audio)
     monkeypatch.setattr(module, "to_wav16k", lambda path: path.with_suffix(".16k.wav"))
-    monkeypatch.setenv("CORGANSHELPER_WHISPER", "cuda:1")
+    monkeypatch.setenv("VIDEO_TLDR_WHISPER", "cuda:1")
 
     result = transcribe("https://youtu.be/BT4ywlPr6Pk", settings, engine="parakeet")
 
@@ -184,10 +185,10 @@ def test_whisper_large_is_the_accurate_whisper_and_auto_takes_the_default(
     import sys
     import types
 
-    from corganshelper_service import transcribe as module
+    from video_tldr_service import transcribe as module
 
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder = work_folder(settings, "BT4ywlPr6Pk")
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(
         json.dumps({"id": "BT4ywlPr6Pk", "subtitles": []}), encoding="utf-8"
@@ -209,7 +210,7 @@ def test_whisper_large_is_the_accurate_whisper_and_auto_takes_the_default(
         sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=FakeWhisper)
     )
     monkeypatch.setattr(module, "download_audio", lambda url, folder, settings: audio)
-    monkeypatch.setenv("CORGANSHELPER_WHISPER", "cpu")
+    monkeypatch.setenv("VIDEO_TLDR_WHISPER", "cpu")
 
     result = transcribe(
         "https://youtu.be/BT4ywlPr6Pk", settings, engine="whisper-large"
@@ -229,7 +230,7 @@ def test_canary_is_told_the_language_and_parakeet_is_not(tmp_path, monkeypatch):
     import sys
     import types
 
-    from corganshelper_service import transcribe as module
+    from video_tldr_service import transcribe as module
 
     calls = []
 
@@ -247,7 +248,7 @@ def test_canary_is_told_the_language_and_parakeet_is_not(tmp_path, monkeypatch):
     )
     monkeypatch.setitem(sys.modules, "onnx_asr", fake)
     monkeypatch.setattr(module, "to_wav16k", lambda path: path)
-    monkeypatch.setenv("CORGANSHELPER_WHISPER", "cpu")
+    monkeypatch.setenv("VIDEO_TLDR_WHISPER", "cpu")
     audio = tmp_path / "a.m4a"
 
     module.onnx_transcribe(audio, tmp_path, "nemo-canary-1b-v2", "de")
@@ -255,3 +256,104 @@ def test_canary_is_told_the_language_and_parakeet_is_not(tmp_path, monkeypatch):
     module.onnx_transcribe(audio, tmp_path, "nemo-parakeet-tdt-0.6b-v3", "de")
 
     assert calls == [{"language": "de"}, {}, {}]
+
+
+def test_stt_status_says_what_would_run_and_whether_it_can(tmp_path, monkeypatch):
+    from video_tldr_service import transcribe as module
+    from video_tldr_service.config import Settings
+
+    monkeypatch.setenv("VIDEO_TLDR_WHISPER", "cpu")
+    settings = Settings(home=tmp_path)
+
+    state = module.stt_status(settings)
+    assert state["ok"] is True
+    assert state["detail"].startswith("captions first, else whisper (large-v3-turbo)")
+    assert "downloads on first use" in state["detail"]
+    assert "cpu" in state["detail"]
+
+    (tmp_path / "models" / "faster-whisper-large-v3-turbo").mkdir(parents=True)
+    assert "downloaded" in module.stt_status(settings)["detail"]
+
+    settings.config["stt"] = "subtitles"
+    assert module.stt_status(settings) == {
+        "ok": True,
+        "detail": "captions only, no model needed",
+    }
+
+    settings.config["stt"] = "openai"
+    assert module.stt_status(settings)["ok"] is False
+    settings.config["openai_api_key"] = "k"
+    assert module.stt_status(settings) == {
+        "ok": True,
+        "detail": "openai whisper-1, key set",
+    }
+
+    settings.config["stt"] = "parakeet"
+    state = module.stt_status(settings)
+    assert state["ok"] is True
+    assert state["detail"].startswith("parakeet (nemo-parakeet-tdt-0.6b-v3)")
+
+
+def test_a_process_without_cuda_is_told_to_restart_the_service(tmp_path, monkeypatch):
+    """The owner met this on 2026-09-10: the light went red with 0 CUDA
+    devices while a fresh process saw both cards. CUDA keeps a failed
+    start for the life of the process, so the advice is a restart, not a
+    switch to the CPU."""
+    import sys
+    import types
+
+    from video_tldr_service import transcribe as module
+
+    monkeypatch.setenv("VIDEO_TLDR_WHISPER", "cuda:0")
+    monkeypatch.setattr(module, "add_nvidia_dll_dirs", lambda: None)
+    settings = Settings(home=tmp_path)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "ctranslate2",
+        types.SimpleNamespace(get_cuda_device_count=lambda: 0),
+    )
+    state = module.stt_status(settings)
+    assert state["ok"] is False
+    assert "restart the service" in state["detail"]
+    assert "Only if it stays away" in state["detail"]
+
+    # A card that is simply not there gets the other advice.
+    monkeypatch.setenv("VIDEO_TLDR_WHISPER", "cuda:3")
+    monkeypatch.setitem(
+        sys.modules,
+        "ctranslate2",
+        types.SimpleNamespace(get_cuda_device_count=lambda: 2),
+    )
+    state = module.stt_status(settings)
+    assert state["ok"] is False
+    assert "cuda:3 not found (2 CUDA devices)" in state["detail"]
+    assert "restart the service" not in state["detail"]
+
+
+def test_the_dll_directories_are_added_once_per_process(tmp_path, monkeypatch):
+    """Every GET /health asked for them, the popup asks every two seconds,
+    and each call grew PATH and the process's DLL directory list until
+    Windows answered WinError 206 and numpy stopped loading mid-run
+    (owner, 2026-09-10)."""
+    import sysconfig
+
+    from video_tldr_service import transcribe as module
+
+    root = tmp_path / "nvidia"
+    for name in ("cublas", "cudnn"):
+        (root / name / "bin").mkdir(parents=True)
+    added: list[str] = []
+    monkeypatch.setattr(module, "_DLL_DIRS", None)
+    monkeypatch.setattr(module.os, "name", "nt")
+    monkeypatch.setattr(module.os, "add_dll_directory", added.append, raising=False)
+    monkeypatch.setattr(sysconfig, "get_paths", lambda: {"purelib": str(tmp_path)})
+    monkeypatch.setenv("PATH", "C:/windows")
+
+    first = module.add_nvidia_dll_dirs()
+    for _ in range(50):
+        module.add_nvidia_dll_dirs()
+
+    assert len(first) == 2
+    assert len(added) == 2
+    assert os.environ["PATH"].count("cublas") == 1

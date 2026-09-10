@@ -122,7 +122,7 @@ first thing a store reviewer reads.
 
 ## Reporting bugs
 
-Open an issue at `https://github.com/corgan2222/corganshelper/issues`. What makes a report quick to act
+Open an issue at `https://github.com/corgan2222/video-tldr/issues`. What makes a report quick to act
 on:
 
 - The version you run, and the browser with its version.

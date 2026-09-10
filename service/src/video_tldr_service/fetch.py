@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
+from datetime import UTC, date, datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from .config import Settings
+from .config import WORK, Settings
 
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 URL_IN_TEXT = re.compile(r"https?://[^\s)>\]]+")
@@ -42,8 +44,93 @@ def video_id(url: str) -> str:
     return candidate
 
 
+# What Windows refuses in a file name, plus control characters.
+FORBIDDEN = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+TITLE_LENGTH = 80
+
+
+def clean_title(title: str | None, fallback: str) -> str:
+    """A title Windows takes as a name: without what it refuses, cut to
+    TITLE_LENGTH, and the video id when nothing is left."""
+    name = FORBIDDEN.sub("", title or "").strip(" .")
+    return name[:TITLE_LENGTH].rstrip(" .") or fallback
+
+
+def folder_name(vid: str, title: str | None, today: date) -> str:
+    """`YYYY_MM_DD_Title`: the day of processing, then the title."""
+    return f"{today:%Y_%m_%d}_{clean_title(title, vid)}"
+
+
+def stored_id(folder: Path) -> str | None:
+    """The video a folder in the library belongs to, from the fetch
+    result inside it; None when there is none to read."""
+    marker = folder / WORK / RESULT_NAME
+    try:
+        return json.loads(marker.read_text(encoding="utf-8")).get("id")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return None
+
+
+def video_folder(settings: Settings, vid: str, today: date | None = None) -> Path:
+    """The folder that holds everything of one video: the outputs and,
+    in `tmp`, what only a run needs. Found by the id in its fetch result,
+    so a folder the owner renamed is still the right one; made under the
+    name of the day when there is none yet."""
+    library = settings.library
+    if library.is_dir():
+        for candidate in sorted(library.iterdir()):
+            if candidate.is_dir() and stored_id(candidate) == vid:
+                return candidate
+    today = today or datetime.now(UTC).astimezone().date()
+    folder = library / folder_name(vid, None, today)
+    older = settings.work_dir / vid
+    if older.is_dir() and not folder.exists():
+        # A run of an older version: its files move into the new place
+        # rather than being fetched again, and the folder takes the title
+        # they already carry.
+        folder.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(older), str(folder / WORK))
+        title = (
+            (json.loads((folder / WORK / RESULT_NAME).read_text("utf-8")) or {}).get(
+                "title"
+            )
+            if (folder / WORK / RESULT_NAME).is_file()
+            else None
+        )
+        named = folder.parent / folder_name(vid, title, today)
+        if title and not named.exists():
+            folder.rename(named)
+            return named
+    return folder
+
+
 def work_folder(settings: Settings, vid: str) -> Path:
-    return settings.work_dir / vid
+    """Where a run keeps what it needs on the way: below the video's own
+    folder, so `cleanup` empties one place and the outputs stay."""
+    return video_folder(settings, vid) / WORK
+
+
+def name_after_title(settings: Settings, vid: str, title: str | None) -> Path:
+    """Rename the folder to the title once `fetch` knows it; the name
+    carries the day the run happened. Returns the folder either way."""
+    folder = video_folder(settings, vid)
+    wanted = folder.parent / folder_name(vid, title, folder_date(folder))
+    if folder == wanted or wanted.exists():
+        return folder
+    try:
+        folder.rename(wanted)
+    except OSError:
+        # A file of that folder is open somewhere; the name is cosmetic.
+        return folder
+    return wanted
+
+
+def folder_date(folder: Path) -> date:
+    """The day in a folder's name, today when the name carries none."""
+    try:
+        return date(*(int(part) for part in folder.name.split("_")[:3]))
+    except (TypeError, ValueError):
+        return datetime.now(UTC).astimezone().date()
 
 
 def _ydl_options(folder: Path, settings: Settings) -> dict:
@@ -182,8 +269,8 @@ def summarise(info: dict, folder: Path, vid: str, url: str) -> dict:
 
 
 def fetch(url: str, settings: Settings, force: bool = False) -> dict:
-    """Fill work/<id>/ and return the summary; a second call returns the
-    stored summary unless `force` is set."""
+    """Fill the video's `tmp` folder and return the summary; a second call
+    returns the stored summary unless `force` is set."""
     vid = video_id(url)
     folder = work_folder(settings, vid)
     result_path = folder / RESULT_NAME
@@ -203,7 +290,7 @@ def fetch(url: str, settings: Settings, force: bool = False) -> dict:
         message = str(error)
         if "Sign in to confirm" in message or "not a bot" in message:
             raise FetchError(
-                "YouTube asks for a sign-in (bot check). Set CORGANSHELPER_COOKIES "
+                "YouTube asks for a sign-in (bot check). Set VIDEO_TLDR_COOKIES "
                 "to a cookies file exported the way the yt-dlp wiki describes, "
                 "or try again later."
             ) from error
@@ -224,4 +311,7 @@ def fetch(url: str, settings: Settings, force: bool = False) -> dict:
     result = summarise(info, folder, vid, url)
     result["warnings"] = log.errors
     result_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    # The folder was made before the title was known; now it can carry it.
+    # Every later step finds it again by the id in this very file.
+    name_after_title(settings, vid, result.get("title"))
     return result

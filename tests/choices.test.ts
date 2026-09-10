@@ -1,15 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { DEFAULT_CHOICES, DEFAULT_SETTINGS } from '../src/service.js';
+import { DEFAULT_CHOICES, DEFAULT_SETTINGS, STEPS } from '../src/service.js';
 
 // The options page shows the service's choices and defaults before it
 // is connected, from a copy in service.ts. This reads config.py, the
 // original, so a backend or a default added there fails here until the
 // copy follows.
-const source = readFileSync(
-  'service/src/corganshelper_service/config.py',
-  'utf8',
-);
+const source = readFileSync('service/src/video_tldr_service/config.py', 'utf8');
 
 function pythonList(name: string): string[] {
   const match = new RegExp(`^${name} = \\[([^\\]]*)\\]`, 'm').exec(source);
@@ -52,6 +49,16 @@ it('the choices shown before connecting are the ones config.py has', () => {
     'subtitles',
     ...pythonDictKeys('STT_MODELS'),
   ]);
+});
+
+it('the steps the popup lists are the ones run.py runs', () => {
+  const runSource = readFileSync(
+    'service/src/video_tldr_service/run.py',
+    'utf8',
+  );
+  const match = /^STEPS = \[([^\]]*)\]/m.exec(runSource);
+  if (!match) throw new Error('STEPS not found in run.py');
+  expect(STEPS).toEqual([...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]));
 });
 
 it('the defaults shown before connecting are the ones config.py has', () => {

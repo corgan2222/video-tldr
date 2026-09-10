@@ -138,8 +138,16 @@ template: |
 
   $CHANGES
 
-  `corganshelper-$RESOLVED_VERSION.zip` is the packed extension, for a
+  `video-tldr-$RESOLVED_VERSION.zip` is the packed extension, for a
   manual install or a store upload. The store listings are the supported
   way to install it.
+
+  The service is the `.whl`, and `install.ps1` in the repository fetches
+  it along with `overrides.txt` and the `constraints-*.txt` that pin the
+  combination this release was resolved with:
+
+  ```
+  irm https://raw.githubusercontent.com/$OWNER/$REPOSITORY/main/install.ps1 | iex
+  ```
 
   **Full changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
