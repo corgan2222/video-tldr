@@ -65,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--home",
         type=Path,
-        help="data directory; default VIDEO_TLDR_HOME or ~/.video-tldr",
+        help="data directory; default VIDEO_TLDR_HOME, else LOCALAPPDATA/video-tldr",
     )
     parser.add_argument(
         "--llm", choices=LLM_BACKENDS, help="language model backend for this run"

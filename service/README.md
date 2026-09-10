@@ -153,7 +153,8 @@ Downloads/video-tldr/2026_09_10_Docker vs Podman/
 
 The folder is found again by the video id in `tmp/fetch.json`, so
 renaming it is safe. `cleanup` empties `tmp` and keeps `run.json` for
-the statistics. `VIDEO_TLDR_HOME` (default `~/.video-tldr`) still
+the statistics. `VIDEO_TLDR_HOME` (default `%LOCALAPPDATA%/video-tldr`,
+`~/.video-tldr` where there is no such variable)
 holds `config.json`, `serve.log` and `models/` with the speech models,
 and a run of an older version moves its `work/<id>` folder into the new
 place by itself. Set `VIDEO_TLDR_COOKIES` to a cookies file only
