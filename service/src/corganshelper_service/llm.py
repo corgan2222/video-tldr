@@ -116,9 +116,19 @@ def models(settings: Settings) -> list[str]:
 
             key, url = endpoint(settings)
             client = openai.OpenAI(api_key=key, base_url=url, timeout=10)
-        return [m.id for m in client.models.list()]
+        return [m.id for m in client.models.list() if is_chat_model(m.id)]
     except Exception as error:  # every SDK has its own error tree
         raise LlmError(reachable_message(name, error)) from error
+
+
+# A local server lists everything it has loaded, and neither a Whisper nor
+# an embedding model can answer a prompt. Offered anyway, one of them cost
+# the owner four jobs with a 400 from LM Studio (2026-09-10).
+NOT_CHAT = ("whisper", "embed")
+
+
+def is_chat_model(name: str) -> bool:
+    return not any(part in name.lower() for part in NOT_CHAT)
 
 
 def reachable_message(name: str, error: Exception) -> str:
