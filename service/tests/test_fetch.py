@@ -110,9 +110,19 @@ def test_a_jpeg_without_a_jfif_segment_gets_one_and_one_with_it_stays(tmp_path):
     assert ensure_jfif(exif).read_bytes()[6:10] == b"Exif"
 
 
-def test_settings_default_to_the_home_folder(monkeypatch):
+def test_settings_default_to_the_place_windows_keeps_machine_data(monkeypatch):
+    """Not APPDATA: that roams, and ten gigabytes of speech models would
+    follow the user to every machine they sign in to."""
     monkeypatch.delenv("VIDEO_TLDR_HOME", raising=False)
     monkeypatch.delenv("VIDEO_TLDR_COOKIES", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(Path("C:/Users/someone/AppData/Local")))
     settings = Settings.load()
-    assert settings.work_dir == Path.home() / ".video-tldr" / "work"
+    assert settings.work_dir == Path("C:/Users/someone/AppData/Local/video-tldr/work")
     assert settings.cookies_file is None
+
+
+def test_settings_fall_back_to_a_dot_folder_without_localappdata(monkeypatch):
+    """The CI runs on Linux, where that variable does not exist."""
+    monkeypatch.delenv("VIDEO_TLDR_HOME", raising=False)
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    assert Settings.load().work_dir == Path.home() / ".video-tldr" / "work"
