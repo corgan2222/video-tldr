@@ -164,7 +164,7 @@ function renderJob(job: Job, now: Date): HTMLElement {
     const row = element('div', undefined, 'row');
     row.append(
       iconButton(t('cancel'), '✕', () => {
-        void ask({ type: 'cancel', id: job.id });
+        tell({ type: 'cancel', id: job.id });
       }),
     );
     box.append(row);
@@ -195,13 +195,13 @@ function renderJob(job: Job, now: Date): HTMLElement {
     if (job.written?.obsidian) {
       row.append(
         iconButton(t('openNote'), '🟣', () => {
-          void ask({ type: 'open', id: job.id, what: 'obsidian' });
+          tell({ type: 'open', id: job.id, what: 'obsidian' });
         }),
       );
     }
     row.append(
       iconButton(t('openFolder'), '📁', () => {
-        void ask({ type: 'open', id: job.id, what: 'folder' });
+        tell({ type: 'open', id: job.id, what: 'folder' });
       }),
     );
     box.append(row);
@@ -212,6 +212,14 @@ function renderJob(job: Job, now: Date): HTMLElement {
     box.append(files);
   }
   return box;
+}
+
+// A click that fires and forgets. ask() has already put the reason in the
+// status line, so there is nothing left to do here; without the catch a
+// cancel or open for a job the service no longer knows ends as an
+// unhandled rejection.
+function tell(what: object): void {
+  void ask(what).catch(() => {});
 }
 
 async function ask(what: object): Promise<unknown> {
@@ -337,12 +345,14 @@ async function start(profile: Profile): Promise<void> {
     return;
   }
   try {
+    // No language here: `Ask` in background.ts has no such field, and a
+    // field it does not know is swallowed. The select below writes the
+    // language to the service itself, on every change.
     await ask({
       type: 'start',
       url: tabUrl,
       profile,
       options: options(),
-      language: languageBox.value,
     });
     logDetails.open = true;
   } catch {

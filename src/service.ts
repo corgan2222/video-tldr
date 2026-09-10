@@ -5,7 +5,6 @@
 // texts live in _locales, this file only names their keys.
 
 export const NAME = 'video-tldr';
-export const TAGLINE = 'Watch it. Vault it.';
 
 export interface Connection {
   serviceUrl: string;
