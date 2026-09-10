@@ -57,7 +57,9 @@ irm https://raw.githubusercontent.com/corgan2222/video-tldr/main/install.ps1 | i
 
 Das wählt die CUDA-Bibliotheken, wenn eine Karte da ist, und sonst allein
 die ONNX-Laufzeit, legt `video-tldr` auf den PATH und trägt keinen
-Autostart ein: die Erweiterung startet den Dienst, wenn sie ihn braucht.
+Autostart ein. Den Dienst startest du selbst mit `video-tldr serve`;
+antwortet er nicht, zeigt die Erweiterung genau diesen Befehl und eine
+Schaltfläche, die ihn kopiert.
 `-Root D:\video-tldr` legt Programm, Umgebung und Daten unter ein
 Verzeichnis statt an drei übliche Orte. Die Sprachmodelle kommen beim
 ersten Lauf dazu, mehrere Gigabyte.
@@ -80,7 +82,8 @@ und Modellwahl.
 
 ## Benutzung
 
-1. Dienst starten: `cd service && uv run video-tldr serve`.
+1. Dienst starten: `video-tldr serve`, aus dem Quelltext gebaut
+   `uv run --project service video-tldr serve`.
 2. Auf das Symbol klicken, „Settings" öffnen, „Connect" drücken, Sprache,
    Ausgaben und Modell wählen, „Save". Ein Token braucht es nur, wenn der
    Dienst eines bekommen hat.
@@ -88,7 +91,7 @@ und Modellwahl.
    „Thorough" drücken. Das Fenster zeigt die Schritte, während sie
    laufen; eine Benachrichtigung meldet, wenn die Zusammenfassung fertig
    ist, und ein Klick darauf öffnet die Notiz.
-4. Ohne Browser: `uv run video-tldr run <url>` macht dasselbe von der
+4. Ohne Browser: `video-tldr run <url>` macht dasselbe von der
    Kommandozeile.
 
 ---
