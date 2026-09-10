@@ -8,8 +8,7 @@ _[English version](../README.md)_
 
 Zu lang zum Lesen? Eine Erweiterung für Firefox und Chrome mit einem
 lokalen Dienst, die aus dem YouTube-Video im aktiven Tab eine
-Zusammenfassung mit Bildern macht. Das Repository behält seinen alten
-Namen, corganshelper.
+Zusammenfassung mit Bildern macht.
 
 ## Was es kann
 

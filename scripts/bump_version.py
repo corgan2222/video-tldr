@@ -128,7 +128,7 @@ def stage(root: Path, path: Path) -> None:
 _DUNDER_VERSION = re.compile(r'^__version__ = "(\d+\.\d+\.\d+)"', re.MULTILINE)
 MIRRORS = (
     ("src/manifest.json", _PACKAGE_JSON_VERSION),
-    ("service/src/corganshelper_service/__init__.py", _DUNDER_VERSION),
+    ("service/src/video_tldr_service/__init__.py", _DUNDER_VERSION),
 )
 
 

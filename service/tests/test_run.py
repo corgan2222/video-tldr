@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from corganshelper_service import run as module
-from corganshelper_service.config import DEFAULTS, Settings
-from corganshelper_service.fetch import FetchError, work_folder
-from corganshelper_service.run import (
+from video_tldr_service import run as module
+from video_tldr_service.config import DEFAULTS, Settings
+from video_tldr_service.fetch import FetchError, work_folder
+from video_tldr_service.run import (
     MODEL_RESULTS,
     STEPS,
     bench,

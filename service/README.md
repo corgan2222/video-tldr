@@ -1,7 +1,7 @@
 # The video-tldr service
 
-The local service the video-tldr extension talks to; the package and the repository keep the name corganshelper. Every pipeline step is a
-command line entry point that runs the same code the HTTP service runs;
+The local service the video-tldr extension talks to. Every pipeline step is
+a command line entry point that runs the same code the HTTP service runs;
 `run` chains them, `serve` offers them to the extension.
 
 ```
@@ -37,7 +37,7 @@ Word file with the same pictures.
 
 One of the two extras is needed to transcribe: `gpu` brings the CUDA
 libraries for faster-whisper and the ONNX runtime for Parakeet (about 2 GB
-of wheels), `cpu` the ONNX runtime alone. `CORGANSHELPER_WHISPER` picks the
+of wheels), `cpu` the ONNX runtime alone. `VIDEO_TLDR_WHISPER` picks the
 device for both local models, `cuda:0` by default, `cuda:1` for the second
 card, `cpu` for none.
 
@@ -151,10 +151,10 @@ Downloads/video-tldr/2026_09_10_Docker vs Podman/
 
 The folder is found again by the video id in `tmp/fetch.json`, so
 renaming it is safe. `cleanup` empties `tmp` and keeps `run.json` for
-the statistics. `CORGANSHELPER_HOME` (default `D:/corganshelper`) still
+the statistics. `VIDEO_TLDR_HOME` (default `~/.video-tldr`) still
 holds `config.json`, `serve.log` and `models/` with the speech models,
 and a run of an older version moves its `work/<id>` folder into the new
-place by itself. Set `CORGANSHELPER_COOKIES` to a cookies file only
+place by itself. Set `VIDEO_TLDR_COOKIES` to a cookies file only
 when YouTube answers with a sign-in check; the yt-dlp wiki explains the
 export and warns that an account used this way can be locked.
 

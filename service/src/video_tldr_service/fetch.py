@@ -290,7 +290,7 @@ def fetch(url: str, settings: Settings, force: bool = False) -> dict:
         message = str(error)
         if "Sign in to confirm" in message or "not a bot" in message:
             raise FetchError(
-                "YouTube asks for a sign-in (bot check). Set CORGANSHELPER_COOKIES "
+                "YouTube asks for a sign-in (bot check). Set VIDEO_TLDR_COOKIES "
                 "to a cookies file exported the way the yt-dlp wiki describes, "
                 "or try again later."
             ) from error

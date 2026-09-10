@@ -8,7 +8,7 @@ and `library(settings)` points into it.
 
 import pytest
 
-from corganshelper_service import config
+from video_tldr_service import config
 
 
 @pytest.fixture(autouse=True)

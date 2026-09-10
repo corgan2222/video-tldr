@@ -81,10 +81,10 @@ def video_id_of(folder: Path) -> str:
 
 
 def whisper_device() -> tuple[str, int, str]:
-    """(device, index, compute_type) from CORGANSHELPER_WHISPER, default the
+    """(device, index, compute_type) from VIDEO_TLDR_WHISPER, default the
     first CUDA device in float16. `cpu` means int8 on the CPU. Parakeet
     reads the same variable, so one setting moves both local models."""
-    spec = os.environ.get("CORGANSHELPER_WHISPER", "cuda:0")
+    spec = os.environ.get("VIDEO_TLDR_WHISPER", "cuda:0")
     if spec == "cpu":
         return "cpu", 0, "int8"
     device, _, index = spec.partition(":")
@@ -304,10 +304,10 @@ def stt_status(settings: Settings) -> dict:
                 # fresh process sees every card (owner, 2026-09-10).
                 where += (
                     "; this process lost CUDA, restart the service. Only if "
-                    "it stays away, set CORGANSHELPER_WHISPER=cpu"
+                    "it stays away, set VIDEO_TLDR_WHISPER=cpu"
                 )
             else:
-                where += "; set CORGANSHELPER_WHISPER=cuda:0 or =cpu"
+                where += "; set VIDEO_TLDR_WHISPER=cuda:0 or =cpu"
     return {"ok": ok, "detail": f"{prefix}{chosen} ({spec['model']}), {disk}, {where}"}
 
 

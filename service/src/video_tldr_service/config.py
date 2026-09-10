@@ -15,7 +15,11 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_HOME = "D:/corganshelper"
+# Under the home directory, not under LOCALAPPDATA: a packaged host
+# virtualises the latter, so a write lands in its LocalCache and the path
+# the user reads in the settings shows nothing. VIDEO_TLDR_HOME moves it,
+# which is what a machine with the models on another drive wants.
+DEFAULT_HOME = Path.home() / ".video-tldr"
 CONFIG_NAME = "config.json"
 # The folder in the download folder that holds one folder per video, and
 # the folder inside that one for what only a run needs.
@@ -80,29 +84,29 @@ LANGUAGES = {"de": "German", "en": "English"}
 # Every key config.json may carry, with the environment variable that
 # overrides it. The vendor variables are the ones their SDKs read anyway.
 KEYS = {
-    "llm": "CORGANSHELPER_LLM",
-    "model": "CORGANSHELPER_MODEL",
-    "stt": "CORGANSHELPER_STT",
-    "language": "CORGANSHELPER_LANGUAGE",
+    "llm": "VIDEO_TLDR_LLM",
+    "model": "VIDEO_TLDR_MODEL",
+    "stt": "VIDEO_TLDR_STT",
+    "language": "VIDEO_TLDR_LANGUAGE",
     "openai_api_key": "OPENAI_API_KEY",
     "openai_base_url": "OPENAI_BASE_URL",
     "anthropic_api_key": "ANTHROPIC_API_KEY",
     "lmstudio_url": "LMSTUDIO_URL",
     "ollama_url": "OLLAMA_URL",
-    "formats": "CORGANSHELPER_FORMATS",
-    "obsidian_vault": "CORGANSHELPER_OBSIDIAN_VAULT",
-    "obsidian_folder": "CORGANSHELPER_OBSIDIAN_FOLDER",
-    "browser": "CORGANSHELPER_BROWSER",
-    "token": "CORGANSHELPER_TOKEN",
+    "formats": "VIDEO_TLDR_FORMATS",
+    "obsidian_vault": "VIDEO_TLDR_OBSIDIAN_VAULT",
+    "obsidian_folder": "VIDEO_TLDR_OBSIDIAN_FOLDER",
+    "browser": "VIDEO_TLDR_BROWSER",
+    "token": "VIDEO_TLDR_TOKEN",
     # Asked for on 2026-09-10: where the outputs go, a look for the PDF,
     # and four switches the popup offers per run (they travel as
     # `options` of a job, the stored value is the default).
-    "download_dir": "CORGANSHELPER_DOWNLOAD_DIR",
-    "pdf_template": "CORGANSHELPER_PDF_TEMPLATE",
-    "cleanup": "CORGANSHELPER_CLEANUP",
-    "timestamps": "CORGANSHELPER_TIMESTAMPS",
-    "condensed": "CORGANSHELPER_CONDENSED",
-    "style": "CORGANSHELPER_STYLE",
+    "download_dir": "VIDEO_TLDR_DOWNLOAD_DIR",
+    "pdf_template": "VIDEO_TLDR_PDF_TEMPLATE",
+    "cleanup": "VIDEO_TLDR_CLEANUP",
+    "timestamps": "VIDEO_TLDR_TIMESTAMPS",
+    "condensed": "VIDEO_TLDR_CONDENSED",
+    "style": "VIDEO_TLDR_STYLE",
 }
 
 # How the note is worded. `normal` is the plain prompt; the others add a
@@ -225,7 +229,7 @@ class Settings:
     def load(cls, home: Path | None = None, overrides: dict | None = None) -> Settings:
         """File, then environment, then `overrides` (the command line)."""
         base = resolve_home(home)
-        cookies = os.environ.get("CORGANSHELPER_COOKIES")
+        cookies = os.environ.get("VIDEO_TLDR_COOKIES")
         config = dict(DEFAULTS)
         config.update(read_config(base / CONFIG_NAME))
         for key, variable in KEYS.items():
@@ -246,7 +250,7 @@ class Settings:
 
 def resolve_home(home: Path | None) -> Path:
     # Absolute: the PDF step turns paths below it into file URLs.
-    return Path(home or os.environ.get("CORGANSHELPER_HOME", DEFAULT_HOME)).resolve()
+    return Path(home or os.environ.get("VIDEO_TLDR_HOME", DEFAULT_HOME)).resolve()
 
 
 # Reading and writing config.json belong together. The options page saves

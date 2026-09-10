@@ -161,7 +161,7 @@ jobs:
 
       - name: Probe
         if: needs.changes.outputs.python == 'true'
-        run: uv run corganshelper --home /tmp/corganshelper probe
+        run: uv run video-tldr --home /tmp/video-tldr probe
 
       - name: Nothing to check
         if: needs.changes.outputs.python != 'true'

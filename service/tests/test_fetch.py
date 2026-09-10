@@ -1,9 +1,10 @@
 import json
+from pathlib import Path
 
 import pytest
 
-from corganshelper_service.config import Settings
-from corganshelper_service.fetch import (
+from video_tldr_service.config import Settings
+from video_tldr_service.fetch import (
     JFIF,
     FetchError,
     ensure_jfif,
@@ -109,9 +110,9 @@ def test_a_jpeg_without_a_jfif_segment_gets_one_and_one_with_it_stays(tmp_path):
     assert ensure_jfif(exif).read_bytes()[6:10] == b"Exif"
 
 
-def test_settings_default_to_the_data_drive(monkeypatch):
-    monkeypatch.delenv("CORGANSHELPER_HOME", raising=False)
-    monkeypatch.delenv("CORGANSHELPER_COOKIES", raising=False)
+def test_settings_default_to_the_home_folder(monkeypatch):
+    monkeypatch.delenv("VIDEO_TLDR_HOME", raising=False)
+    monkeypatch.delenv("VIDEO_TLDR_COOKIES", raising=False)
     settings = Settings.load()
-    assert settings.work_dir.as_posix() == "D:/corganshelper/work"
+    assert settings.work_dir == Path.home() / ".video-tldr" / "work"
     assert settings.cookies_file is None

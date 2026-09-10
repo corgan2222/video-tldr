@@ -23,7 +23,7 @@ const config = {
   // every link and asset needs the prefix. Set here rather than only in the
   // workflow: a path that is right in CI and wrong locally is a path nobody
   // tests. `npm run dev` therefore also runs under the same prefix.
-  basePath: "/corganshelper",
+  basePath: "/video-tldr",
   // Without this the export writes docs.html and no docs/index.html, so a
   // typed or shared /docs/ answers 404 while /docs answers 200. Static hosts
   // resolve a directory to its index, and GitHub Pages redirects the form

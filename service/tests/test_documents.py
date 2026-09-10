@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from corganshelper_service import documents
-from corganshelper_service.documents import (
+from video_tldr_service import documents
+from video_tldr_service.documents import (
     browser,
     command_runs,
     content_box,
@@ -17,8 +17,8 @@ from corganshelper_service.documents import (
     mermaid_png,
     pdf,
 )
-from corganshelper_service.fetch import FetchError
-from corganshelper_service.render import LABELS, by_section
+from video_tldr_service.fetch import FetchError
+from video_tldr_service.render import LABELS, by_section
 
 
 def png(shade: int) -> bytes:
