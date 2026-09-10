@@ -13,16 +13,17 @@ Written in TypeScript, tsc, vitest, prettier.
 
 ## Code map
 
-| Path           | What lives there                                    |
-| -------------- | --------------------------------------------------- |
-| `.github/`     | CI workflows, issue and pull request templates      |
-| `docs/`        | Documentation and the German user guide             |
-| `scripts/`     | The version bump                                    |
-| `tests/`       | vitest tests                                        |
-| `src/`         | The extension                                       |
-| `service/`     | The local Python service the extension talks to     |
-| `website/`     | Documentation site (fumadocs), deployed by docs.yml |
-| `package.json` | Node manifest, holds the version                    |
+| Path           | What lives there                                                      |
+| -------------- | --------------------------------------------------------------------- |
+| `.github/`     | CI workflows, issue and pull request templates                        |
+| `docs/`        | Documentation and the German user guide                               |
+| `scripts/`     | The version bump                                                      |
+| `tests/`       | vitest tests                                                          |
+| `src/`         | The extension                                                         |
+| `service/`     | The local Python service the extension talks to                       |
+| `website/`     | Documentation site (fumadocs), deployed by docs.yml                   |
+| `package.json` | Node manifest, holds the version                                      |
+| `install.ps1`  | Fetches the service from a release, tested by `tests/install.test.ts` |
 
 Add a row when a new area appears; a row per file is an index that `grep`
 keeps better.
