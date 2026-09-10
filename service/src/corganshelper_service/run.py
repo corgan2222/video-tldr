@@ -1,4 +1,4 @@
-"""Every step in a row: `corganshelper run URL` is what the service runs
+"""Every step in a row: `video-tldr run URL` is what the service runs
 for a job, `run --batch urls.txt` what measures the pipeline over many.
 
 Each step skips itself when its result exists, so a second run of the

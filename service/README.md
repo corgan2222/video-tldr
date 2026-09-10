@@ -7,17 +7,17 @@ command line entry point that runs the same code the HTTP service runs;
 ```
 cd service
 uv sync --extra gpu          # or --extra cpu on a machine without CUDA
-uv run corganshelper probe
-uv run corganshelper fetch https://www.youtube.com/watch?v=BT4ywlPr6Pk
-uv run corganshelper transcribe https://www.youtube.com/watch?v=BT4ywlPr6Pk
-uv run corganshelper analyze https://www.youtube.com/watch?v=BT4ywlPr6Pk
-uv run corganshelper enrich https://www.youtube.com/watch?v=BT4ywlPr6Pk
-uv run corganshelper frames https://www.youtube.com/watch?v=BT4ywlPr6Pk
-uv run corganshelper render https://www.youtube.com/watch?v=BT4ywlPr6Pk
-uv run corganshelper render --format obsidian --format pdf https://youtu.be/BT4ywlPr6Pk
-uv run corganshelper run https://youtu.be/BT4ywlPr6Pk          # all of the above
-uv run corganshelper run --batch urls.txt                      # one URL per line
-uv run corganshelper serve                                     # for the extension
+uv run video-tldr probe
+uv run video-tldr fetch https://www.youtube.com/watch?v=BT4ywlPr6Pk
+uv run video-tldr transcribe https://www.youtube.com/watch?v=BT4ywlPr6Pk
+uv run video-tldr analyze https://www.youtube.com/watch?v=BT4ywlPr6Pk
+uv run video-tldr enrich https://www.youtube.com/watch?v=BT4ywlPr6Pk
+uv run video-tldr frames https://www.youtube.com/watch?v=BT4ywlPr6Pk
+uv run video-tldr render https://www.youtube.com/watch?v=BT4ywlPr6Pk
+uv run video-tldr render --format obsidian --format pdf https://youtu.be/BT4ywlPr6Pk
+uv run video-tldr run https://youtu.be/BT4ywlPr6Pk          # all of the above
+uv run video-tldr run --batch urls.txt                      # one URL per line
+uv run video-tldr serve                                     # for the extension
 ```
 
 `enrich` reads the README of up to three GitHub repositories the
@@ -49,7 +49,7 @@ line and prints a Markdown table, one row per video, as each finishes.
 
 ## Serving the extension
 
-`corganshelper serve` listens on `http://127.0.0.1:8765` (`--port`
+`video-tldr serve` listens on `http://127.0.0.1:8765` (`--port`
 changes that). The extension hands over the URL of the active tab, the service
 runs `run` on it, one job at a time, and the extension polls the job
 until it is done. A click on the notification asks the service to open
@@ -79,7 +79,7 @@ Every request must carry a `Host` header of `127.0.0.1:<port>`; an
 `Origin` header is accepted only from `moz-extension://` and
 `chrome-extension://`. The service sends no CORS headers, so a web page
 cannot reach it. A token is optional: with `token` set in `config.json`
-(`corganshelper config --set token=<secret>`), every request must also
+(`video-tldr config --set token=<secret>`), every request must also
 carry `Authorization: Bearer <token>`, which keeps other extensions in
 the browser out; without one, any extension that may reach 127.0.0.1 can
 use the service.
@@ -92,29 +92,29 @@ extension's side is in the console of its background script:
 
 ## Choosing the model
 
-`corganshelper config` shows the settings, `corganshelper config --set
+`video-tldr config` shows the settings, `video-tldr config --set
 key=value` writes them to `config.json` in the data directory. An
 environment variable overrides the file, the flags `--llm`, `--model` and
 `--stt` override both for one run. Keys stay in that file or in the
 environment; the file lives next to the data, outside the repository.
 
-| Setting                                         | Values                                                                                                                                | Notes                                                                                                                                                                       |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `llm`                                           | `claude` (default), `anthropic`, `openai`, `lmstudio`, `ollama`                                                                       | `claude` runs `claude -p` from the Claude Code CLI on the subscription; the APIs need `anthropic_api_key` or `openai_api_key`; the local servers need `model` set           |
-| `model`                                         | a name the backend accepts                                                                                                            | `corganshelper models` lists them; empty means the backend's default                                                                                                        |
-| `stt`                                           | `auto` (default), `subtitles`, or a model from `corganshelper models stt`: `whisper`, `whisper-large`, `parakeet`, `canary`, `openai` | `auto` takes YouTube's caption track when there is one, else `whisper`; the list shows each model's speed class, its Open ASR Leaderboard word error rate and its languages |
-| `language`                                      | `de`, `en`                                                                                                                            | language of the note                                                                                                                                                        |
-| `formats`                                       | comma list of `md`, `obsidian`, `pdf`, `docx`                                                                                         | what `render` writes besides `summary.md`; default `md`                                                                                                                     |
-| `obsidian_vault`, `obsidian_folder`             | a path, a folder inside it                                                                                                            | where the Obsidian note goes, pictures under `_bilder` in that folder; default folder `Videos`                                                                              |
-| `browser`                                       | path to `chrome.exe` or `msedge.exe`                                                                                                  | prints the PDF; empty searches the usual places                                                                                                                             |
-| `lmstudio_url`, `ollama_url`, `openai_base_url` | URLs                                                                                                                                  | where the OpenAI-protocol servers listen                                                                                                                                    |
-| `token`                                         | what the extension sends with every request                                                                                           | optional; without one the Host and Origin checks alone guard the service                                                                                                    |
-| `download_dir`                                  | a folder                                                                                                                              | where the outputs go; empty means the user's Downloads folder                                                                                                               |
-| `pdf_template`                                  | an HTML file with `{{content}}`, or a CSS file                                                                                        | the look of the PDF; empty means the built-in one                                                                                                                           |
-| `style`                                         | `normal` (default), `caveman`, `noslop`, `engineer`, `human`, `all`                                                                   | how the note is worded; `all` writes one note per style, for comparing them                                                                                                 |
-| `timestamps`                                    | `on` (default), `off`                                                                                                                 | link every section, key point and picture to its moment in the video                                                                                                        |
-| `condensed`                                     | `on`, `off` (default)                                                                                                                 | boil the video down to a two-minute read                                                                                                                                    |
-| `cleanup`                                       | `on`, `off` (default)                                                                                                                 | delete `work/<id>/` after a run that wrote its outputs, `run.json` kept                                                                                                     |
+| Setting                                         | Values                                                                                                                             | Notes                                                                                                                                                                       |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `llm`                                           | `claude` (default), `anthropic`, `openai`, `lmstudio`, `ollama`                                                                    | `claude` runs `claude -p` from the Claude Code CLI on the subscription; the APIs need `anthropic_api_key` or `openai_api_key`; the local servers need `model` set           |
+| `model`                                         | a name the backend accepts                                                                                                         | `video-tldr models` lists them; empty means the backend's default                                                                                                           |
+| `stt`                                           | `auto` (default), `subtitles`, or a model from `video-tldr models stt`: `whisper`, `whisper-large`, `parakeet`, `canary`, `openai` | `auto` takes YouTube's caption track when there is one, else `whisper`; the list shows each model's speed class, its Open ASR Leaderboard word error rate and its languages |
+| `language`                                      | `de`, `en`                                                                                                                         | language of the note                                                                                                                                                        |
+| `formats`                                       | comma list of `md`, `obsidian`, `pdf`, `docx`                                                                                      | what `render` writes besides `summary.md`; default `md`                                                                                                                     |
+| `obsidian_vault`, `obsidian_folder`             | a path, a folder inside it                                                                                                         | where the Obsidian note goes, pictures under `_bilder` in that folder; default folder `Videos`                                                                              |
+| `browser`                                       | path to `chrome.exe` or `msedge.exe`                                                                                               | prints the PDF; empty searches the usual places                                                                                                                             |
+| `lmstudio_url`, `ollama_url`, `openai_base_url` | URLs                                                                                                                               | where the OpenAI-protocol servers listen                                                                                                                                    |
+| `token`                                         | what the extension sends with every request                                                                                        | optional; without one the Host and Origin checks alone guard the service                                                                                                    |
+| `download_dir`                                  | a folder                                                                                                                           | where the outputs go; empty means the user's Downloads folder                                                                                                               |
+| `pdf_template`                                  | an HTML file with `{{content}}`, or a CSS file                                                                                     | the look of the PDF; empty means the built-in one                                                                                                                           |
+| `style`                                         | `normal` (default), `caveman`, `noslop`, `engineer`, `human`, `all`                                                                | how the note is worded; `all` writes one note per style, for comparing them                                                                                                 |
+| `timestamps`                                    | `on` (default), `off`                                                                                                              | link every section, key point and picture to its moment in the video                                                                                                        |
+| `condensed`                                     | `on`, `off` (default)                                                                                                              | boil the video down to a two-minute read                                                                                                                                    |
+| `cleanup`                                       | `on`, `off` (default)                                                                                                              | delete `work/<id>/` after a run that wrote its outputs, `run.json` kept                                                                                                     |
 
 `probe` says what keeps the chosen backend from answering, and
 `GET /health` says it while the extension is open. A local model needs a

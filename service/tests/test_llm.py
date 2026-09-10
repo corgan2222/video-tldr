@@ -331,7 +331,7 @@ def test_openai_without_a_key_and_a_local_server_without_a_model_are_named(
 
     with pytest.raises(LlmError) as caught:
         llm.complete("i", "d", {}, settings_for(tmp_path, llm="ollama"))
-    assert "corganshelper models" in str(caught.value)
+    assert "video-tldr models" in str(caught.value)
 
     assert llm.models(settings_for(tmp_path, llm="lmstudio")) == ["qwen3-8b", "gemma"]
     assert llm.models(settings_for(tmp_path)) == ["sonnet", "opus", "haiku"]

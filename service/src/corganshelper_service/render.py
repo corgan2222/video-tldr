@@ -323,7 +323,7 @@ def render(
         if not settings.config["obsidian_vault"]:
             raise FetchError(
                 "no obsidian_vault in config.json; "
-                "`corganshelper config --set obsidian_vault=<path to the vault>`"
+                "`video-tldr config --set obsidian_vault=<path to the vault>`"
             )
         # A mistyped vault would be created, note and all, where Obsidian
         # never looks.

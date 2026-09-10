@@ -115,8 +115,8 @@ def check(settings: Settings) -> str | None:
             models(settings)
         if not model_name(settings):
             return (
-                f"no model set for {backend(settings)}; `corganshelper models` "
-                "lists what it offers, `corganshelper config --set model=<name>` "
+                f"no model set for {backend(settings)}; `video-tldr models` "
+                "lists what it offers, `video-tldr config --set model=<name>` "
                 "picks one"
             )
     except LlmError as error:

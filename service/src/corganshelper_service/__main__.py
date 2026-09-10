@@ -30,7 +30,10 @@ from .run import bench, bench_table, header, row, run, urls_in
 from .serve import PORT, serve
 from .transcribe import transcribe
 
-PROG = "corganshelper"
+# What `--help` and every error message call the command. The package and
+# the repository keep the name corganshelper, which is why `pyproject.toml`
+# installs both names for the same entry point.
+PROG = "video-tldr"
 
 
 def probe(settings: Settings) -> list[str]:

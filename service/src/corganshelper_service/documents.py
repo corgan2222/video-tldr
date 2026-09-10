@@ -103,7 +103,7 @@ def command_runs(steps: list[str]) -> list[tuple[bool, list[str]]]:
     return runs
 
 
-BROWSER_HINT = "`corganshelper config --set browser=<path to chrome.exe>`"
+BROWSER_HINT = "`video-tldr config --set browser=<path to chrome.exe>`"
 
 
 def browser(configured: str = "") -> str:

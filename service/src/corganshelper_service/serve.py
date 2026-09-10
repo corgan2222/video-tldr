@@ -271,7 +271,7 @@ class Service:
         # secret must not overwrite the real one. The token is not written
         # either: this process keeps the one it started with, so a change
         # here would look accepted and lock the extension out until the
-        # next start. `corganshelper config --set token=...` is the way.
+        # next start. `video-tldr config --set token=...` is the way.
         store(
             self.home,
             {
@@ -658,7 +658,7 @@ def serve(home: Path | None, overrides: dict | None = None, port: int = PORT) ->
     else:
         print(
             "no token set: any extension in the browser may use the service; "
-            "`corganshelper config --set token=<secret>` turns the check on",
+            "`video-tldr config --set token=<secret>` turns the check on",
             flush=True,
         )
     service.log.info("video-tldr service %s listening on port %s", __version__, port)

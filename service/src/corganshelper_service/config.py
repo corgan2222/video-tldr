@@ -1,6 +1,6 @@
 """Where the service keeps its data, and the knobs it reads.
 
-The knobs live in `<home>/config.json`, written by `corganshelper config`
+The knobs live in `<home>/config.json`, written by `video-tldr config`
 and later by the extension's options page. An environment variable
 overrides the file, a command line flag overrides both. API keys stay in
 that file or in the environment; the file lives next to the data, outside
@@ -295,7 +295,7 @@ def split_formats(text: str) -> list[str]:
 
 
 def parse_assignments(pairs: list[str]) -> dict:
-    """`key=value` arguments of `corganshelper config --set`."""
+    """`key=value` arguments of `video-tldr config --set`."""
     values = {}
     for pair in pairs:
         key, separator, value = pair.partition("=")
