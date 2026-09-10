@@ -5,7 +5,7 @@ Each step skips itself when its result exists, so a second run of the
 same video costs seconds; `force` redoes every step. The note is
 rendered once right after analyze, before the expensive steps, so a
 video that fails in frames still has a readable summary. What a run
-took and cost goes to `work/<id>/run.json`; `stats()` reads those back
+took and cost goes to the video's `tmp/run.json`; `stats()` reads those back
 for the popup's time estimate and the options page's model table.
 
 `bench()` is the other way in: the same analyze step over several models,
@@ -24,7 +24,7 @@ from pathlib import Path
 
 from . import llm
 from .analyze import analyze
-from .config import Settings
+from .config import WORK, Settings
 from .enrich import enrich
 from .fetch import FetchError, fetch, video_id, work_folder
 from .frames import frames
@@ -235,7 +235,7 @@ def stats(settings: Settings) -> dict:
     step (cached steps left out), and per language model and transcriber
     the runs, seconds and tokens they cost. Empty until a run happened."""
     runs = []
-    for path in sorted(settings.work_dir.glob(f"*/{RESULT_NAME}")):
+    for path in sorted(settings.library.glob(f"*/{WORK}/{RESULT_NAME}")):
         try:
             runs.append(json.loads(path.read_text(encoding="utf-8")))
         except (OSError, json.JSONDecodeError):

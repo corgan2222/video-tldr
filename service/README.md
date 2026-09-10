@@ -26,10 +26,11 @@ a short clip around every moment `analyze` marked, keeps the sharpest
 second of each, has the model label the pictures and keeps at most eight,
 none of them a speaker. When none of them is a diagram, the model may
 draw one as Mermaid, and Chrome renders it to PNG with the Mermaid script
-that ships in the package. `render` places all of it into `work/<id>/summary.md`
-when they exist; it does not run them. `--format`, or `formats` in the
-settings, adds outputs named `YYYY_MM_DD_<title>` after the day of
-processing: `md` copies the note and its pictures to `out/`, `obsidian`
+that ships in the package. `render` places all of it into the video's
+`tmp/summary.md` when they exist; it does not run them. `--format`, or
+`formats` in the settings, adds outputs named `YYYY_MM_DD_<title>` after
+the day of processing: `md` copies the note and its pictures beside that
+`tmp` folder, `obsidian`
 writes a note with frontmatter and wikilinks into the vault, `pdf` prints
 the note with Chrome or Edge (the HTML stays next to it), `docx` builds a
 Word file with the same pictures.
@@ -114,7 +115,7 @@ environment; the file lives next to the data, outside the repository.
 | `style`                                         | `normal` (default), `caveman`, `noslop`, `engineer`, `human`, `all`                                                                | how the note is worded; `all` writes one note per style, for comparing them                                                                                                 |
 | `timestamps`                                    | `on` (default), `off`                                                                                                              | link every section, key point and picture to its moment in the video                                                                                                        |
 | `condensed`                                     | `on`, `off` (default)                                                                                                              | boil the video down to a two-minute read                                                                                                                                    |
-| `cleanup`                                       | `on`, `off` (default)                                                                                                              | delete `work/<id>/` after a run that wrote its outputs, `run.json` kept                                                                                                     |
+| `cleanup`                                       | `on`, `off` (default)                                                                                                              | delete the video's `tmp` folder after a run that wrote its outputs, `run.json` kept                                                                                         |
 
 `probe` says what keeps the chosen backend from answering, and
 `GET /health` says it while the extension is open. A local model needs a
@@ -138,9 +139,22 @@ with seconds, tokens and tokens per second, and appends every row to
 `bench.json` next to the data. The extension's settings page offers the
 same over `POST /bench`.
 
-Data lives under `CORGANSHELPER_HOME` (default `D:/corganshelper`): `work/<id>/`
-holds the per-video results, `models/` the downloaded speech models, `out/`
-the rendered documents. Set `CORGANSHELPER_COOKIES` to a cookies file only
+Every video gets one folder of its own, under `video-tldr` in the
+download folder (`download_dir`, else the browser's Downloads):
+
+```
+Downloads/video-tldr/2026_09_10_Docker vs Podman/
+    2026_09_10_Docker vs Podman.md, .pdf, .docx, the pictures
+    tmp/    what only the run needs: info.json, transcript, analysis,
+            frames, clips, run.json
+```
+
+The folder is found again by the video id in `tmp/fetch.json`, so
+renaming it is safe. `cleanup` empties `tmp` and keeps `run.json` for
+the statistics. `CORGANSHELPER_HOME` (default `D:/corganshelper`) still
+holds `config.json`, `serve.log` and `models/` with the speech models,
+and a run of an older version moves its `work/<id>` folder into the new
+place by itself. Set `CORGANSHELPER_COOKIES` to a cookies file only
 when YouTube answers with a sign-in check; the yt-dlp wiki explains the
 export and warns that an account used this way can be locked.
 

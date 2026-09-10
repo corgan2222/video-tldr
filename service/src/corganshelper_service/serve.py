@@ -77,7 +77,7 @@ from .config import (
     validate,
 )
 from .documents import browser as find_browser
-from .fetch import FetchError, video_id
+from .fetch import FetchError, video_folder, video_id
 from .llm import LlmError
 from .run import bench, read_bench, run, stats
 from .transcribe import stt_status
@@ -476,10 +476,15 @@ class Service:
         if job is None:
             raise KeyError(vid)
         if what == "folder":
-            # The folder is there whatever the job did, so no wait for it.
-            folder = str(self.settings(job.get("profile"), job.get("options")).out_dir)
-            start(folder)
-            return folder
+            # The video's own folder, there whatever the job did; the
+            # library above it when the video has none yet.
+            settings = self.settings(job.get("profile"), job.get("options"))
+            folder = video_folder(settings, vid)
+            if not folder.is_dir():
+                folder = settings.library
+            folder.mkdir(parents=True, exist_ok=True)
+            start(str(folder))
+            return str(folder)
         if job["status"] != "done":
             raise NotReady(f"job {vid} is {job['status']}")
         for kind in ["obsidian"] if what == "obsidian" else OPEN_ORDER:

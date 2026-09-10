@@ -16,6 +16,10 @@ from pathlib import Path
 
 DEFAULT_HOME = "D:/corganshelper"
 CONFIG_NAME = "config.json"
+# The folder in the download folder that holds one folder per video, and
+# the folder inside that one for what only a run needs.
+LIBRARY = "video-tldr"
+WORK = "tmp"
 
 LLM_BACKENDS = ["claude", "anthropic", "openai", "lmstudio", "ollama"]
 
@@ -194,7 +198,16 @@ class Settings:
     config: dict = field(default_factory=lambda: dict(DEFAULTS))
 
     @property
+    def library(self) -> Path:
+        """Where a video's own folder goes: one folder per video under
+        `video-tldr` in the download folder, so everything that belongs to
+        a video lies together (asked for on 2026-09-10)."""
+        return self.out_dir / LIBRARY
+
+    @property
     def work_dir(self) -> Path:
+        """Where the runs of older versions kept their files; `fetch`
+        moves such a folder into the library when it finds one."""
         return self.home / "work"
 
     @property

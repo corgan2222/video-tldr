@@ -13,6 +13,7 @@ from corganshelper_service.enrich import (
     readme,
     repositories,
 )
+from corganshelper_service.fetch import work_folder
 
 VID = "jFHu6wx_TMQ"
 
@@ -87,7 +88,7 @@ def test_readme_tries_the_next_name_on_404_and_gives_up_otherwise(monkeypatch):
 
 def test_enrich_reads_the_readmes_and_stores_the_steps(tmp_path, monkeypatch):
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / VID
+    folder = work_folder(settings, VID)
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(json.dumps({"id": VID}), encoding="utf-8")
     (folder / "analysis.json").write_text(
@@ -153,7 +154,7 @@ def test_enrich_reads_the_readmes_and_stores_the_steps(tmp_path, monkeypatch):
 
 def test_without_a_repository_no_request_is_made(tmp_path, monkeypatch):
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / VID
+    folder = work_folder(settings, VID)
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(json.dumps({"id": VID}), encoding="utf-8")
     (folder / "analysis.json").write_text(

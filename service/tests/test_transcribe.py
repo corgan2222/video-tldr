@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from corganshelper_service.config import Settings
-from corganshelper_service.fetch import FetchError
+from corganshelper_service.fetch import FetchError, work_folder
 from corganshelper_service.transcribe import segments_from_json3, transcribe
 
 # Three caption lines as YouTube writes them, with the scrolling line breaks
@@ -43,7 +43,7 @@ def test_caption_lines_become_segments_that_end_where_the_next_begins():
 
 def test_the_youtube_track_is_used_when_it_was_fetched(tmp_path):
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder = work_folder(settings, "BT4ywlPr6Pk")
     folder.mkdir(parents=True)
     (folder / "BT4ywlPr6Pk.en-orig.json3").write_text(
         json.dumps(JSON3), encoding="utf-8"
@@ -63,7 +63,7 @@ def test_the_youtube_track_is_used_when_it_was_fetched(tmp_path):
 
 def test_asking_for_subtitles_without_a_track_is_an_error(tmp_path):
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder = work_folder(settings, "BT4ywlPr6Pk")
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(
         json.dumps({"id": "BT4ywlPr6Pk", "subtitles": []}), encoding="utf-8"
@@ -82,7 +82,7 @@ def test_the_openai_engine_uploads_shrunk_audio_and_keeps_the_segments(
 
     settings = Settings(home=tmp_path)
     settings.config.update(stt="openai", openai_api_key="sk-fake")
-    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder = work_folder(settings, "BT4ywlPr6Pk")
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(
         json.dumps({"id": "BT4ywlPr6Pk", "subtitles": []}), encoding="utf-8"
@@ -132,7 +132,7 @@ def test_the_parakeet_engine_turns_vad_segments_into_lines(tmp_path, monkeypatch
     from corganshelper_service import transcribe as module
 
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder = work_folder(settings, "BT4ywlPr6Pk")
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(
         json.dumps({"id": "BT4ywlPr6Pk", "subtitles": ["BT4ywlPr6Pk.de-orig.json3"]}),
@@ -187,7 +187,7 @@ def test_whisper_large_is_the_accurate_whisper_and_auto_takes_the_default(
     from corganshelper_service import transcribe as module
 
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder = work_folder(settings, "BT4ywlPr6Pk")
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(
         json.dumps({"id": "BT4ywlPr6Pk", "subtitles": []}), encoding="utf-8"
