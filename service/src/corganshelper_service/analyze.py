@@ -145,27 +145,71 @@ def header(fetched: dict, info: dict) -> str:
     return "\n".join(lines)
 
 
-# What a wording adds to the prompt. `normal` adds nothing, and the keys
-# in this order are what `style=all` walks. `all` is no wording itself.
+# What a wording changes: the voice that leads the prompt, and the shape
+# of the two long fields. A voice tacked on at the end lost against "a
+# two- to four-sentence summary" in the middle of the text, and the five
+# wordings of one video read alike (owner, 2026-09-10). So the voice goes
+# first and writes the lengths itself. `normal` sets none, and the keys
+# in this order are what `style=all` walks; `all` is no wording itself.
 STYLE_INSTRUCTIONS = {
-    "normal": "",
-    "caveman": (
-        "Terse. Fragments allowed. Drop articles, filler and hedging. "
-        "Keep every technical term and number."
-    ),
-    "noslop": (
-        "Plain, concrete language. No marketing words, no 'delve', "
-        "'seamless', 'robust', 'landscape', no filler openers, no closing "
-        "summaries."
-    ),
-    "engineer": (
-        "Precise and technical: name the commands, flags, versions and "
-        "numbers the video shows; prefer a command over a description."
-    ),
-    "human": (
-        "Warm and conversational, as a colleague would explain it over "
-        "coffee, still accurate."
-    ),
+    "normal": {
+        "voice": "",
+        "section": "a two- to four-sentence summary",
+        "summary": "five to eight sentences",
+        "points": "one sentence each",
+    },
+    "caveman": {
+        "voice": (
+            "Voice, and it outranks every length below: caveman speech. "
+            "Fragments, never full sentences. No articles, no pronouns, no "
+            'auxiliary verbs, no hedging. Like this: "Old way: copy files by '
+            'hand. Restart server. Hope nothing break." Keep every technical '
+            "term, product name, command and number exactly as the video says "
+            "it. Titles too."
+        ),
+        "section": "two to four fragments, never a full sentence",
+        "summary": "six to ten fragments, never a full sentence",
+        "points": "one fragment each, under eight words",
+    },
+    "noslop": {
+        "voice": (
+            "Voice: plain and concrete, the way a good manual reads. No "
+            'marketing words, no "delve", "seamless", "robust", '
+            '"landscape", "powerful", "leverage". No opener that '
+            "announces what follows and no closing sentence that repeats it. "
+            "Name the thing, say what happens, stop. Do not borrow an English "
+            "verb where the target language has its own."
+        ),
+        "section": "two to four plain sentences, no opener, no summary line",
+        "summary": "five to eight plain sentences",
+        "points": "one plain sentence each",
+    },
+    "engineer": {
+        "voice": (
+            "Voice: an engineer writing for engineers. Lead with the command, "
+            "the flag, the file, the version, the number. Quote a command "
+            "verbatim in backticks instead of describing it. Skip the "
+            "motivation and the analogies; keep what someone would type or "
+            "check."
+        ),
+        "section": (
+            "two to four dense sentences that name the commands, files and "
+            "numbers shown"
+        ),
+        "summary": "five to eight dense sentences, numbers included",
+        "points": "one line each, the command or the number first",
+    },
+    "human": {
+        "voice": (
+            "Voice: a colleague explaining it over coffee. Address the reader "
+            "directly, use contractions and short everyday words, allow an "
+            "aside where it helps. Warm, never chatty, and never at the cost "
+            "of a fact: every term, number and name stays exact."
+        ),
+        "section": "two to four sentences that speak to the reader",
+        "summary": "five to eight sentences that speak to the reader",
+        "points": "one spoken sentence each",
+    },
 }
 CONDENSED_INSTRUCTION = (
     "The note is a two-minute read: three to five sections, at most five "
@@ -180,18 +224,22 @@ def instruction(
     style: str = "normal",
     condensed: bool = False,
 ) -> str:
+    spec = STYLE_INSTRUCTIONS.get(style) or STYLE_INSTRUCTIONS["normal"]
     name = LANGUAGES.get(language, language)
+    voice = f"{spec['voice']} " if spec["voice"] else ""
     common = (
-        f"You summarise a YouTube video for a personal knowledge base. Write "
-        f"every text field in {name}; keep product names and technical terms "
-        "in English and quote wording verbatim where the wording matters. "
+        f"{voice}You summarise a YouTube video for a personal knowledge base. "
+        f"Write every text field in {name}; keep product names and technical "
+        "terms in English and quote wording verbatim where the wording "
+        "matters. "
         "Timestamps in the transcript are [m:ss] or [h:mm:ss]; every start, "
         "end and time field is such a stamp, copied from the line it belongs "
         "to. Copy the digits, never convert them and never estimate a moment "
         "that no line carries. "
-        "sections: the video's own structure, 4 to 12 entries, each with a "
-        "two- to four-sentence summary. key_points: the claims, numbers and "
-        "recommendations worth remembering, each at the second it is said. "
+        f"sections: the video's own structure, 4 to 12 entries, each with "
+        f"{spec['section']}. key_points: the claims, numbers and "
+        f"recommendations worth remembering, {spec['points']}, each at the "
+        "second it is said. "
         "frame_candidates: up to 12 moments, spread over the video, where the "
         "screen most likely shows code, a diagram, a user interface or a "
         "table that a reader would want to see; say why."
@@ -203,14 +251,16 @@ def instruction(
             " kind: software-tutorial when the video installs or operates "
             "software step by step, explainer when it explains concepts, "
             "review for tests, benchmarks and comparisons, news for "
-            "announcements, else other. summary: five to eight sentences on "
-            "what the video says and for whom. links: every URL in the "
-            "description, with its role."
+            "announcements, else other. summary: "
+            f"{spec['summary']} on what the video says and for whom. links: "
+            "every URL in the description, with its role."
         )
-    tail = [STYLE_INSTRUCTIONS.get(style, "")]
-    if condensed:
-        tail.append(CONDENSED_INSTRUCTION)
-    return " ".join([common, *filter(None, tail)])
+    tail = [CONDENSED_INSTRUCTION] if condensed else []
+    if spec["voice"]:
+        # Said twice on purpose: a model weighs the start and the end of a
+        # prompt over its middle, and the middle is where the fields live.
+        tail.append(f"Keep the voice through every field. {spec['voice']}")
+    return " ".join([common, *tail])
 
 
 def split_parts(segments: list[dict], chapters: list[dict]) -> list[list[dict]]:
