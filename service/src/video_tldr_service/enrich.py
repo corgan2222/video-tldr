@@ -152,13 +152,27 @@ def enrich(
         else:
             readmes[repo] = (text, note)
     if readmes:
+        # One request for all of them, so they share the budget: LIMIT
+        # READMEs at SIZE_LIMIT each are 180 000 characters, far past the
+        # smallest context llm accepts (llm.MIN_CONTEXT, 2026-09-10). A
+        # request per repository would keep every README whole and cost
+        # LIMIT times as much; the budget is the smaller change.
+        share = SIZE_LIMIT // len(readmes)
         data = "\n\n".join(
-            f"## {repo} ({name})\n\n{text}" for repo, (text, name) in readmes.items()
+            f"## {repo} ({name})\n\n{text[:share]}"
+            for repo, (text, name) in readmes.items()
         )
         answer = llm.complete(instruction(language), data, INSTALL_SCHEMA, settings)
         result["cost"] = llm.totals([dict(llm.last_cost)])
+        # The input of this request is a stranger's README, so the name that
+        # comes back counts only where it is one of the names this run asked
+        # about; anything else would become a GitHub link in the note.
+        known = {repo.lower(): repo for repo in readmes}
         for entry in answer.get("repositories") or []:
-            repo = str(entry.get("repo", "")).strip().strip("/")
+            repo = known.get(str(entry.get("repo", "")).strip().strip("/").lower())
+            if repo is None:
+                result["skipped"].append("an answer named a repository nobody read")
+                continue
             result["repositories"].append(
                 {
                     "repo": repo,

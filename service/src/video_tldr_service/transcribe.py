@@ -10,19 +10,14 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 from itertools import pairwise
 from pathlib import Path
 
 from .config import STT_DEFAULT, STT_MODELS, Settings
+from .fetch import FFMPEG_AUDIO_TIMEOUT_SECONDS, FetchError, fetch, ffmpeg, work_folder
 from .fetch import RESULT_NAME as FETCH_RESULT
-from .fetch import FetchError, fetch, work_folder
 
 RESULT_NAME = "transcript.json"
-
-
-class Segment(dict):
-    """{start, end, text}, seconds as floats."""
 
 
 def segments_from_json3(data: dict) -> list[dict]:
@@ -164,10 +159,10 @@ def to_wav16k(audio: Path) -> Path:
     """Mono 16 kHz WAV, the one format every ONNX speech model reads."""
     target = audio.with_suffix(".16k.wav")
     if not target.exists():
-        subprocess.run(
-            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(audio)]
-            + ["-ac", "1", "-ar", "16000", str(target)],
-            check=True,
+        ffmpeg(
+            *("-y", "-i", str(audio)),
+            *("-ac", "1", "-ar", "16000", str(target)),
+            timeout=FFMPEG_AUDIO_TIMEOUT_SECONDS,
         )
     return target
 
@@ -218,10 +213,10 @@ def shrink_for_upload(audio: Path) -> Path:
     16 kHz anyway, so nothing it hears is lost."""
     target = audio.with_suffix(".upload.mp3")
     if not target.exists():
-        subprocess.run(
-            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(audio)]
-            + ["-vn", "-ac", "1", "-b:a", "48k", str(target)],
-            check=True,
+        ffmpeg(
+            *("-y", "-i", str(audio)),
+            *("-vn", "-ac", "1", "-b:a", "48k", str(target)),
+            timeout=FFMPEG_AUDIO_TIMEOUT_SECONDS,
         )
     return target
 
@@ -361,23 +356,3 @@ def transcribe(
     }
     result_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     return result
-
-
-def run_ffprobe_duration(path: Path) -> float:
-    """Seconds of media in a file, for the batch table later."""
-    out = subprocess.run(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_entries",
-            "format=duration",
-            "-of",
-            "default=nw=1:nk=1",
-            str(path),
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return float(out.stdout.strip())

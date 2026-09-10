@@ -1,7 +1,4 @@
 {
-  "extensionName": {
-    "message": "video-tldr"
-  },
   "tagline": {
     "message": "Watch it. Vault it."
   },
@@ -296,12 +293,6 @@
   "transcriber": {
     "message": "Transkribierer"
   },
-  "statsHeading": {
-    "message": "Was deine Läufe gebraucht haben"
-  },
-  "statsHelp": {
-    "message": "Auf diesem Rechner an deinen Videos gemessen; Mediane über die Läufe, die den Schritt wirklich gerechnet haben."
-  },
   "statsEmpty": {
     "message": "Noch kein Lauf; das erste Video füllt das hier."
   },
@@ -438,12 +429,6 @@
   },
   "historyHelp": {
     "message": "Was deine eigenen Läufe auf diesem Rechner gebraucht haben. Mediane über die Läufe, die den Schritt wirklich gerechnet haben."
-  },
-  "video": {
-    "message": "Video"
-  },
-  "openSettings": {
-    "message": "Einstellungen"
   },
   "welcomeSourceTitle": {
     "message": "Aus dem Quelltext"

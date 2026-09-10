@@ -93,6 +93,12 @@ function Save-Asset($release, $pattern, $directory) {
     if (-not $asset) {
         throw "release $($release.tag_name) has no asset matching $pattern"
     }
+    # The name comes from the release answer and decides a path here, so it
+    # has to be a bare file name: a separator in it would write outside the
+    # staging directory.
+    if ($asset.name -ne [IO.Path]::GetFileName($asset.name)) {
+        throw "asset name '$($asset.name)' is not a plain file name"
+    }
     $target = Join-Path $directory $asset.name
     Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $target
     return $target
@@ -111,11 +117,35 @@ function Resolve-Extra {
 
 # Windows keeps an installed console script open while the process behind
 # it runs, and uv cannot replace it then. The service answers `stop`.
+#
+# `stop` exits 0 whatever it found, so the exit code says nothing about
+# what happened; the line it prints does. serve.py answers in one of three
+# ways: "service on port N is stopping" when one took the request, "no
+# service on port N (...)" when nothing was listening, and "a service on
+# port N may still be running, ..." when something is on the port that did
+# not confirm the stop. Only the first leaves the machine without a
+# service, so only the first raises $askedToStop for the error path below.
+#
+# The third answer gets no branch of its own here (2026-09-10). It is
+# printed, the install goes ahead, and uv is the one that fails on the file
+# Windows still holds open, in its own words. A branch would buy a message
+# a second earlier for the price of a second wording to keep in step with
+# serve.py, and tests/install.test.ts only ties down the one read below.
 function Stop-RunningService($binDirectory) {
     $exe = Join-Path $binDirectory 'video-tldr.exe'
     if (-not (Test-Path $exe)) { return }
     Write-Step 'Stopping a running service'
-    & $exe stop 2>&1 | Write-Host
+    # 'Continue' for this one call, in a child scope so the setting ends
+    # with it: under 'Stop', Windows PowerShell 5.1 turns the first stderr
+    # line of a native call into a terminating NativeCommandError. A throw
+    # here would end the run with the service down and $askedToStop still
+    # $false, so the warning that names the way back would never be shown.
+    $said = & {
+        $ErrorActionPreference = 'Continue'
+        (& $exe stop 2>&1) -join "`n"
+    }
+    Write-Host $said
+    if ($said -match 'is stopping') { $script:askedToStop = $true }
 }
 
 function Add-ToUserPath($directory) {
@@ -155,6 +185,7 @@ Write-Step "Release $($release.tag_name)"
 
 $staging = Join-Path ([System.IO.Path]::GetTempPath()) "video-tldr-install-$PID"
 New-Item -ItemType Directory -Path $staging -Force | Out-Null
+$askedToStop = $false
 try {
     $wheel = Save-Asset $release '*.whl' $staging
     # Both files come from the release rather than from this script: the
@@ -164,11 +195,33 @@ try {
     $overrides = Save-Asset $release 'overrides.txt' $staging
     $constraints = Save-Asset $release "constraints-$chosen.txt" $staging
 
+    # Downloads first, then the stop, then the install. Windows will not let
+    # uv replace video-tldr.exe while the process behind it runs, so the stop
+    # cannot move behind the install, and a download that fails leaves a
+    # running service alone.
+    #
+    # What remains is a failed install with the service down, and both ways
+    # out of that are worse than saying so. Stopping only once the new version
+    # stands cannot work: the running shim is the file uv has to overwrite, so
+    # the install fails before there is anything new to stop for. Starting the
+    # service again in the catch hides the damage: after `uv tool install
+    # --force` broke off, the environment behind the shim is whatever uv left
+    # there, and a service that answers says nothing about which version it
+    # is. So the catch warns, names the way back, and starts nothing.
     Stop-RunningService $binDir
 
     $requirement = "$PackageName[$chosen] @ $(([System.Uri]$wheel).AbsoluteUri)"
     & uv tool install --force --overrides $overrides --constraints $constraints $requirement
     if ($LASTEXITCODE -ne 0) { throw "uv tool install failed with $LASTEXITCODE" }
+}
+catch {
+    if ($askedToStop) {
+        Write-Warning ('The update failed with the service stopped. How much of ' +
+            'the installation uv had already replaced is not something this ' +
+            'script can tell, so the version from before is not to be counted ' +
+            'on: run this installer again to get back to a known one.')
+    }
+    throw
 }
 finally {
     Remove-Item -Recurse -Force $staging -ErrorAction SilentlyContinue

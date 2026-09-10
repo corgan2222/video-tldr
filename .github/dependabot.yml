@@ -75,11 +75,17 @@ updates:
     groups:
       github-actions:
         patterns: ['*']
-        # No update-types filter here, unlike the block above. Every action a
-        # workflow pins is pinned to a floating major tag (actions/checkout@v4
-        # and the rest), so minor and patch fixes already arrive by
-        # themselves and the only bump Dependabot can see at all is a major
-        # one. Excluding majors would leave this group matching nothing.
+        # Majors are held out here too, for the same reason as the blocks
+        # above: a major can change how an action behaves, so it needs its
+        # own review, and it must stay rejectable without holding back the
+        # patches it would otherwise travel with.
+        #
+        # The filter has teeth only because of how the workflows pin. Every
+        # action sits on a commit SHA with its version in a trailing comment
+        # (`<action>@<sha> # <version>`), so Dependabot proposes minor and
+        # patch bumps here as well. A floating major tag (`@v4`) would pull
+        # those in by itself and leave nothing for this group to match.
+        update-types: ['minor', 'patch']
     commit-message:
       prefix: 'chore'
       include: 'scope'

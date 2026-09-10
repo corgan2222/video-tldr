@@ -173,6 +173,158 @@ def test_profiles_change_the_transcriber_and_the_model_on_top_of_the_file():
         profile_overrides("quick", DEFAULTS)
 
 
+def test_a_broken_file_is_named_without_its_path(tmp_path, monkeypatch):
+    """The text of a ConfigError travels to the extension as the answer of
+    a request, so it names config.json, not where the machine keeps it."""
+    clean_env(monkeypatch)
+    (tmp_path / "config.json").write_text("{not json", encoding="utf-8")
+
+    with pytest.raises(ConfigError) as caught:
+        Settings.load(home=tmp_path)
+
+    assert "config.json is not valid JSON" in str(caught.value)
+    assert str(tmp_path) not in str(caught.value)
+
+    (tmp_path / "config.json").write_text("[]", encoding="utf-8")
+    with pytest.raises(ConfigError) as caught:
+        Settings.load(home=tmp_path)
+    assert "config.json must hold one JSON object" in str(caught.value)
+    assert str(tmp_path) not in str(caught.value)
+
+
+def test_config_json_is_written_for_its_owner_alone(tmp_path, monkeypatch):
+    """The API keys and the token stand in this file. The mode is set on
+    the staging file, so the name never exists with a wider one."""
+    import os
+
+    from video_tldr_service.config import store
+
+    asked: list[tuple[str, int]] = []
+    real = os.chmod
+    monkeypatch.setattr(os, "chmod", lambda path, mode: asked.append((str(path), mode)))
+
+    store(tmp_path, {"llm": "ollama"})
+
+    assert [mode for _, mode in asked] == [0o600]
+    assert asked[0][0].startswith(str(tmp_path / "config.json"))
+    assert asked[0][0] != str(tmp_path / "config.json")  # the staging file
+
+    # Windows knows the bit only as the read-only flag, and a filesystem
+    # may refuse it outright; neither may cost the owner a setting.
+    def refuse(path, mode):
+        raise PermissionError("no modes here")
+
+    monkeypatch.setattr(os, "chmod", refuse)
+    store(tmp_path, {"llm": "claude"})
+    assert json.loads((tmp_path / "config.json").read_text())["llm"] == "claude"
+
+    monkeypatch.setattr(os, "chmod", real)
+    if os.name != "nt":
+        store(tmp_path, {"llm": "claude"})
+        assert (tmp_path / "config.json").stat().st_mode & 0o777 == 0o600
+
+
+def test_a_request_sets_the_switches_and_nothing_that_reaches_the_machine():
+    """A request says how to summarise. Which program runs, where the
+    outputs land and where the API key travels are the machine owner's,
+    through `video-tldr config --set`."""
+    from video_tldr_service.config import KEYS, OVER_HTTP, over_http
+
+    assert over_http({"style": "caveman", "stt": "whisper"}) == {
+        "style": "caveman",
+        "stt": "whisper",
+    }
+    # A subfolder name inside the vault starts no program and writes
+    # nothing outside it, so it travels like the other fields of the
+    # options page.
+    assert over_http({"obsidian_folder": "Clips"}) == {"obsidian_folder": "Clips"}
+    barred = set(KEYS) - OVER_HTTP
+    assert barred == {
+        "browser",
+        "download_dir",
+        "pdf_template",
+        "obsidian_vault",
+        "openai_base_url",
+        "lmstudio_url",
+        "ollama_url",
+        "openai_api_key",
+        "anthropic_api_key",
+        "token",
+    }
+    for key in sorted(barred):
+        with pytest.raises(ConfigError) as caught:
+            over_http({key: "anything"})
+        assert f"{key} may not be set over HTTP" in str(caught.value)
+        assert "video-tldr config --set" in str(caught.value)
+        # A job passes no token, and no token on the machine lifts its bar,
+        # so its answer offers only the way through the command line.
+        assert "or a token" not in str(caught.value)
+    # The command line writes every one of them.
+    assert parse_assignments(["browser=C:/x/chrome.exe"])["browser"]
+
+
+def test_a_token_lets_a_request_set_what_the_command_line_sets():
+    """`PUT /config` passes the service's token. A caller that got past the
+    Authorization check owns the machine as much as the command line does,
+    so the options page keeps saving every field it shows. Without a token
+    the answer names both ways in: the command line, or a token."""
+    from video_tldr_service.config import over_http
+
+    assert over_http({"browser": "C:/x/chrome.exe"}, token="secret") == {
+        "browser": "C:/x/chrome.exe"
+    }
+    # A token does not make a wrong value right.
+    with pytest.raises(ConfigError):
+        over_http({"stt": "loud"}, token="secret")
+
+    with pytest.raises(ConfigError) as caught:
+        over_http({"browser": "C:/x/chrome.exe"}, token="")
+    assert "video-tldr config --set browser=" in str(caught.value)
+    assert "or a token set there and sent with the request" in str(caught.value)
+
+
+def test_the_obsidian_subfolder_stays_inside_the_vault():
+    """`render` hangs this value onto the vault, and a request may set it
+    without a token. A `..` part would write the note outside the vault and
+    a drive letter would win over the vault altogether, so the check sits
+    where every way in passes: the file, a variable, `config --set` and
+    PUT /config.
+
+    It normalises the way `render` does, `strip("/")` included. A leading
+    slash is therefore a name, not an absolute path: `\\Videos`, which is
+    what a Windows user types, reached `render` as `Videos` all along.
+    Refusing it locked the service out of its own config file, because
+    `Settings.load` validates what it read and `config --set` could not
+    repair it either (2026-09-10)."""
+    from video_tldr_service.config import over_http, validate
+
+    assert validate({"obsidian_folder": "Clips/2026"}) == {
+        "obsidian_folder": "Clips/2026"
+    }
+    for harmless in ("Videos", "/Videos", r"\Videos", "Clips/2026"):
+        assert validate({"obsidian_folder": harmless}) == {
+            "obsidian_folder": harmless
+        }, harmless
+    for bad in (
+        "../Desktop",
+        "Clips/../../Desktop",
+        r"..\Desktop",
+        "/../Desktop",
+        "C:/Windows/Temp",
+        r"C:\Windows\Temp",
+    ):
+        with pytest.raises(ConfigError) as caught:
+            validate({"obsidian_folder": bad})
+        assert "subfolder inside the vault" in str(caught.value), bad
+    # Both entrances take the same check, the one without a token included.
+    with pytest.raises(ConfigError):
+        over_http({"obsidian_folder": "../Desktop"})
+    with pytest.raises(ConfigError):
+        over_http({"obsidian_folder": r"C:\Windows\Temp"}, token="secret")
+    with pytest.raises(ConfigError):
+        parse_assignments(["obsidian_folder=../Desktop"])
+
+
 def test_two_saves_at_once_keep_both_values(tmp_path):
     """The options page saves every field on its own, and the service
     answers each request in its own thread. Without a lock around read
@@ -216,3 +368,21 @@ def test_two_saves_at_once_keep_both_values(tmp_path):
     assert stored["language"] == "de"
     # Nothing left behind: the staging file is renamed, never kept.
     assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_a_save_that_cannot_replace_the_file_leaves_no_staging_file(
+    tmp_path, monkeypatch
+):
+    """A replace that fails, the target held open or the disk full, used to
+    leave config.json.<pid>.tmp behind, with the keys in it."""
+    from video_tldr_service import config as module
+
+    def refuse(source, target):
+        raise OSError("the target is held open")
+
+    monkeypatch.setattr(module.os, "replace", refuse)
+
+    with pytest.raises(OSError):
+        module.store(tmp_path, {"llm": "ollama"})
+
+    assert list(tmp_path.iterdir()) == []

@@ -18,6 +18,21 @@
 
 minimum_pre_commit_version: '3.2.0'
 default_install_hook_types: [pre-commit, pre-push]
+# Every hook on the commit stage carries `fail_fast: true`. The run has to stop
+# at the first failure, or it reaches bump-version at the bottom of this file
+# even when a formatter has already said no, and raises the version for a commit
+# that cannot happen. A new commit-stage hook needs the key as well; nothing
+# fails when it is forgotten.
+#
+# Per hook, not the top-level key of the same name: that one would govern the
+# push stage too, where a failing typecheck would hide what vitest, ruff check
+# and pytest have to say. A push is the run worth seeing in full.
+#
+# The price is on the commit stage. end-of-file-fixer and trailing-whitespace
+# repair the file and report failure while doing it, so a file that needs both
+# takes two commit attempts. Every extra attempt is another chance to lose
+# unstaged changes: pre-commit stashes them for the run and a failed restore
+# leaves them nowhere.
 
 repos:
   # ---------------------------------------------------------------- secrets
@@ -27,6 +42,7 @@ repos:
       - id: gitleaks
         name: no credentials in the staged change
         stages: [pre-commit]
+        fail_fast: true
 
   # ------------------------------------------------------ the usual suspects
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -34,6 +50,7 @@ repos:
     hooks:
       - id: detect-private-key
         stages: [pre-commit]
+        fail_fast: true
       - id: check-added-large-files
         # Raise this deliberately when the repository legitimately needs a
         # bigger file, not because a build artefact slipped in.
@@ -41,41 +58,34 @@ repos:
         # mermaid.min.js ships with the service on purpose, licence next to it.
         exclude: '^service/src/video_tldr_service/assets/'
         stages: [pre-commit]
+        fail_fast: true
       - id: check-merge-conflict
         stages: [pre-commit]
+        fail_fast: true
       - id: check-yaml
         # The workflows and the drafter config: a typo here is invisible until
         # a release does not happen.
         stages: [pre-commit]
+        fail_fast: true
       - id: check-toml
         stages: [pre-commit]
+        fail_fast: true
       - id: end-of-file-fixer
         # Add an exclude: pattern here for recorded test fixtures that must
         # stay byte for byte as they were captured; the shipped minified
         # script is one of those.
         exclude: '(?i)\.(png|ico|jpg|gif)$|^service/src/video_tldr_service/assets/'
         stages: [pre-commit]
+        fail_fast: true
       - id: trailing-whitespace
         # Two trailing spaces are a line break in Markdown; keep them.
         args: ['--markdown-linebreak-ext=md']
         exclude: '(?i)\.(png|ico|jpg|gif)$|^service/src/video_tldr_service/assets/'
         stages: [pre-commit]
+        fail_fast: true
 
   - repo: local
     hooks:
-      # ---------------------------------------------- version tracks the commit
-      # pre-commit decides "files were modified" by diffing the unstaged tree
-      # before and after a hook runs. This hook writes the bump and stages it
-      # itself (scripts/bump_version.py --stage), so that diff stays empty and
-      # the commit goes through instead of failing on its own change.
-      - id: bump-version
-        name: bump the patch version until the first release tag
-        language: system
-        entry: python scripts/bump_version.py
-        always_run: true
-        pass_filenames: false
-        stages: [pre-commit]
-
       # ------------------------------------------------- main is read-only
       # If main is protected on the server as well, this hook adds nothing to
       # that -- it only fails a second earlier and says what to do instead,
@@ -104,6 +114,7 @@ repos:
         entry: npx prettier --check
         types_or: [ts, tsx, json, yaml, markdown, css, html]
         stages: [pre-commit]
+        fail_fast: true
 
       # `files` rather than a type filter: a dependency bump touches
       # package.json and no source file at all, and that is exactly the change
@@ -139,6 +150,7 @@ repos:
         types: [python]
         pass_filenames: false
         stages: [pre-commit]
+        fail_fast: true
 
       - id: ruff-check
         name: ruff check
@@ -155,3 +167,26 @@ repos:
         files: '(\.py$|^service/pyproject\.toml$|^service/uv\.lock$)'
         pass_filenames: false
         stages: [pre-push]
+
+  - repo: local
+    hooks:
+      # ---------------------------------------------- version tracks the commit
+      # Last in this file on purpose, and it has to stay last. pre-commit runs
+      # hooks in file order, the bump adds one to the patch number on every
+      # run, and the hook stages its own change -- so a formatter that fails
+      # after it leaves the raised number staged in a commit that never
+      # happened, and the next attempt raises it again. The `fail_fast: true`
+      # on every hook above only spares the bump while the bump comes last.
+      # Move this entry up and the version starts jumping by more than one.
+      #
+      # The staging (scripts/bump_version.py --stage) is also what keeps the
+      # commit from failing on the hook's own change: pre-commit decides
+      # "files were modified" by diffing the unstaged tree before and after a
+      # hook runs, and staging keeps that diff empty.
+      - id: bump-version
+        name: bump the patch version until the first release tag
+        language: system
+        entry: python scripts/bump_version.py
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]

@@ -285,11 +285,27 @@ def store(home: Path | None, values: dict) -> Path:
         # JSON". The name carries the process id, so a command line
         # running next to the service never shares the staging file.
         staging = path.with_suffix(f".json.{os.getpid()}.tmp")
-        staging.write_text(
-            json.dumps({k: config[k] for k in KEYS}, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        os.replace(staging, path)
+        try:
+            staging.write_text(
+                json.dumps({k: config[k] for k in KEYS}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            # The API keys and the token live in this file, so only its
+            # owner reads it. Set on the staging file, so the mode is right
+            # before the name exists. Windows knows the bit only as the
+            # read-only flag and keeps no other user out; the call is
+            # harmless there, and a filesystem that refuses it must not
+            # fail the save.
+            try:
+                os.chmod(staging, 0o600)
+            except OSError:
+                pass
+            os.replace(staging, path)
+        finally:
+            # A replace that failed (the target held open, a full disk)
+            # would otherwise leave config.json.<pid>.tmp in the data
+            # directory, with the keys in it.
+            staging.unlink(missing_ok=True)
     return path
 
 
@@ -299,20 +315,28 @@ def read_config(path: Path) -> dict:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as error:
-        raise ConfigError(f"{path} is not valid JSON: {error}") from error
+        # The name, not the path: this text reaches the extension as the
+        # answer of a request, and the path tells a caller where the
+        # machine keeps its data.
+        raise ConfigError(f"{path.name} is not valid JSON: {error}") from error
     if not isinstance(data, dict):
-        raise ConfigError(f"{path} must hold one JSON object")
+        raise ConfigError(f"{path.name} must hold one JSON object")
     return validate({k: v for k, v in data.items() if v not in (None, "")})
 
 
-# What a job may carry in its `options`. The rest of KEYS names a program
-# to start, a place to write, a vendor URL or a secret, and those belong
-# to whoever owns the machine — through `video-tldr config` or the
-# settings page, not through the body of a job. Without this list a
-# `POST /jobs` with {"options": {"browser": "..."}} decides which program
-# the PDF step runs, and one with an `openai_base_url` decides where the
-# API key travels.
-JOB_OPTIONS = frozenset(
+# Which of the KEYS a request may set: the switches the popup sends per
+# job and the settings page saves. Each of the rest starts a program,
+# names a place to write outside the library, or carries a secret or the
+# address a secret travels to, and those belong to whoever owns the
+# machine — typed there with `video-tldr config --set`, not sent in a
+# request body that any extension with the loopback permission may send.
+# Without this list a `POST /jobs` with {"options": {"browser": "..."}}
+# decides which program the PDF step runs, one with a `download_dir`
+# decides where the outputs land, and one with an `openai_base_url`
+# decides where the API key travels. `obsidian_folder` is none of the
+# three: it is a subfolder name inside the vault, which `validate` holds
+# it to, and the vault itself stays barred (2026-09-10).
+OVER_HTTP = frozenset(
     {
         "llm",
         "model",
@@ -323,18 +347,38 @@ JOB_OPTIONS = frozenset(
         "timestamps",
         "condensed",
         "cleanup",
+        "obsidian_folder",
     }
 )
 
 
-def job_options(values: dict) -> dict:
-    """The options a job may set, validated; a ConfigError for the rest."""
-    barred = sorted(set(values) & (set(KEYS) - JOB_OPTIONS))
+def over_http(values: dict, token: str | None = None) -> dict:
+    """What a request may set, validated; for the rest a ConfigError that
+    names the way in.
+
+    Both entrances take this, and they read `token` differently. A job's
+    `options` pass none, so the bar stands there whatever config.json
+    says: one run's option never has a reason to name a program or a
+    vendor URL, and a job is the road a foreign extension in the browser
+    takes. `PUT /config` passes the service's token, which lifts the bar
+    when one is set: such a caller is authenticated and may set what the
+    command line may, so the options page keeps working. Without a token
+    that page loses those fields and says for each one why, which is the
+    price of leaving the token optional (2026-09-10).
+    """
+    if token:
+        return validate(values)
+    barred = sorted(set(values) & (set(KEYS) - OVER_HTTP))
     if barred:
-        raise ConfigError(
-            f"a job may not set {', '.join(barred)}; "
-            "use `video-tldr config --set` or the settings page"
+        way_in = (
+            f"`video-tldr config --set {barred[0]}=...` on the machine "
+            "that runs the service does it"
         )
+        if token is not None:
+            # PUT /config, with no token set: a token would lift the bar,
+            # so the answer names both ways in one sentence.
+            way_in += ", or a token set there and sent with the request"
+        raise ConfigError(f"{', '.join(barred)} may not be set over HTTP; {way_in}")
     return validate(values)
 
 
@@ -358,6 +402,26 @@ def validate(values: dict) -> dict:
         if unknown:
             raise ConfigError(
                 f"formats must name only {', '.join(FORMATS)}, not {', '.join(unknown)}"
+            )
+    if values.get("obsidian_folder"):
+        # render hangs this onto the vault (`vault / subfolder`), so a `..`
+        # part writes the note outside the vault, and a drive letter makes
+        # the path absolute, which wins over the vault altogether. Checked
+        # here because every way in passes through: config.json, a
+        # variable, `config --set`, and PUT /config, which takes this key
+        # without a token.
+        #
+        # Normalised exactly the way render does it, `strip("/")` included.
+        # Without that, a `\Videos` a Windows user typed became a leading
+        # slash and was refused, although render had always stripped it:
+        # `Settings.load` then refused to start the service, and
+        # `config --set` could not repair the file either, because it
+        # validates what it read (2026-09-10).
+        folder = values["obsidian_folder"].replace("\\", "/").strip("/")
+        if ".." in folder.split("/") or ":" in folder:
+            raise ConfigError(
+                "obsidian_folder must be a subfolder inside the vault: "
+                "no .., no drive letter"
             )
     return values
 

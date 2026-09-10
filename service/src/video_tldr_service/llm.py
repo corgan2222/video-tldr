@@ -17,6 +17,7 @@ import os
 import shutil
 import subprocess
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -90,6 +91,28 @@ def claude_binary() -> str:
     return found
 
 
+def checked_url(url: str) -> str:
+    """A provider address, or an LlmError saying what is wrong with it.
+
+    The key travels to whatever host this names, as a bearer header, and the
+    transcript travels with it. So the address is checked where it is used,
+    behind whatever checked it where it was set. The error text names no
+    part of the URL: an address with a password in it must not reach a log
+    or the popup."""
+    parts = urllib.parse.urlsplit(url)
+    if parts.username or parts.password:
+        raise LlmError(
+            "the provider address carries a user name or password before the "
+            "host; drop them and keep the key in the api_key setting"
+        )
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise LlmError(
+            f"the provider address is no http or https URL with a host (scheme "
+            f"{parts.scheme or 'none'}); set it with `video-tldr config`"
+        )
+    return url
+
+
 def endpoint(settings: Settings) -> tuple[str, str | None]:
     """(api_key, base_url) for the backends that speak the OpenAI protocol.
     A local server takes any key; the SDK insists on one."""
@@ -100,10 +123,12 @@ def endpoint(settings: Settings) -> tuple[str, str | None]:
                 "no OpenAI API key; put it in config.json as openai_api_key "
                 "or set OPENAI_API_KEY"
             )
-        return config["openai_api_key"], config["openai_base_url"] or None
+        base = config["openai_base_url"]
+        # Empty means the vendor's own address, which the SDK fills in.
+        return config["openai_api_key"], checked_url(base) if base else None
     if backend(settings) == "lmstudio":
-        return "lm-studio", config["lmstudio_url"]
-    return "ollama", config["ollama_url"]
+        return "lm-studio", checked_url(config["lmstudio_url"])
+    return "ollama", checked_url(config["ollama_url"])
 
 
 def check(settings: Settings) -> str | None:
@@ -113,7 +138,9 @@ def check(settings: Settings) -> str | None:
             claude_binary()
         else:
             models(settings)
-        if not model_name(settings):
+        # Only a local server leaves the name open: every other backend has a
+        # default in DEFAULT_MODELS, so the question cannot arise there.
+        if backend(settings) in LOCAL and not model_name(settings):
             return (
                 f"no model set for {backend(settings)}; `video-tldr models` "
                 "lists what it offers, `video-tldr config --set model=<name>` "
@@ -222,7 +249,7 @@ def fetch_json(url: str, payload: dict | None = None) -> dict:
     an HTTP client is not worth a dependency."""
     body = json.dumps(payload).encode() if payload is not None else None
     request = urllib.request.Request(
-        url, data=body, headers={"Content-Type": "application/json"}
+        checked_url(url), data=body, headers={"Content-Type": "application/json"}
     )
     with urllib.request.urlopen(request, timeout=ASK_SECONDS) as response:
         return json.loads(response.read().decode("utf-8"))
@@ -629,7 +656,12 @@ def complete_openai(
         if images and no_vision(error):
             raise NoVisionError(str(error)) from error
         raise LlmError(reachable_message(name, error)) from error
-    choice = response.choices[0]
+    # A server that answers without a single choice would be an IndexError
+    # here, and no caller catches that one: run, serve and the CLI all wait
+    # for an LlmError.
+    choice = next(iter(response.choices or []), None)
+    if choice is None:
+        raise LlmError(f"{name} answered without a single choice")
     if getattr(choice.message, "refusal", None):
         raise LlmError(f"{name} refused: {choice.message.refusal}")
     usage = response.usage

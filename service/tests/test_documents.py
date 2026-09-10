@@ -1,6 +1,7 @@
 import struct
 import zipfile
 import zlib
+from html import unescape
 from types import SimpleNamespace
 
 import pytest
@@ -70,6 +71,47 @@ def test_markdown_that_should_work_still_does():
     assert "<table>" in page and "<td>1</td>" in page
     assert "<strong>bold</strong>" in page
     assert '<a href="https://e.com">l</a>' in page
+    assert "unsafe:" not in page
+
+
+# A link is Markdown's own syntax, so deregistering the raw-HTML handlers
+# leaves it alone: measured 2026-09-10, each target below reaches the page
+# as the one href the parser made of it, which is why a newline and an
+# entity need no pattern over the Markdown text. The tab form is the
+# exception and stays only because the check covers it too: the tab reaches
+# the href as four spaces, and a URL parser keeps a space inside a word, so
+# that one was never a live `javascript:` href.
+def test_a_link_target_the_browser_would_run_is_defused():
+    for target in (
+        "javascript:alert(1)",
+        "java\tscript:alert(1)",
+        "java\nscript:alert(1)",
+        "&#106;avascript:alert(1)",
+        "javascript&#58;alert(1)",
+        "JavaScript:alert(1)",
+        "data:text/html,<b>1</b>",
+        "data:image/svg+xml,<svg onload=alert(1)></svg>",
+        "vbscript:msgbox(1)",
+    ):
+        page = html("t", f"[x]({target})\n")
+        href = page.split('<a href="')[1].split('"')[0]
+        # Decoded the way a browser decodes the attribute, the scheme in
+        # front is one the browser does not know, so the link does nothing.
+        assert unescape(href).lower().startswith("unsafe:"), target
+        assert ">x</a>" in page
+    # Nothing is dropped: the target keeps its text behind the prefix, so a
+    # reader sees that something was there. A picture goes the same way.
+    assert 'href="unsafe:javascript:alert(1)"' in html("t", "[x](javascript:alert(1))")
+    assert 'src="unsafe:javascript:alert(1)"' in html("t", "![x](javascript:alert(1))")
+    # Only a scheme in front of the target counts. One inside a URL is
+    # nothing a browser runs, and the PDF page is made of file:// pictures.
+    untouched = html("t", "[a](https://e.com/?u=javascript:1) ![b](file:///D:/a.png)")
+    assert "unsafe:" not in untouched
+    # A base64 picture out of a README is the one `data:` that passes, so
+    # the PDF shows it rather than a source no browser loads. SVG does not
+    # pass; it is in the list above.
+    badge = html("t", "![b](data:image/png;base64,iVBORw0KGgo=)")
+    assert 'src="data:image/png;base64,iVBORw0KGgo="' in badge
 
 
 def test_a_command_block_becomes_a_pre_the_style_sets_apart():
@@ -193,6 +235,11 @@ def test_the_content_box_hugs_the_drawing():
             frame[y * width + x] = 0
     assert content_box(bytes(frame), width, height, margin=4) == (26, 6, 18, 18)
     assert content_box(b"\xff" * width * height, width, height) == (0, 0, 100, 50)
+    # A screenshot smaller than the window asked for: named, not a reshape
+    # traceback out of numpy.
+    with pytest.raises(FetchError) as caught:
+        content_box(b"\xff" * 10, width, height)
+    assert "too few" in str(caught.value)
 
 
 def test_the_diagram_is_checked_in_the_dom_and_cut_from_a_screenshot(
