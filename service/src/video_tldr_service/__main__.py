@@ -28,7 +28,7 @@ from .frames import frames
 from .llm import LlmError
 from .render import render
 from .run import bench, bench_table, header, row, run, urls_in
-from .serve import PORT, serve, stop
+from .serve import PORT, WSAEACCES, serve, stop
 from .transcribe import transcribe
 
 # What `--help` and every error message call the command.
@@ -204,6 +204,13 @@ def main(argv: list[str] | None = None) -> int:
             return serve(args.home, overrides, args.port)
         except OSError as error:
             print(f"serve failed: {error}", file=sys.stderr)
+            if getattr(error, "winerror", None) == WSAEACCES:
+                print(
+                    f"Windows reserves port ranges for Hyper-V, and {args.port} "
+                    "sits in one. `netsh interface ipv4 show excludedportrange "
+                    "protocol=tcp` lists them; --port moves the service out.",
+                    file=sys.stderr,
+                )
             return 1
 
     if args.command == "stop":

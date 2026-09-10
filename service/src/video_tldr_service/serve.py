@@ -90,6 +90,10 @@ from .run import bench, needs_model, read_bench, run, stats
 from .transcribe import stt_status
 
 PORT = 8765
+# Windows answers a bind inside a range it reserved for Hyper-V with this,
+# not with "address in use", and the ranges move on every reboot: 8765 was
+# free on 2026-09-09 and inside 8694-8793 a day later.
+WSAEACCES = 10013
 # Every request, every job step and every traceback, next to the data:
 # the console scrolls away, this stays. Three files of a megabyte each.
 LOG_NAME = "serve.log"
