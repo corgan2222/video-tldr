@@ -18,6 +18,7 @@ uv run video-tldr render --format obsidian --format pdf https://youtu.be/BT4ywlP
 uv run video-tldr run https://youtu.be/BT4ywlPr6Pk          # all of the above
 uv run video-tldr run --batch urls.txt                      # one URL per line
 uv run video-tldr serve                                     # for the extension
+uv run video-tldr stop                                      # before an update
 ```
 
 `enrich` reads the README of up to three GitHub repositories the
@@ -71,6 +72,7 @@ first document among PDF, Word and Markdown.
 | `GET /stats`                               | what earlier runs took, per step, model and transcriber                      |
 | `GET /log?lines=<n>`                       | the tail of `serve.log`                                                      |
 | `POST /pick {"kind"}`                      | a file or folder dialog on this desktop, for the options page                |
+| `POST /shutdown`                           | `{"stopping": true}`, then the process ends and frees the port               |
 
 `options` carries what the popup offers per run and overrides the stored
 settings for that job: `timestamps`, `condensed`, `cleanup` (each `on`

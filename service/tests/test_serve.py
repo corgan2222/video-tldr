@@ -647,3 +647,33 @@ def test_restart_answers_first_and_then_hands_over_the_port(service, monkeypatch
         assert handed == [(service.home, port, service.overrides)]
     finally:
         server.server_close()
+
+
+def test_stop_ends_the_process_without_handing_over_the_port(service, monkeypatch):
+    """An update cannot replace the installed script while Windows holds it
+    open, so the installer asks for this first. Unlike restart, nothing
+    takes the port afterwards."""
+    handed: list[tuple] = []
+    ended: list[int] = []
+    monkeypatch.setattr(module.os, "_exit", lambda code: ended.append(code))
+    server = Server(service, 0, relauncher=lambda *args: handed.append(args))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        code, answer = call(server, "POST", "/shutdown")
+        assert (code, answer) == (200, {"stopping": True})
+        for _ in range(100):
+            if ended:
+                break
+            time.sleep(0.05)
+        assert ended == [0]
+        assert handed == []
+    finally:
+        server.server_close()
+
+
+def test_stop_says_so_when_no_service_listens():
+    """The ordinary case for an installer on a fresh machine, and for a
+    second stop. It must not look like a failure."""
+    # Port 0 is never listening; the message names the port it tried.
+    assert "no service on port 1" in module.stop("", port=1)
