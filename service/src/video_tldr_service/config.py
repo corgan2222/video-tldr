@@ -15,11 +15,7 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# Under the home directory, not under LOCALAPPDATA: a packaged host
-# virtualises the latter, so a write lands in its LocalCache and the path
-# the user reads in the settings shows nothing. VIDEO_TLDR_HOME moves it,
-# which is what a machine with the models on another drive wants.
-DEFAULT_HOME = Path.home() / ".video-tldr"
+HOME_NAME = "video-tldr"
 CONFIG_NAME = "config.json"
 # The folder in the download folder that holds one folder per video, and
 # the folder inside that one for what only a run needs.
@@ -248,9 +244,22 @@ class Settings:
         return {k: (MASK if k in SECRETS and v else v) for k, v in self.config.items()}
 
 
+def default_home() -> Path:
+    """Where an installed service keeps its data when nobody says otherwise.
+
+    LOCALAPPDATA is the Windows place for data that belongs to a machine:
+    APPDATA roams, and a roaming profile would copy ten gigabytes of speech
+    models to every machine the user signs in to. Elsewhere, a dot
+    directory under the home. VIDEO_TLDR_HOME moves it, which is what a
+    machine with room on another drive wants.
+    """
+    local = os.environ.get("LOCALAPPDATA")
+    return Path(local) / HOME_NAME if local else Path.home() / f".{HOME_NAME}"
+
+
 def resolve_home(home: Path | None) -> Path:
     # Absolute: the PDF step turns paths below it into file URLs.
-    return Path(home or os.environ.get("VIDEO_TLDR_HOME", DEFAULT_HOME)).resolve()
+    return Path(home or os.environ.get("VIDEO_TLDR_HOME") or default_home()).resolve()
 
 
 # Reading and writing config.json belong together. The options page saves

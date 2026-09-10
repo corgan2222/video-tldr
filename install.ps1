@@ -23,7 +23,8 @@ param(
 
     # Put the program, its environment and its data under one directory,
     # in bin\, tools\ and data\. Without this each goes to its own
-    # standard place: ~\.local\bin, uv's tool directory, ~\.video-tldr.
+    # standard place: ~\.local\bin, uv's tool directory, and
+    # %LOCALAPPDATA%\video-tldr for the data.
     [string]$Root,
 
     # Where config.json, serve.log and the speech models live. Overrides
