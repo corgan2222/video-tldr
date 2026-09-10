@@ -380,6 +380,33 @@ def test_stats_take_the_median_over_runs_and_skip_cached_steps(tmp_path):
     assert stats(empty) == {"runs": 0, "steps": {}, "models": {}, "stt": {}}
 
 
+def test_only_the_language_model_is_charged_the_tokens_of_a_run(tmp_path):
+    settings = Settings(home=tmp_path)
+    folder = work_folder(settings, "tokensvideo")
+    folder.mkdir(parents=True)
+    (folder / "run.json").write_text(
+        json.dumps(
+            {
+                "model": "claude:sonnet",
+                "stt": "whisper",
+                "input": 300,
+                "output": 30,
+                "usd": 0.3,
+                "steps": {"transcribe": 17.0, "analyze": 80.0},
+            }
+        ),
+        "utf-8",
+    )
+
+    result = stats(settings)
+
+    model = result["models"]["claude:sonnet"]
+    assert (model["input"], model["output"], model["usd"]) == (300, 30, 0.3)
+    whisper = result["stt"]["whisper"]
+    assert (whisper["input"], whisper["output"], whisper["usd"]) == (0, 0, 0.0)
+    assert (whisper["runs"], whisper["seconds"]) == (1, 17.0)
+
+
 def test_urls_in_skips_blank_lines_and_comments(tmp_path):
     listing = tmp_path / "urls.txt"
     listing.write_text(

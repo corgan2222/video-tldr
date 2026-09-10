@@ -247,8 +247,9 @@ def paths(written: dict[str, Path]) -> dict[str, str]:
 
 def stats(settings: Settings) -> dict:
     """What earlier runs on this machine took: the median seconds per
-    step (cached steps left out), and per language model and transcriber
-    the runs, seconds and tokens they cost. Empty until a run happened."""
+    step (cached steps left out), per language model the runs, seconds,
+    tokens and dollars it cost, and per transcriber the runs and seconds.
+    Empty until a run happened."""
     runs = []
     for path in sorted(settings.library.glob(f"*/{WORK}/{RESULT_NAME}")):
         try:
@@ -261,7 +262,12 @@ def stats(settings: Settings) -> dict:
             if name in by_step and seconds >= CACHED_SECONDS:
                 by_step[name].append(seconds)
 
-    def summary(group: str, step: str) -> dict:
+    def summary(group: str, step: str, tokens: bool = False) -> dict:
+        """What the runs of one group took, keyed by its name. `tokens` says
+        whether the tokens and the dollars of a whole run belong to this
+        group: they are the language model's, every one of them, and a
+        transcriber spends none (2026-09-10, the model table had credited
+        a whisper run with the tokens of the run it rode along in)."""
         table: dict[str, dict] = {}
         for done in runs:
             name = done.get(group)
@@ -273,9 +279,10 @@ def stats(settings: Settings) -> dict:
             )
             entry["runs"] += 1
             entry["seconds"].append(seconds)
-            entry["input"] += done.get("input", 0)
-            entry["output"] += done.get("output", 0)
-            entry["usd"] += done.get("usd", 0.0)
+            if tokens:
+                entry["input"] += done.get("input", 0)
+                entry["output"] += done.get("output", 0)
+                entry["usd"] += done.get("usd", 0.0)
         return {
             name: {
                 "runs": e["runs"],
@@ -294,7 +301,7 @@ def stats(settings: Settings) -> dict:
             for name, values in by_step.items()
             if values
         },
-        "models": summary("model", "analyze"),
+        "models": summary("model", "analyze", tokens=True),
         "stt": summary("stt", "transcribe"),
     }
 
