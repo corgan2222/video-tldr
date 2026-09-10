@@ -52,10 +52,12 @@ irm https://raw.githubusercontent.com/corgan2222/video-tldr/main/install.ps1 | i
 
 That picks the CUDA libraries when the machine has a card and the ONNX
 runtime alone when it has none, puts `video-tldr` on your PATH, and
-registers no autostart: the extension starts the service when it needs
-one. `-Root D:\video-tldr` keeps the program, its environment and its
-data under one directory instead of three standard places. The speech
-models download on first use, several gigabytes of them.
+registers no autostart. You start the service yourself with
+`video-tldr serve`; whenever it is not answering, the extension shows
+that command with a button that copies it. `-Root D:\video-tldr` keeps
+the program, its environment and its data under one directory instead of
+three standard places. The speech models download on first use, several
+gigabytes of them.
 
 The extension is the `.zip` on the same release: load it as a temporary
 add-on in Firefox (`about:debugging`, "This Firefox") or unpack it and
@@ -74,15 +76,16 @@ that README covers its setup and the model choice.
 
 ## Usage
 
-1. Start the service: `cd service && uv run video-tldr serve`.
+1. Start the service: `video-tldr serve`. From a source build:
+   `uv run --project service video-tldr serve`.
 2. Click the toolbar icon, open Settings, press Connect, choose the
    language, the outputs and the model, Save. A token is needed only
    when the service was given one.
 3. Open a YouTube video, click the icon, press Fast or Thorough. The
    window shows the steps as they run; a notification says when the
    summary is ready, and a click on it opens the note.
-4. Without a browser: `uv run video-tldr run <url>` does the same from
-   the command line.
+4. Without a browser: `video-tldr run <url>` does the same from the
+   command line.
 
 ## Contributing
 

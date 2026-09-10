@@ -138,7 +138,7 @@
     "message": "Starte ihn in einem Terminal, dann in den Einstellungen auf Verbinden drücken:"
   },
   "noServiceCommand": {
-    "message": "cd service && uv run video-tldr serve"
+    "message": "video-tldr serve"
   },
   "copyCommand": {
     "message": "Befehl kopieren"
