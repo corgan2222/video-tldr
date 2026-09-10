@@ -126,3 +126,17 @@ def test_language_is_a_choice_and_the_file_is_replaced_not_truncated(
     assert main(["--home", home, "config", "--set", "language=en"]) == 0
     # Written beside and renamed over, so a reader never sees a half file.
     assert [p.name for p in tmp_path.iterdir()] == ["config.json"]
+
+
+def test_profiles_change_the_transcriber_and_the_model_on_top_of_the_file():
+    from corganshelper_service.config import DEFAULTS, ConfigError, profile_overrides
+
+    assert profile_overrides("fast", DEFAULTS) == {"stt": "auto", "model": ""}
+    assert profile_overrides("thorough", DEFAULTS) == {
+        "stt": "whisper-large",
+        "model": "opus",
+    }
+    # A backend with no known strongest model keeps the one in the file.
+    assert profile_overrides("thorough", {**DEFAULTS, "llm": "lmstudio"})["model"] == ""
+    with pytest.raises(ConfigError):
+        profile_overrides("quick", DEFAULTS)

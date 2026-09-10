@@ -1,7 +1,7 @@
 {
-  "name": "corganshelper",
-  "version": "0.1.29",
-  "description": "A Manifest V3 browser extension for Firefox and Chrome.",
+  "name": "video-tltr",
+  "version": "0.1.30",
+  "description": "Too long to read? One click turns the YouTube video in the active tab into a summary with pictures, as a note, PDF or Word file.",
   "type": "module",
   "license": "MIT",
   "engines": {

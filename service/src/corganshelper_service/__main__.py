@@ -194,8 +194,8 @@ def main(argv: list[str] | None = None) -> int:
                 force=args.force,
                 language=args.language,
                 formats=args.format,
-                progress=lambda step, url=url: print(
-                    f"  {url} {step}", file=sys.stderr
+                progress=lambda step, detail="", url=url: print(
+                    f"  {url} {step} {detail}".rstrip(), file=sys.stderr
                 ),
             )
             if result["error"]:

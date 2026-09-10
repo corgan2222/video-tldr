@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>video-tltr</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        font: 13px sans-serif;
+        margin: 0;
+        padding: 10px 12px;
+        width: 380px;
+        background: Canvas;
+        color: CanvasText;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 6px;
+      }
+      h1 {
+        font-size: 15px;
+        margin: 0;
+      }
+      a {
+        color: LinkText;
+        cursor: pointer;
+      }
+      #video {
+        font-weight: bold;
+        margin: 4px 0 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      button {
+        font: inherit;
+        padding: 4px 12px;
+      }
+      .note {
+        opacity: 0.75;
+        font-size: 12px;
+        margin: 4px 0;
+      }
+      .job {
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+      }
+      .job h2 {
+        font-size: 13px;
+        margin: 0 0 4px;
+      }
+      .steps {
+        list-style: none;
+        margin: 4px 0;
+        padding: 0;
+        font-size: 12px;
+      }
+      .steps li {
+        display: flex;
+        justify-content: space-between;
+        padding: 1px 0;
+      }
+      .steps .pending {
+        opacity: 0.55;
+      }
+      .steps .running {
+        font-weight: bold;
+      }
+      .steps .failed {
+        color: #d93025;
+      }
+      .error {
+        color: #d93025;
+        white-space: pre-wrap;
+      }
+      .outputs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 4px 0;
+      }
+      pre {
+        font: 11px monospace;
+        max-height: 160px;
+        overflow: auto;
+        margin: 4px 0 0;
+        padding: 4px;
+        background: color-mix(in srgb, CanvasText 6%, transparent);
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      details {
+        margin-top: 10px;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>video-tltr</h1>
+      <a id="settings">Settings</a>
+    </header>
+    <div id="video">…</div>
+    <div class="row">
+      <button id="fast" disabled>Fast</button>
+      <button id="thorough" disabled>Thorough</button>
+      <span id="hint" class="note"></span>
+    </div>
+    <p class="note">
+      Fast keeps every cached result, takes YouTube's captions and the model in
+      the settings. Thorough redoes every step, transcribes with the large
+      Whisper and asks the strongest model the backend has.
+    </p>
+    <div id="jobs"></div>
+    <details id="log-box">
+      <summary>Service log</summary>
+      <pre id="log"></pre>
+    </details>
+    <p id="status" class="note"></p>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

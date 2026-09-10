@@ -3,16 +3,21 @@ job at a time, the same `run` the command line calls.
 
 The contract, every answer JSON:
 
-    POST /jobs {"url": ...}     202 the job; 400 when the URL is no video
-    GET  /jobs/<id>             200 the job; 404
-    POST /jobs/<id>/open        200 {"opened": ...}; 409 until it is done
-    GET  /config                200 {"settings", "choices", "stt_models", ...}
-    PUT  /config {key: value}   200 {"settings", ...}; 400 on a wrong key
-    GET  /models?llm=<backend>  200 {"models": [...]}; 400 when it cannot answer
+    POST /jobs {"url", "profile"}   202 the job; 400 when the URL is no video
+                                    or the profile unknown (fast, thorough)
+    GET  /jobs/<id>                 200 the job; 404
+    POST /jobs/<id>/open            200 {"opened": ...}; 409 until it is done
+    GET  /config                    200 {"settings", "choices", "stt_models",
+                                         "profiles", "home", "log", "version"}
+    PUT  /config {key: value}       200 {"settings", ...}; 400 on a wrong key
+    GET  /models?llm=<backend>      200 {"models": [...]}; 400 with the reason
+    GET  /log?lines=<n>             200 {"lines": [...]}, the tail of serve.log
+    GET  /stats                     200 what earlier runs took, see run.stats
 
-A job carries `id` (the video id), `url`, `status` (queued, running,
-done, error), `step` (the running or last step) and, once it ran, what
-`run` returned: `title`, `steps`, `images`, `usd`, `written`, `error`.
+A job carries `id` (the video id), `url`, `profile`, `status` (queued,
+running, done, error), `step` and `step_started` (the running or last
+step) and, once it ran, what `run` returned: `title`, `model`, `stt`,
+`steps` with seconds, `images`, `usd`, `written`, `error`.
 
 Who gets in, after decision 0001: the Host header must read
 127.0.0.1:<port>, an Origin header must be absent (curl, the command
@@ -37,6 +42,7 @@ import secrets
 import subprocess
 import sys
 import threading
+from collections import deque
 from collections.abc import Callable
 from datetime import datetime
 from http import HTTPStatus
@@ -51,16 +57,18 @@ from .config import (
     LANGUAGES,
     LLM_BACKENDS,
     MASK,
+    PROFILES,
     SECRETS,
     STT_ENGINES,
     STT_MODELS,
     ConfigError,
     Settings,
+    profile_overrides,
     store,
 )
 from .fetch import FetchError, video_id
 from .llm import LlmError
-from .run import run
+from .run import run, stats
 
 PORT = 8765
 # Every request, every job step and every traceback, next to the data:
@@ -68,6 +76,8 @@ PORT = 8765
 LOG_NAME = "serve.log"
 LOG_BYTES = 1_000_000
 LOG_FILES = 3
+LOG_LINES = 50
+LOG_LINES_MAX = 500
 EXTENSION_ORIGINS = ("moz-extension://", "chrome-extension://")
 # What `open` starts, the first that the job wrote.
 OPEN_ORDER = ["obsidian", "pdf", "docx", "md", "summary"]
@@ -107,9 +117,14 @@ class Service:
         self.log = self.open_log()
         threading.Thread(target=self.work, daemon=True, name="jobs").start()
 
-    def settings(self) -> Settings:
+    def settings(self, profile: str | None = None) -> Settings:
         # Loaded per use, not once: PUT /config changes the file underneath.
-        return Settings.load(self.home, self.overrides)
+        # A profile sits on top of the file and under the command line.
+        base = Settings.load(self.home, self.overrides)
+        if not profile:
+            return base
+        overrides = {**profile_overrides(profile, base.config), **self.overrides}
+        return Settings.load(self.home, overrides)
 
     def open_log(self) -> logging.Logger:
         log = logging.getLogger(f"corganshelper.serve.{id(self)}")
@@ -126,6 +141,13 @@ class Service:
         log.addHandler(to_file)
         log.addHandler(to_console)
         return log
+
+    def log_tail(self, lines: int) -> list[str]:
+        """The last `lines` of the log file, oldest first."""
+        if not self.log_path.exists():
+            return []
+        with self.log_path.open(encoding="utf-8", errors="replace") as handle:
+            return [line.rstrip("\n") for line in deque(handle, maxlen=lines)]
 
     def ensure_token(self) -> str:
         token = self.settings().config["token"]
@@ -147,6 +169,7 @@ class Service:
             # Speed class, error rate and languages per transcriber, for
             # the options page to label the choice with.
             "stt_models": STT_MODELS,
+            "profiles": list(PROFILES),
             "home": str(settings.home),
             "log": str(self.log_path),
             "version": __version__,
@@ -174,8 +197,9 @@ class Service:
         )
         return self.config()
 
-    def submit(self, url: str) -> dict:
+    def submit(self, url: str, profile: str = "fast") -> dict:
         vid = video_id(url)
+        profile_overrides(profile, self.settings().config)  # names a wrong one
         with self.lock:
             job = self.jobs.get(vid)
             if job and job["status"] in ("queued", "running"):
@@ -183,8 +207,10 @@ class Service:
             job = {
                 "id": vid,
                 "url": url,
+                "profile": profile,
                 "status": "queued",
                 "step": None,
+                "step_started": None,
                 "queued": now(),
             }
             self.jobs[vid] = job
@@ -199,21 +225,38 @@ class Service:
         with self.lock:
             self.jobs[vid].update(fields)
 
-    def step(self, vid: str, name: str) -> None:
-        self.log.info("job %s: %s", vid, name)
-        self.update(vid, step=name)
+    def step(self, vid: str, name: str, detail: str | None = None) -> None:
+        """What run reports: a step starting, or a step done with a line
+        about it (seconds, model, tokens, pictures)."""
+        if detail is None:
+            self.log.info("job %s: %s", vid, name)
+            self.update(vid, step=name, step_started=now())
+        else:
+            self.log.info("job %s: %s %s", vid, name, detail)
 
     def work(self) -> None:
         while True:
             vid = self.queue.get()
-            url = self.job(vid)["url"]
-            self.log.info("job %s: running, %s", vid, url)
+            job = self.job(vid)
+            profile = job["profile"]
             self.update(vid, status="running", started=now())
             try:
+                settings = self.settings(profile)
+                self.log.info(
+                    "job %s: running %s, profile %s, %s, stt %s",
+                    vid,
+                    job["url"],
+                    profile,
+                    llm.describe(settings),
+                    settings.config["stt"],
+                )
                 result = self.runner(
-                    url,
-                    self.settings(),
-                    progress=lambda step, vid=vid: self.step(vid, step),
+                    job["url"],
+                    settings,
+                    force=profile == "thorough",
+                    progress=lambda step, detail=None, vid=vid: self.step(
+                        vid, step, detail
+                    ),
                 )
             # Blind on purpose: a bug in a step must not leave the job on
             # "running" for the extension to poll forever.
@@ -239,9 +282,12 @@ class Service:
                 )
             else:
                 self.log.info(
-                    "job %s: done in %ss, wrote %s",
+                    "job %s: done in %ss, %s+%s tokens, %.3f USD, wrote %s",
                     vid,
                     result["seconds"],
+                    result["input"],
+                    result["output"],
+                    result["usd"],
                     ", ".join(result["written"]),
                 )
             self.update(vid, **result, status=status, finished=now())
@@ -328,14 +374,20 @@ class Handler(BaseHTTPRequestHandler):
                 HTTPStatus.UNAUTHORIZED,
                 {"error": "Authorization: Bearer <token>; serve prints the token"},
             )
-        parts = [p for p in self.path.partition("?")[0].split("/") if p]
+        path, _, query_text = self.path.partition("?")
+        parts = [p for p in path.split("/") if p]
+        query = parse_qs(query_text)
         service = self.server.service
         try:
             if method == "POST" and parts == ["jobs"]:
-                url = self.body().get("url")
+                body = self.body()
+                url = body.get("url")
                 if not isinstance(url, str):
                     raise ValueError("url missing")
-                return self.reply(HTTPStatus.ACCEPTED, service.submit(url))
+                profile = body.get("profile") or "fast"
+                if not isinstance(profile, str):
+                    raise TypeError("profile must be a string")
+                return self.reply(HTTPStatus.ACCEPTED, service.submit(url, profile))
             if method == "GET" and len(parts) == 2 and parts[0] == "jobs":
                 job = service.job(parts[1])
                 if job is None:
@@ -350,9 +402,13 @@ class Handler(BaseHTTPRequestHandler):
             if method == "PUT" and parts == ["config"]:
                 return self.reply(HTTPStatus.OK, service.update_config(self.body()))
             if method == "GET" and parts == ["models"]:
-                query = parse_qs(self.path.partition("?")[2])
                 backend = query.get("llm", [None])[0]
                 return self.reply(HTTPStatus.OK, {"models": service.models(backend)})
+            if method == "GET" and parts == ["log"]:
+                lines = min(int(query.get("lines", [LOG_LINES])[0]), LOG_LINES_MAX)
+                return self.reply(HTTPStatus.OK, {"lines": service.log_tail(lines)})
+            if method == "GET" and parts == ["stats"]:
+                return self.reply(HTTPStatus.OK, stats(service.settings()))
             raise KeyError(self.path)
         except (FetchError, ConfigError, LlmError, ValueError, TypeError) as error:
             self.reply(HTTPStatus.BAD_REQUEST, {"error": str(error)})
@@ -382,7 +438,7 @@ def serve(home: Path | None, overrides: dict | None = None, port: int = PORT) ->
     # Flushed: started by the task scheduler with stdout in a file, the
     # lines would otherwise sit in the buffer until the service stops.
     print(
-        f"corganshelper {__version__} listening on http://127.0.0.1:{port}, "
+        f"video-tltr service {__version__} listening on http://127.0.0.1:{port}, "
         f"data under {service.settings().home}, log in {service.log_path}",
         flush=True,
     )
@@ -390,7 +446,7 @@ def serve(home: Path | None, overrides: dict | None = None, port: int = PORT) ->
         f"token: {service.token}  (paste it into the extension's options)",
         flush=True,
     )
-    service.log.info("corganshelper %s listening on port %s", __version__, port)
+    service.log.info("video-tltr service %s listening on port %s", __version__, port)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>corganshelper options</title>
+    <title>video-tltr settings</title>
     <style>
       /* The browser's own scheme: about:addons embeds this page, and a
          white box inside a dark browser is what the owner saw first. */
@@ -60,15 +60,29 @@
       .note {
         opacity: 0.75;
       }
+      table {
+        border-collapse: collapse;
+        font-size: 12px;
+        margin-top: 6px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 2px 10px 2px 0;
+      }
+      td.n {
+        text-align: right;
+      }
     </style>
   </head>
   <body>
     <h2>Video summary</h2>
     <p class="note">
-      The toolbar icon hands the active YouTube tab to the local service,
-      <code>corganshelper serve</code>, which prints its token when it starts.
-      The settings below live in the service's <code>config.json</code>; grey
-      text shows the default.
+      The toolbar icon opens a window with two buttons, Fast and Thorough, that
+      hand the YouTube video in the active tab to the local service,
+      <code>video-tltr serve</code>. The service prints its token when it
+      starts. The settings below live in the service's <code>config.json</code>;
+      grey text shows the default.
     </p>
     <label for="service-url">Service URL</label>
     <input id="service-url" type="url" placeholder="http://127.0.0.1:8765" />
@@ -77,7 +91,7 @@
       id="token"
       type="password"
       autocomplete="off"
-      placeholder="printed by corganshelper serve"
+      placeholder="printed by video-tltr serve"
     />
     <div class="row">
       <button id="connect">Connect</button>
@@ -108,7 +122,8 @@
       <h3>Summary: the language model</h3>
       <p class="note">
         Reads the transcript and writes the note. Two things to choose: where it
-        runs (the backend) and which model there.
+        runs (the backend) and which model there. Thorough asks for the
+        strongest model of the backend instead.
       </p>
       <label for="llm">Backend</label>
       <select id="llm"></select>
@@ -164,11 +179,19 @@
         Turns the audio into text, and only runs when YouTube has no captions or
         when a model is chosen here instead of auto. These models run on this
         machine (whisper is Whisper large-v3-turbo on the GPU) or at OpenAI;
-        they are not language models and cannot write the note.
+        they are not language models and cannot write the note. Thorough always
+        transcribes with whisper-large.
       </p>
       <label for="stt">Transcriber</label>
       <select id="stt"></select>
     </fieldset>
+
+    <h2>What your runs took</h2>
+    <p class="note" id="stats-note">
+      Measured on this machine from the videos you ran; medians over the runs
+      that did the step, cached steps left out.
+    </p>
+    <div id="stats"></div>
 
     <h2>Open all links</h2>
     <label for="blocklist"

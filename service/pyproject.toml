@@ -24,8 +24,11 @@ dependencies = [
     "yt-dlp>=2026.8.19",
 ]
 
+# Two names for one command: the extension is called video-tltr, the
+# repository and the package keep their old name.
 [project.scripts]
 corganshelper = "corganshelper_service.__main__:main"
+video-tltr = "corganshelper_service.__main__:main"
 
 # One of the two extras is needed to transcribe: they carry the ONNX
 # runtime for parakeet and, in gpu, the CUDA libraries whisper needs too.

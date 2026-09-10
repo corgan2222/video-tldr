@@ -4,9 +4,14 @@ import {
   DEFAULT_CHOICES,
   DEFAULT_CONNECTION,
   DEFAULT_SETTINGS,
+  formatSeconds,
   request,
+  STEP_LABEL,
+  STEPS,
   type Config,
   type Connection,
+  type Measure,
+  type Stats,
 } from './service.js';
 
 function pick<T extends HTMLElement>(selector: string): T {
@@ -24,6 +29,8 @@ const serviceStatus = pick<HTMLElement>('#service-status');
 const formatsBox = pick<HTMLElement>('#formats');
 const modelList = pick<HTMLDataListElement>('#models');
 const modelHint = pick<HTMLElement>('#model-hint');
+const statsBox = pick<HTMLElement>('#stats');
+const statsNote = pick<HTMLElement>('#stats-note');
 
 // Every key of config.json this page edits, by element. A select takes
 // its choices from the service, so a backend added there shows up here
@@ -71,7 +78,7 @@ function fillSelect(
   select.value = value;
 }
 
-// The choice between fast and accurate, as `corganshelper models stt`
+// The choice between fast and accurate, as `video-tltr models stt`
 // prints it: speed class, leaderboard word error rate, languages.
 function sttLabel(config: Config | undefined, name: string): string {
   const spec = config?.stt_models[name];
@@ -123,6 +130,65 @@ function show(config?: Config): void {
   );
 }
 
+function table(head: string[], rows: string[][]): HTMLTableElement {
+  const node = document.createElement('table');
+  const header = node.insertRow();
+  for (const text of head)
+    header.append(
+      Object.assign(document.createElement('th'), { textContent: text }),
+    );
+  for (const cells of rows) {
+    const row = node.insertRow();
+    cells.forEach((text, index) => {
+      const cell = row.insertCell();
+      cell.textContent = text;
+      if (index > 0) cell.className = 'n';
+    });
+  }
+  return node;
+}
+
+// Three small tables from GET /stats: the steps, the language models,
+// the transcribers, each with what it took on this machine.
+function showStats(stats: Stats): void {
+  if (stats.runs === 0) {
+    statsBox.replaceChildren();
+    statsNote.textContent = 'No run yet; the first video fills this in.';
+    return;
+  }
+  statsNote.textContent = `${stats.runs} runs on this machine; medians over the runs that did the step, cached steps left out.`;
+  const measure = (name: string, m: Measure, seconds: string): string[] => [
+    name,
+    String(m.runs),
+    seconds,
+    `${m.input}+${m.output}`,
+    m.usd ? m.usd.toFixed(3) : '0',
+  ];
+  statsBox.replaceChildren(
+    table(
+      ['Step', 'Median'],
+      STEPS.filter((s) => s in stats.steps).map((s) => [
+        STEP_LABEL[s] ?? s,
+        formatSeconds(stats.steps[s]),
+      ]),
+    ),
+    table(
+      ['Language model', 'Runs', 'Summarise', 'Tokens per video', 'USD'],
+      Object.entries(stats.models).map(([name, m]) =>
+        measure(name, m, formatSeconds(m.seconds)),
+      ),
+    ),
+    table(
+      ['Transcriber', 'Runs', 'Transcribe'],
+      Object.entries(stats.stt).map(([name, m]) => [
+        name,
+        String(m.runs),
+        formatSeconds(m.seconds),
+      ]),
+    ),
+  );
+}
+
 // What the chosen backend accepts as `model`, for the field's list; a
 // backend that needs a key or a running server says so in the hint.
 async function loadModels(): Promise<void> {
@@ -150,7 +216,8 @@ async function loadService(): Promise<void> {
     const config = await request<Config>(connection(), 'GET', '/config');
     connected = true;
     show(config);
-    serviceStatus.textContent = `Connected to corganshelper ${config.version}, data under ${config.home}, log in ${config.log}.`;
+    serviceStatus.textContent = `Connected to the video-tltr service ${config.version}, data under ${config.home}, log in ${config.log}.`;
+    showStats(await request<Stats>(connection(), 'GET', '/stats'));
   } catch (error) {
     connected = false;
     show();
@@ -196,7 +263,8 @@ async function load(): Promise<void> {
   } else {
     show();
     serviceStatus.textContent =
-      'Not connected: paste the token from `corganshelper serve` and press Connect.';
+      'Not connected: paste the token from `video-tltr serve` and press Connect.';
+    statsNote.textContent = 'Connect to see what your runs took.';
     await loadModels();
   }
 }

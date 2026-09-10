@@ -1,22 +1,27 @@
-# corganshelper
+# video-tltr
 
 _[Deutsche Fassung](docs/README_DE.md)_
 
-A Manifest V3 browser extension for Firefox and Chrome, with a local
-service that turns a YouTube video into a summary.
+Too long to read? A Firefox and Chrome extension with a local service that
+turns the YouTube video in the active tab into a summary with pictures.
+The repository keeps its old name, corganshelper.
 
 ## What It Can Do
 
-- **Video summary.** A click on the toolbar icon hands the YouTube video
-  in the active tab to a local service. The service fetches title,
-  description, chapters and captions, transcribes the audio when there
-  are no captions, has a language model sort and summarise the content,
-  pulls still frames at the moments worth seeing, reads the installation
-  steps out of linked GitHub repositories and writes the result as
-  Markdown, as a note in an Obsidian vault, as PDF and as a Word file. The
-  language model runs through the Claude Code CLI, the Anthropic or
-  OpenAI API, LM Studio or Ollama; the transcriber is Whisper, Parakeet,
-  Canary or OpenAI. The choice is made in the extension's options.
+- **Video summary.** The toolbar icon opens a small window with two
+  buttons. Fast and Thorough hand the video to a local service, which
+  fetches title, description, chapters and captions, transcribes the
+  audio when there are no captions, has a language model sort and
+  summarise the content, pulls still frames at the moments worth seeing,
+  reads the installation steps out of linked GitHub repositories and
+  writes the result as Markdown, as a note in an Obsidian vault, as PDF
+  and as a Word file. The window shows each step with the seconds it
+  took, an estimate of what is left from your earlier runs, the service
+  log, and a button to open the result. The language model runs through
+  the Claude Code CLI, the Anthropic or OpenAI API, LM Studio or Ollama;
+  the transcriber is Whisper, Parakeet, Canary or OpenAI. The choice is
+  made in the extension's settings, which also show what each model took
+  on your machine.
 - **Open all links.** Select text, pick "Open all links" from the context
   menu, and every link inside the selection opens as a tab in a new
   window: YouTube redirects unwrapped, sponsor and affiliate hosts
@@ -39,14 +44,15 @@ model choice.
 
 ## Usage
 
-1. Start the service: `cd service && uv run corganshelper serve`. It
-   prints a token.
-2. Open the extension's options, enter the service URL and the token,
-   press Connect, choose the language, the outputs and the model, Save.
-3. Open a YouTube video and click the toolbar icon. The badge shows the
-   step the service is on; a notification says when the summary is
-   ready, and a click on it opens the note.
-4. Without a browser: `uv run corganshelper run <url>` does the same from
+1. Start the service: `cd service && uv run video-tltr serve`. It prints
+   a token.
+2. Click the toolbar icon; without a token it opens the settings. Enter
+   the token, press Connect, choose the language, the outputs and the
+   model, Save.
+3. Open a YouTube video, click the icon, press Fast or Thorough. The
+   window shows the steps as they run; a notification says when the
+   summary is ready, and a click on it opens the note.
+4. Without a browser: `uv run video-tltr run <url>` does the same from
    the command line.
 
 ## Contributing

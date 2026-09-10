@@ -2,10 +2,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   badgeFor,
   failureBadge,
+  formatSeconds,
   isLocal,
+  remainingSeconds,
   request,
   ServiceError,
+  stepViews,
+  videoId,
   type Job,
+  type Stats,
 } from '../src/service.js';
 
 const connection = { serviceUrl: 'http://127.0.0.1:8765/', token: 'secret' };
@@ -69,7 +74,7 @@ describe('request', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('refused')));
 
     await expect(request(connection, 'GET', '/config')).rejects.toThrow(
-      'no service at http://127.0.0.1:8765; start it with "corganshelper serve"',
+      'no service at http://127.0.0.1:8765; start it with "video-tltr serve"',
     );
   });
 });
@@ -96,6 +101,85 @@ describe('isLocal', () => {
   });
 });
 
+describe('videoId', () => {
+  it('reads the id the way the service does', () => {
+    expect(videoId('https://www.youtube.com/watch?v=Zvc5QkrWgAU&t=3')).toBe(
+      'Zvc5QkrWgAU',
+    );
+    expect(videoId('https://youtu.be/Zvc5QkrWgAU')).toBe('Zvc5QkrWgAU');
+    expect(videoId('https://m.youtube.com/shorts/Zvc5QkrWgAU')).toBe(
+      'Zvc5QkrWgAU',
+    );
+    expect(videoId('https://www.youtube.com/')).toBeNull();
+    expect(videoId('https://www.youtube.com/watch?v=short')).toBeNull();
+    expect(videoId('https://example.org/watch?v=Zvc5QkrWgAU')).toBeNull();
+    expect(videoId('about:blank')).toBeNull();
+  });
+});
+
+describe('time estimate', () => {
+  const stats: Stats = {
+    runs: 3,
+    steps: { fetch: 9, analyze: 75, enrich: 8, frames: 240, render: 4 },
+    models: {},
+    stt: {},
+  };
+  const now = new Date('2026-09-10T12:00:40+02:00');
+  const running: Job = {
+    id: 'x',
+    url: 'u',
+    status: 'running',
+    step: 'analyze',
+    step_started: '2026-09-10T12:00:10+02:00',
+    steps: { fetch: 9.2, transcribe: 0.0 },
+  };
+
+  it('lists every step with what it took, takes or is expected to take', () => {
+    const views = stepViews(running, stats, now);
+
+    expect(views.map((v) => `${v.name}:${v.state}`)).toEqual([
+      'fetch:done',
+      'transcribe:done',
+      'analyze:running',
+      'note:pending',
+      'enrich:pending',
+      'frames:pending',
+      'render:pending',
+    ]);
+    expect(views[0].seconds).toBe(9.2);
+    expect(views[2].seconds).toBe(30);
+    expect(views[3].seconds).toBeNull();
+    expect(views[5].seconds).toBe(240);
+  });
+
+  it('adds the pending medians and what is left of the running step', () => {
+    // analyze: 75 expected, 30 used; then enrich 8, frames 240, render 4.
+    expect(remainingSeconds(running, stats, now)).toBe(45 + 8 + 240 + 4);
+    expect(
+      remainingSeconds(
+        { ...running, status: 'queued', step: null, steps: {} },
+        stats,
+        now,
+      ),
+    ).toBe(9 + 75 + 8 + 240 + 4);
+    expect(remainingSeconds({ ...running, status: 'done' }, stats, now)).toBe(
+      0,
+    );
+    expect(remainingSeconds(running, { ...stats, steps: {} }, now)).toBeNull();
+  });
+
+  it('marks the failed step and formats seconds as minutes', () => {
+    const failed: Job = {
+      ...running,
+      status: 'error',
+      error: { step: 'analyze', message: 'boom' },
+    };
+    expect(stepViews(failed, stats, now)[2].state).toBe('failed');
+    expect(formatSeconds(42)).toBe('42 s');
+    expect(formatSeconds(297)).toBe('4:57 min');
+  });
+});
+
 describe('badgeFor', () => {
   const job: Job = { id: 'x', url: 'u', status: 'queued', step: null };
 
@@ -103,7 +187,7 @@ describe('badgeFor', () => {
     expect(badgeFor(job).text).toBe('…');
     expect(
       badgeFor({ ...job, status: 'running', step: 'frames' }),
-    ).toMatchObject({ text: 'img', title: 'corganshelper: frames x' });
+    ).toMatchObject({ text: 'img', title: 'video-tltr: frames x' });
     expect(badgeFor({ ...job, status: 'running', step: 'odd' }).text).toBe('…');
     expect(
       badgeFor({ ...job, status: 'done', title: 'A video' }).title,
@@ -118,6 +202,6 @@ describe('badgeFor', () => {
     });
     expect(badge).toEqual(failureBadge('frames failed: ffmpeg failed'));
     expect(badge.text).toBe('!');
-    expect(badge.title).toBe('corganshelper: frames failed: ffmpeg failed');
+    expect(badge.title).toBe('video-tltr: frames failed: ffmpeg failed');
   });
 });

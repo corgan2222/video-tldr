@@ -21,11 +21,14 @@ class Runner:
         self.gate.set()
         self.calls = 0
         self.fail = None
+        self.seen: list[tuple] = []
 
-    def __call__(self, url, settings, progress=None, **kwargs):
+    def __call__(self, url, settings, progress=None, force=False, **kwargs):
         self.calls += 1
+        self.seen.append((settings.config["stt"], settings.config["model"], force))
         if progress:
             progress("fetch")
+            progress("fetch", "0.1s, A video, 1 caption tracks")
         self.gate.wait(timeout=5)
         if self.fail:
             raise self.fail
@@ -33,6 +36,8 @@ class Runner:
             "id": "x_x_x_x_x_x",
             "url": url,
             "title": "A video",
+            "model": "claude:sonnet",
+            "stt": settings.config["stt"],
             "step": "render",
             "steps": {"fetch": 0.1},
             "seconds": 0.1,
@@ -126,12 +131,17 @@ def test_a_job_runs_once_from_queued_to_done(server, runner):
     runner.gate.clear()
     code, job = call(server, "POST", "/jobs", {"url": URL})
     assert code == 202
-    assert (job["id"], job["status"]) == ("x_x_x_x_x_x", "queued")
+    assert (job["id"], job["status"], job["profile"]) == (
+        "x_x_x_x_x_x",
+        "queued",
+        "fast",
+    )
 
     # A second click on the same video joins the running job.
     assert call(server, "POST", "/jobs", {"url": URL})[1]["id"] == job["id"]
     job = wait_for(server, job["id"], "running")
     assert job["step"] == "fetch"
+    assert job["step_started"]
     assert call(server, "POST", f"/jobs/{job['id']}/open")[0] == 409
 
     runner.gate.set()
@@ -140,6 +150,21 @@ def test_a_job_runs_once_from_queued_to_done(server, runner):
     assert job["written"]["obsidian"] == "C:/v/n.md"
     assert job["finished"]
     assert runner.calls == 1
+    # fast: captions when there are any, the stored model, cached results kept.
+    assert runner.seen == [("auto", "", False)]
+
+
+def test_thorough_redoes_everything_with_the_large_whisper_and_the_best_model(
+    server, runner
+):
+    code, job = call(server, "POST", "/jobs", {"url": URL, "profile": "thorough"})
+    assert code == 202
+    wait_for(server, job["id"], "done")
+
+    assert runner.seen == [("whisper-large", "opus", True)]
+    code, answer = call(server, "POST", "/jobs", {"url": URL, "profile": "quick"})
+    assert code == 400
+    assert "profile must be one of fast, thorough" in answer["error"]
 
 
 def test_open_starts_the_note_in_obsidian_first(server, runner, monkeypatch):
@@ -179,6 +204,7 @@ def test_config_is_read_and_written_through_the_service(server, tmp_path):
     assert answer["settings"]["language"] == "de"
     assert answer["settings"]["token"] == "********"
     assert answer["choices"]["llm"][0] == "claude"
+    assert answer["profiles"] == ["fast", "thorough"]
     assert answer["home"] == str(tmp_path.resolve())
 
     # The options page sends back what it was shown, masks included.
@@ -255,7 +281,7 @@ def test_models_lists_what_a_backend_offers_and_says_why_not(server, monkeypatch
     assert config["stt_models"]["parakeet"]["speed"] == "fast"
 
 
-def test_the_log_file_names_every_request_and_what_a_job_did(server, runner, tmp_path):
+def test_the_log_names_every_request_and_what_a_job_did(server, runner, tmp_path):
     _, config = call(server, "GET", "/config")
     assert config["log"] == str(tmp_path.resolve() / "serve.log")
     _, job = call(server, "POST", "/jobs", {"url": URL})
@@ -267,6 +293,33 @@ def test_the_log_file_names_every_request_and_what_a_job_did(server, runner, tmp
     log = (tmp_path / "serve.log").read_text(encoding="utf-8")
 
     assert '"GET /config HTTP/1.1" 200' in log
-    assert "job x_x_x_x_x_x: fetch" in log
-    assert "job x_x_x_x_x_x: done in 0.1s, wrote summary, obsidian" in log
+    assert "running https://youtu.be/x_x_x_x_x_x, profile fast, claude:sonnet" in log
+    assert "job x_x_x_x_x_x: fetch\n" in log
+    assert "job x_x_x_x_x_x: fetch 0.1s, A video, 1 caption tracks" in log
+    assert "done in 0.1s, 0+0 tokens, 0.000 USD, wrote summary, obsidian" in log
     assert "crashed in fetch" in log and "RuntimeError: boom" in log
+
+    # The popup shows the tail of the same file.
+    code, answer = call(server, "GET", "/log?lines=3")
+    assert code == 200
+    assert len(answer["lines"]) == 3
+    code, answer = call(server, "GET", "/log?lines=30")
+    assert any("RuntimeError: boom" in line for line in answer["lines"])
+
+
+def test_stats_come_from_the_runs_in_the_work_folder(server, tmp_path):
+    code, answer = call(server, "GET", "/stats")
+    assert (code, answer["runs"]) == (200, 0)
+
+    folder = tmp_path / "work" / "v"
+    folder.mkdir(parents=True)
+    (folder / "run.json").write_text(
+        json.dumps(
+            {"model": "claude:sonnet", "stt": "auto", "steps": {"analyze": 70.0}}
+        ),
+        "utf-8",
+    )
+    code, answer = call(server, "GET", "/stats")
+    assert answer["runs"] == 1
+    assert answer["steps"] == {"analyze": 70.0}
+    assert answer["models"]["claude:sonnet"]["seconds"] == 70.0

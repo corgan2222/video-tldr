@@ -116,6 +116,28 @@ SECRETS = ("openai_api_key", "anthropic_api_key", "token")
 MASK = "*" * 8
 CHOICES = {"llm": LLM_BACKENDS, "stt": STT_ENGINES, "language": list(LANGUAGES)}
 
+# The two buttons in the extension's popup. `fast` keeps every cached
+# result, takes YouTube's captions and the backend's default model.
+# `thorough` redoes every step, transcribes with the large Whisper even
+# when captions exist, and asks the strongest model where the backend
+# has a known one.
+PROFILES = {
+    "fast": {"stt": "auto", "model": ""},
+    "thorough": {"stt": "whisper-large", "model": ""},
+}
+THOROUGH_MODELS = {"claude": "opus", "anthropic": "claude-opus-5"}
+
+
+def profile_overrides(name: str, config: dict) -> dict:
+    """What a profile changes on top of the stored settings; an empty
+    value changes nothing."""
+    if name not in PROFILES:
+        raise ConfigError(f"profile must be one of {', '.join(PROFILES)}")
+    overrides = dict(PROFILES[name])
+    if name == "thorough":
+        overrides["model"] = THOROUGH_MODELS.get(config["llm"], "")
+    return overrides
+
 
 class ConfigError(Exception):
     """config.json or a flag carries something the service cannot use."""
