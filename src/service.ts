@@ -119,6 +119,9 @@ export interface Job {
   usd?: number;
   tokens_per_second?: number;
   error?: { step: string; message: string } | null;
+  // Every failure of the run: a step that only adds to the note lets the
+  // rest go on, so there can be more than one.
+  errors?: { step: string; message: string }[];
   written?: Record<string, string>;
   queued?: string;
   started?: string;

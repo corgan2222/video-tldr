@@ -117,7 +117,12 @@ def test_the_note_is_rendered_without_formats_and_the_end_with_the_wanted(
     assert all(c[1] for c in steps if c[0] in ("fetch", "analyze", "frames"))
 
 
-def test_a_failing_step_ends_the_run_and_names_itself(steps, monkeypatch, tmp_path):
+def test_a_failing_picture_step_costs_the_pictures_and_not_the_run(
+    steps, monkeypatch, tmp_path
+):
+    """Asked for on 2026-09-10: a step that only adds to the note lets the
+    rest run, and the outputs are written from what there is."""
+
     def broken(url, settings, force=False, language=None):
         raise FetchError("ffmpeg failed")
 
@@ -127,11 +132,34 @@ def test_a_failing_step_ends_the_run_and_names_itself(steps, monkeypatch, tmp_pa
     result = run(URL, Settings(home=tmp_path), progress=lambda *e: heard.append(e))
 
     assert result["error"] == {"step": "frames", "message": "ffmpeg failed"}
-    assert list(result["steps"]) == ["fetch", "transcribe", "analyze", "note", "enrich"]
-    # The note from before the failure is still there to open.
-    assert "summary" in result["written"]
+    assert result["errors"] == [result["error"]]
+    assert list(result["steps"]) == [
+        "fetch",
+        "transcribe",
+        "analyze",
+        "note",
+        "enrich",
+        "render",
+    ]
+    assert result["images"] == 0
+    # Every output is there, the pictures are what is missing.
+    assert result["written"]["pdf"] == str(tmp_path / "a")
     assert "error in frames" in row(result)
-    assert heard[-1] == ("frames", "failed: ffmpeg failed")
+    assert ("frames", "failed: ffmpeg failed") in heard
+
+
+def test_a_failing_spine_step_ends_the_run(steps, monkeypatch, tmp_path):
+    # Without an analysis there is nothing to render; that one does end it.
+    def broken(url, settings, force=False, language=None):
+        raise FetchError("the model said no")
+
+    monkeypatch.setattr(module, "analyze", broken)
+
+    result = run(URL, Settings(home=tmp_path))
+
+    assert result["error"] == {"step": "analyze", "message": "the model said no"}
+    assert list(result["steps"]) == ["fetch", "transcribe"]
+    assert result["written"] == {}
 
 
 def test_a_url_that_is_no_video_fails_before_the_first_step(steps, tmp_path):

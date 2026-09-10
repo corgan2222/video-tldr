@@ -310,12 +310,16 @@ def reasoning_hint(settings: Settings) -> dict:
 
 
 def no_vision(error: Exception) -> bool:
-    """LM Studio answers a picture to a text model with 400 "The provided
-    messages contain images, but <model> does not support image inputs"
-    (2026-09-10). Every server words this differently, so the two halves
-    are matched rather than the sentence."""
+    """A picture sent to a text model. LM Studio has two wordings for it,
+    both measured on 2026-09-10: "The provided messages contain images,
+    but <model> does not support image inputs", and, for another model,
+    the misleading "'url' field must be a base64 encoded image" on a data
+    URL that a vision model of the same server accepts. Every server
+    words this differently, so halves are matched, not sentences."""
     text = str(error).lower()
-    return "image" in text and "not support" in text
+    return ("image" in text and "not support" in text) or (
+        "url" in text and "base64 encoded image" in text
+    )
 
 
 # openai, anthropic and httpx each name their own; the backends wrap all of

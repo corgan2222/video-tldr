@@ -19,6 +19,15 @@
   box-sizing: border-box;
 }
 
+/* Nothing may push the window wider than it is: a flex or grid child
+   defaults to its content's width, and a long model name or file path
+   would do exactly that. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   font:
     13px/1.5 system-ui,
@@ -239,6 +248,13 @@ code {
 }
 
 /* -------------------------------------------------------------- tables */
+
+/* A table with six columns is wider than a popup; it scrolls in its own
+   box rather than pushing the whole window sideways. */
+.table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
 
 table {
   width: 100%;

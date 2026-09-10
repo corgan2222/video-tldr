@@ -359,7 +359,7 @@ def test_a_model_without_eyes_keeps_the_pictures_unlabelled(tmp_path, monkeypatc
     candidates = [
         {"time": 20.0 * i, "kind": "ui", "why": f"w{i}"} for i in range(1, 11)
     ]
-    settings, folder = prepare(tmp_path, candidates)
+    settings, _ = prepare(tmp_path, candidates)
 
     def fake_download(url, folder, vid, times, settings):
         clips = {}
@@ -381,6 +381,10 @@ def test_a_model_without_eyes_keeps_the_pictures_unlabelled(tmp_path, monkeypatc
     monkeypatch.setattr(frames_module, "download_clips", fake_download)
     monkeypatch.setattr(frames_module, "ffmpeg", fake_ffmpeg)
     monkeypatch.setattr(llm, "complete", blind)
+    # The server here does not say beforehand what the model can do.
+    monkeypatch.setattr(
+        llm, "capabilities", lambda settings: {"vision": None, "context": None}
+    )
 
     result = frames(f"https://youtu.be/{VID}", settings)
 
@@ -390,11 +394,59 @@ def test_a_model_without_eyes_keeps_the_pictures_unlabelled(tmp_path, monkeypatc
     assert len(chosen) == LIMIT
     assert [f["time"] for f in chosen] == [20.0 * i for i in range(1, LIMIT + 1)]
     assert all(f["label"] == "unknown" for f in chosen)
+
+
+def test_a_server_that_says_the_model_is_blind_is_believed_before_the_request(
+    tmp_path, monkeypatch
+):
+    """The picture requests are skipped, not tried: against a text model
+    every one of them costs minutes before it fails (2026-09-10)."""
+    candidates = [
+        {"time": 20.0 * i, "kind": "ui", "why": f"w{i}"} for i in range(1, 11)
+    ]
+    settings, folder = prepare(tmp_path, candidates)
+    asked = []
+
+    def fake_download(url, folder, vid, times, settings):
+        clips = {}
+        for t in times:
+            clip = frames_module.clip_path(folder, vid, max(0.0, t - 8))
+            clip.write_bytes(b"clip")
+            clips[t] = clip
+        return clips
+
+    def fake_ffmpeg(*args):
+        if args[0] == "-y":
+            tmp_path.joinpath(args[-1]).write_bytes(b"png")
+            return b""
+        return bytes(PROBE_WIDTH * PROBE_HEIGHT)
+
+    monkeypatch.setattr(frames_module, "download_clips", fake_download)
+    monkeypatch.setattr(frames_module, "ffmpeg", fake_ffmpeg)
+    monkeypatch.setattr(
+        llm, "capabilities", lambda s: {"vision": False, "context": 8192}
+    )
+
+    def note_the_request(*args, **kwargs):
+        asked.append(kwargs.get("images"))
+        return {"mermaid": "graph TD; A-->B", "caption": "c"}
+
+    monkeypatch.setattr(llm, "complete", note_the_request)
+
+    result = frames(f"https://youtu.be/{VID}", settings)
+
+    # No picture was sent; the diagram is text and still worth asking for.
+    assert all(images is None for images in asked)
+    assert result["warnings"] == [NO_VISION]
+    assert all(f["label"] == "unknown" for f in result["frames"])
     # An empty caption, because render places it as text next to the picture.
-    assert all(f["caption"] == "" and f["commands"] == [] for f in chosen)
-    assert result["diagram"] is None
+    assert all(f["caption"] == "" and f["commands"] == [] for f in result["frames"])
+    # None of the pictures is labelled a diagram, so one is drawn: that
+    # request is text, which the same model answers.
+    assert result["diagram"]["mermaid"] == "graph TD; A-->B"
+    kept = [f["file"] for f in result["frames"] if f["chosen"]]
     assert sorted(p.name for p in folder.glob("*.png")) == sorted(
-        f["file"] for f in chosen
+        [*kept, f"{VID}-diagram.png"]
     )
 
 

@@ -77,7 +77,10 @@ def run(
         "output": 0,
         "usd": 0.0,
         "written": {},
+        # The first failure, and every one of them: a step that only adds
+        # to the note lets the run go on, so there can be more than one.
         "error": None,
+        "errors": [],
     }
     started = time.monotonic()
 
@@ -113,6 +116,24 @@ def run(
             f"tokens, {cost.get('usd', 0.0):.3f} USD"
         )
 
+    def failed(name: str, error: Exception) -> None:
+        """Every failure lands in `errors`; `error` keeps the first one,
+        which is what the badge and the older readers show."""
+        entry = {"step": name, "message": str(error)}
+        result["errors"].append(entry)
+        result["error"] = result["error"] or entry
+        tell(name, f"failed: {error}")
+
+    def optional(name: str, call: Callable[[], dict], describe=None) -> dict:
+        """A step whose failure costs its own part of the note and not the
+        rest of the run: the outputs are still rendered from what the
+        steps before it produced."""
+        try:
+            return step(name, call, describe)
+        except (FetchError, LlmError) as error:
+            failed(name, error)
+            return {}
+
     try:
         result["id"] = video_id(url)
         fetched = step(
@@ -143,7 +164,10 @@ def run(
         result["written"] = paths(
             step("note", lambda: render(url, settings, language=language, formats=[]))
         )
-        enriched = step(
+        # The two steps that add to the note rather than make it: one of
+        # them failing costs its own part, not the video (asked for on
+        # 2026-09-10, after a blind model ended a run at the pictures).
+        enriched = optional(
             "enrich",
             lambda: enrich(url, settings, force=force, language=language),
             lambda e: (
@@ -152,7 +176,7 @@ def run(
             ),
         )
         spent(enriched.get("cost") or {})
-        framed = step(
+        framed = optional(
             "frames",
             lambda: frames(url, settings, force=force, language=language),
             lambda f: (
@@ -170,8 +194,7 @@ def run(
             )
         )
     except (FetchError, LlmError, Cancelled) as error:
-        result["error"] = {"step": result["step"] or "fetch", "message": str(error)}
-        tell(result["error"]["step"], f"failed: {error}")
+        failed(result["step"] or "fetch", error)
     result["seconds"] = round(time.monotonic() - started, 1)
     if result["id"]:
         folder = work_folder(settings, result["id"])
@@ -179,7 +202,9 @@ def run(
         (folder / RESULT_NAME).write_text(
             json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        if not result["error"] and settings.config.get("cleanup") == "on":
+        # Cleaned only after a run that wrote every output: a failed step
+        # is worth resuming, and that needs the files it left behind.
+        if not result["errors"] and settings.config.get("cleanup") == "on":
             tell("cleanup", cleanup(folder))
     return result
 

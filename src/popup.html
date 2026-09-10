@@ -60,6 +60,13 @@
         gap: var(--gap);
         padding: 2px 0;
       }
+      /* The label gives way, the seconds never do. */
+      .steps li > span:first-child {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .steps .mark {
         flex: none;
         width: 1em;

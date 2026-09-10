@@ -513,6 +513,19 @@ def test_a_model_without_eyes_is_named_as_such_and_not_asked_a_second_time(
     assert len(tries) == 1
 
 
+def test_the_other_lmstudio_wording_for_a_blind_model_counts_too():
+    # Measured 2026-09-10: the same data URL a vision model of that server
+    # accepts comes back from a text model as this, which reads like a
+    # broken picture and is not one.
+    assert llm.no_vision(
+        Exception(
+            "Error code: 400 - {'error': \"'url' field must be a "
+            'base64 encoded image."}'
+        )
+    )
+    assert not llm.no_vision(Exception("Error code: 400 - Invalid url."))
+
+
 def test_the_same_refusal_without_a_picture_stays_an_ordinary_error(
     tmp_path, monkeypatch
 ):

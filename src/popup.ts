@@ -169,11 +169,11 @@ function renderJob(job: Job, now: Date): HTMLElement {
     );
     box.append(row);
   }
-  if (job.error) {
+  for (const failure of job.errors ?? (job.error ? [job.error] : [])) {
     box.append(
       element(
         'div',
-        `${t(STEP_KEY[job.error.step] ?? job.error.step)}: ${job.error.message}`,
+        `${t(STEP_KEY[failure.step] ?? failure.step)}: ${failure.message}`,
         'error',
       ),
     );
@@ -226,7 +226,7 @@ async function ask(what: object): Promise<unknown> {
   return reply;
 }
 
-function table(head: string[], rows: string[][]): HTMLTableElement {
+function table(head: string[], rows: string[][]): HTMLElement {
   const node = document.createElement('table');
   const header = node.insertRow();
   head.forEach((text, index) => {
@@ -243,7 +243,9 @@ function table(head: string[], rows: string[][]): HTMLTableElement {
       if (index > 0) cell.className = 'n';
     });
   }
-  return node;
+  const wrap = element('div', undefined, 'table-wrap');
+  wrap.append(node);
+  return wrap;
 }
 
 function showStats(): void {

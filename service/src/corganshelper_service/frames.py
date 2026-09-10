@@ -386,6 +386,11 @@ def frames(
 
     spend: list[dict] = []
     try:
+        # Asked before the first request, not learned from its error: a
+        # local server answers a picture to a text model after minutes,
+        # and once per picture (2026-09-10).
+        if llm.capabilities(settings).get("vision") is False:
+            raise llm.NoVisionError(llm.describe(settings))
         labeled = label(images, taken, settings, language, spend)
         for entry, candidate in zip(labeled, taken):
             entry.update(time=candidate["time"], expected=candidate["kind"])
