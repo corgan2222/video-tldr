@@ -1,4 +1,10 @@
 {
   "title": "Documentation",
-  "pages": ["index", "getting-started", "privacy", "contributing"]
+  "pages": [
+    "index",
+    "getting-started",
+    "privacy",
+    "contributing",
+    "de"
+  ]
 }
