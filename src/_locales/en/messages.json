@@ -167,6 +167,21 @@
   "notConnected": {
     "message": "Not connected."
   },
+  "restartService": {
+    "message": "Restart the service"
+  },
+  "restartServiceHelp": {
+    "message": "Starts the service fresh. Worth a try when a light stays red although the machine is fine: a process that lost its graphics card at the wrong moment keeps that loss until it is started again."
+  },
+  "restarting": {
+    "message": "the service is restarting…"
+  },
+  "restarted": {
+    "message": "the service is back"
+  },
+  "restartSlow": {
+    "message": "the service is not back yet; press Connect in a moment"
+  },
   "save": {
     "message": "Save"
   },

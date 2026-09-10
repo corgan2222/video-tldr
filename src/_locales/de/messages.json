@@ -167,6 +167,21 @@
   "notConnected": {
     "message": "Nicht verbunden."
   },
+  "restartService": {
+    "message": "Dienst neu starten"
+  },
+  "restartServiceHelp": {
+    "message": "Startet den Dienst frisch. Einen Versuch wert, wenn eine Lampe rot bleibt, obwohl am Rechner alles stimmt: ein Prozess, der im falschen Moment die Grafikkarte verloren hat, behält diesen Verlust bis zum Neustart."
+  },
+  "restarting": {
+    "message": "der Dienst startet neu…"
+  },
+  "restarted": {
+    "message": "der Dienst ist wieder da"
+  },
+  "restartSlow": {
+    "message": "der Dienst ist noch nicht zurück; drücke gleich auf Verbinden"
+  },
   "save": {
     "message": "Speichern"
   },
