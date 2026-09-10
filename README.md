@@ -41,18 +41,36 @@ turns the YouTube video in the active tab into a summary with pictures.
 
 ## Install
 
-Until the first release is published, build from source:
+Two parts: the service, and the extension that talks to it.
+
+The service comes from a release. It needs [uv](https://docs.astral.sh/uv/),
+which carries the Python with it:
+
+```
+irm https://raw.githubusercontent.com/corgan2222/video-tldr/main/install.ps1 | iex
+```
+
+That picks the CUDA libraries when the machine has a card and the ONNX
+runtime alone when it has none, puts `video-tldr` on your PATH, and
+registers no autostart: the extension starts the service when it needs
+one. `-Root D:\video-tldr` keeps the program, its environment and its
+data under one directory instead of three standard places. The speech
+models download on first use, several gigabytes of them.
+
+The extension is the `.zip` on the same release: load it as a temporary
+add-on in Firefox (`about:debugging`, "This Firefox") or unpack it and
+load the folder in Chrome (`chrome://extensions`, developer mode).
+
+Until the first release is published, build both from source. The
+extension:
 
 ```
 npm ci
 npm run build
 ```
 
-Load `dist/` as a temporary add-on in Firefox (`about:debugging`, "This
-Firefox") or as an unpacked extension in Chrome (`chrome://extensions`,
-developer mode). The video summary needs the local service from
-[`service/`](service/README.md); that README covers its setup and the
-model choice.
+Then load `dist/`. The service is in [`service/`](service/README.md);
+that README covers its setup and the model choice.
 
 ## Usage
 
