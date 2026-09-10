@@ -59,7 +59,9 @@ Das wählt die CUDA-Bibliotheken, wenn eine Karte da ist, und sonst allein
 die ONNX-Laufzeit, legt `video-tldr` auf den PATH und trägt keinen
 Autostart ein. Den Dienst startest du selbst mit `video-tldr serve`;
 antwortet er nicht, zeigt die Erweiterung genau diesen Befehl und eine
-Schaltfläche, die ihn kopiert.
+Schaltfläche, die ihn kopiert. Mit `-Autostart` legt der Installer
+stattdessen eine Aufgabe an, die ihn bei jeder Anmeldung startet;
+`video-tldr autostart on|off|status` schaltet das später um.
 `-Root D:\video-tldr` legt Programm, Umgebung und Daten unter ein
 Verzeichnis statt an drei übliche Orte. Die Sprachmodelle kommen beim
 ersten Lauf dazu, mehrere Gigabyte.

@@ -39,6 +39,15 @@ The installer registers no autostart. Start the service yourself:
 video-tldr serve
 ```
 
+If you would rather not think about it again, let a logon task do it:
+
+```powershell
+video-tldr autostart on
+```
+
+`video-tldr autostart off` takes it back, `status` says which it is, and
+`install.ps1 -Autostart` sets it up during the install.
+
 Then click the toolbar icon, open Settings, press Connect, and choose the
 language, the outputs and the model. Open a YouTube video, click the icon
 and press Fast or Thorough.

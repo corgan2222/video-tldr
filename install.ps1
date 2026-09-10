@@ -32,6 +32,12 @@ param(
     # the data directory -Root would choose.
     [string]$DataDir,
 
+    # Register a task that starts the service at every logon, so the
+    # extension always finds one. Off by default: a service that runs
+    # unasked is the kind of thing a user wants to have chosen.
+    # `video-tldr autostart off` takes it back.
+    [switch]$Autostart,
+
     [string]$Repo = 'corgan2222/video-tldr'
 )
 
@@ -177,5 +183,14 @@ Add-ToUserPath $binDir
 
 $installed = Join-Path $binDir 'video-tldr.exe'
 & $installed --version
+
+if ($Autostart) {
+    & $installed autostart on
+    if ($LASTEXITCODE -ne 0) { Write-Warning 'autostart could not be registered' }
+}
+
 Write-Step 'Done. `video-tldr probe` checks the tools, `video-tldr serve` starts it.'
+if (-not $Autostart) {
+    Write-Step '`video-tldr autostart on` starts it at every logon instead.'
+}
 Write-Step 'The speech models download on first use, several gigabytes.'
