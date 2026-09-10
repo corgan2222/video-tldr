@@ -2,19 +2,19 @@ import json
 
 import pytest
 
-from corganshelper_service.__main__ import main
-from corganshelper_service.config import ConfigError, Settings, parse_assignments
+from video_tldr_service.__main__ import main
+from video_tldr_service.config import ConfigError, Settings, parse_assignments
 
 
 def clean_env(monkeypatch):
     for variable in (
-        "CORGANSHELPER_LLM",
-        "CORGANSHELPER_MODEL",
-        "CORGANSHELPER_STT",
-        "CORGANSHELPER_FORMATS",
-        "CORGANSHELPER_OBSIDIAN_VAULT",
-        "CORGANSHELPER_OBSIDIAN_FOLDER",
-        "CORGANSHELPER_BROWSER",
+        "VIDEO_TLDR_LLM",
+        "VIDEO_TLDR_MODEL",
+        "VIDEO_TLDR_STT",
+        "VIDEO_TLDR_FORMATS",
+        "VIDEO_TLDR_OBSIDIAN_VAULT",
+        "VIDEO_TLDR_OBSIDIAN_FOLDER",
+        "VIDEO_TLDR_BROWSER",
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
     ):
@@ -90,7 +90,7 @@ def test_config_set_writes_the_file_and_the_key_is_never_printed(
 
 
 def test_formats_are_a_comma_list_of_known_names(tmp_path, monkeypatch, capsys):
-    from corganshelper_service.config import split_formats
+    from video_tldr_service.config import split_formats
 
     clean_env(monkeypatch)
     home = str(tmp_path)
@@ -126,3 +126,93 @@ def test_language_is_a_choice_and_the_file_is_replaced_not_truncated(
     assert main(["--home", home, "config", "--set", "language=en"]) == 0
     # Written beside and renamed over, so a reader never sees a half file.
     assert [p.name for p in tmp_path.iterdir()] == ["config.json"]
+
+
+def test_outputs_go_to_downloads_unless_a_folder_is_set(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from video_tldr_service.config import default_download_dir
+
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    settings = Settings(home=tmp_path / "data")
+    assert settings.out_dir == default_download_dir()
+    (tmp_path / "Downloads").mkdir()
+    assert settings.out_dir == tmp_path / "Downloads"
+
+    settings.config["download_dir"] = str(tmp_path / "elsewhere")
+    assert settings.out_dir == Path(tmp_path / "elsewhere")
+
+
+def test_the_run_switches_are_on_or_off_and_style_is_a_choice(
+    tmp_path, monkeypatch, capsys
+):
+    clean_env(monkeypatch)
+    home = str(tmp_path)
+    assert main(["--home", home, "config", "--set", "timestamps=off"]) == 0
+    assert main(["--home", home, "config", "--set", "style=caveman"]) == 0
+    assert main(["--home", home, "config", "--set", "condensed=maybe"]) == 1
+    assert "condensed must be one of on, off" in capsys.readouterr().err
+    assert main(["--home", home, "config", "--set", "style=shakespeare"]) == 1
+    assert "style must be one of normal, caveman" in capsys.readouterr().err
+    stored = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+    assert (stored["timestamps"], stored["style"]) == ("off", "caveman")
+
+
+def test_profiles_change_the_transcriber_and_the_model_on_top_of_the_file():
+    from video_tldr_service.config import DEFAULTS, ConfigError, profile_overrides
+
+    assert profile_overrides("fast", DEFAULTS) == {"stt": "auto", "model": ""}
+    assert profile_overrides("thorough", DEFAULTS) == {
+        "stt": "whisper-large",
+        "model": "opus",
+    }
+    # A backend with no known strongest model keeps the one in the file.
+    assert profile_overrides("thorough", {**DEFAULTS, "llm": "lmstudio"})["model"] == ""
+    with pytest.raises(ConfigError):
+        profile_overrides("quick", DEFAULTS)
+
+
+def test_two_saves_at_once_keep_both_values(tmp_path):
+    """The options page saves every field on its own, and the service
+    answers each request in its own thread. Without a lock around read
+    and write, the slower one wrote back the file it had read before the
+    faster one changed it, and the owner lost a setting on 2026-09-10."""
+    import threading
+
+    from video_tldr_service.config import store
+
+    store(tmp_path, {"llm": "claude"})
+    ready = threading.Barrier(4)
+    values = [
+        {"llm": "lmstudio"},
+        {"model": "qwen3-8b"},
+        {"language": "de"},
+    ]
+
+    failures: list[str] = []
+
+    def save(one: dict) -> None:
+        ready.wait(timeout=5)
+        for _ in range(20):
+            try:
+                store(tmp_path, one)
+            except OSError as error:  # two renames over one target
+                failures.append(str(error))
+
+    threads = [threading.Thread(target=save, args=(v,)) for v in values]
+    for thread in threads:
+        thread.start()
+    ready.wait(timeout=5)
+    for thread in threads:
+        thread.join(timeout=10)
+
+    # Without the lock this counted dozens of "the process cannot access
+    # the file", the 500 the options page showed.
+    assert failures == []
+    stored = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+    assert stored["llm"] == "lmstudio"
+    assert stored["model"] == "qwen3-8b"
+    assert stored["language"] == "de"
+    # Nothing left behind: the staging file is renamed, never kept.
+    assert not list(tmp_path.glob("*.tmp"))

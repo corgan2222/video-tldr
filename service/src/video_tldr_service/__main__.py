@@ -16,6 +16,7 @@ from .config import (
     STT_DEFAULT,
     STT_ENGINES,
     STT_MODELS,
+    STYLES,
     ConfigError,
     Settings,
     parse_assignments,
@@ -26,11 +27,12 @@ from .fetch import FetchError, fetch
 from .frames import frames
 from .llm import LlmError
 from .render import render
-from .run import header, row, run, urls_in
-from .serve import PORT, serve
+from .run import bench, bench_table, header, row, run, urls_in
+from .serve import PORT, WSAEACCES, serve, stop
 from .transcribe import transcribe
 
-PROG = "corganshelper"
+# What `--help` and every error message call the command.
+PROG = "video-tldr"
 
 
 def probe(settings: Settings) -> list[str]:
@@ -63,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--home",
         type=Path,
-        help="data directory; default CORGANSHELPER_HOME or D:/corganshelper",
+        help="data directory; default VIDEO_TLDR_HOME or ~/.video-tldr",
     )
     parser.add_argument(
         "--llm", choices=LLM_BACKENDS, help="language model backend for this run"
@@ -71,6 +73,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", help="model name at that backend")
     parser.add_argument(
         "--stt", choices=STT_ENGINES, help="speech-to-text engine for this run"
+    )
+    parser.add_argument(
+        "--style", choices=STYLES, help="wording of the note for this run"
     )
     commands = parser.add_subparsers(dest="command")
     commands.add_parser(
@@ -148,10 +153,24 @@ def build_parser() -> argparse.ArgumentParser:
         choices=FORMATS,
         help="an output besides summary.md; repeatable; default from config",
     )
+    bench_cmd = commands.add_parser(
+        "bench", help="analyze one video with several models and compare them"
+    )
+    bench_cmd.add_argument("url")
+    bench_cmd.add_argument(
+        "--models", required=True, metavar="A,B,C", help="model names, comma separated"
+    )
+    bench_cmd.add_argument(
+        "--repeat", type=int, default=1, help="runs per model; default 1"
+    )
     serve_cmd = commands.add_parser(
         "serve", help="listen on 127.0.0.1 for the extension until Ctrl+C"
     )
     serve_cmd.add_argument("--port", type=int, default=PORT, help=f"default {PORT}")
+    stop_cmd = commands.add_parser(
+        "stop", help="ask a running service to end, so an update can replace it"
+    )
+    stop_cmd.add_argument("--port", type=int, default=PORT, help=f"default {PORT}")
     return parser
 
 
@@ -165,7 +184,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "run" and not (args.url or args.batch):
         parser.error("run needs a URL or --batch FILE")
-    overrides = {"llm": args.llm, "model": args.model, "stt": args.stt}
+    overrides = {
+        "llm": args.llm,
+        "model": args.model,
+        "stt": args.stt,
+        "style": args.style,
+    }
     try:
         if args.command == "config" and args.set:
             # Written first, then loaded like any other run reads it.
@@ -180,7 +204,20 @@ def main(argv: list[str] | None = None) -> int:
             return serve(args.home, overrides, args.port)
         except OSError as error:
             print(f"serve failed: {error}", file=sys.stderr)
+            if getattr(error, "winerror", None) == WSAEACCES:
+                print(
+                    f"Windows reserves port ranges for Hyper-V, and {args.port} "
+                    "sits in one. `netsh interface ipv4 show excludedportrange "
+                    "protocol=tcp` lists them; --port moves the service out.",
+                    file=sys.stderr,
+                )
             return 1
+
+    if args.command == "stop":
+        # Zero either way: an installer runs this before every update, and
+        # a machine without a running service is the ordinary case.
+        print(stop(settings.config["token"], args.port))
+        return 0
 
     if args.command == "run":
         urls = urls_in(args.batch) if args.batch else [args.url]
@@ -194,8 +231,8 @@ def main(argv: list[str] | None = None) -> int:
                 force=args.force,
                 language=args.language,
                 formats=args.format,
-                progress=lambda step, url=url: print(
-                    f"  {url} {step}", file=sys.stderr
+                progress=lambda step, detail="", url=url: print(
+                    f"  {url} {step} {detail}".rstrip(), file=sys.stderr
                 ),
             )
             if result["error"]:
@@ -210,6 +247,26 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print(json.dumps(result, indent=2, ensure_ascii=False))
         return 1 if failed else 0
+
+    if args.command == "bench":
+        names = [name.strip() for name in args.models.split(",") if name.strip()]
+        if not names:
+            parser.error("bench needs --models with at least one name")
+        try:
+            rows = bench(
+                args.url,
+                settings,
+                names,
+                args.repeat,
+                progress=lambda step, detail="": print(
+                    f"  {step} {detail}".rstrip(), file=sys.stderr
+                ),
+            )
+        except (FetchError, LlmError) as error:
+            print(f"bench failed: {error}", file=sys.stderr)
+            return 1
+        print(bench_table(rows))
+        return 0
 
     if args.command == "probe":
         problems = probe(settings)

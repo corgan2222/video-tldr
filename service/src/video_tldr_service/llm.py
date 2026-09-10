@@ -16,6 +16,8 @@ import mimetypes
 import os
 import shutil
 import subprocess
+import time
+import urllib.request
 from pathlib import Path
 
 from .config import Settings
@@ -32,17 +34,36 @@ DEFAULT_MODELS = {
 CLAUDE_MODELS = ["sonnet", "opus", "haiku"]
 MAX_OUTPUT_TOKENS = 16000
 TIMEOUT_SECONDS = 600
+# How long the small REST call that asks a local server what it can do may
+# take. Short: `status` waits for it while the popup is open.
+ASK_SECONDS = 5
 ATTEMPTS = 2
+CONNECTION_ATTEMPTS = 3
+RETRY_PAUSE_SECONDS = 2
+# A transcript plus the model's own thinking below this many tokens is what
+# emptied two runs (2026-09-09, 2026-09-10).
+MIN_CONTEXT = 32768
 START_HINT = {
     "lmstudio": "start the server in LM Studio or run `lms server start`",
     "ollama": "run `ollama serve`",
 }
+CONTEXT_HINT = {
+    "lmstudio": "load the model with a larger context in LM Studio",
+    "ollama": "raise OLLAMA_CONTEXT_LENGTH or num_ctx",
+}
+LOCAL = ("lmstudio", "ollama")
 
 
 # What the last answer cost. The CLI reports it per request and the
 # milestone asks what a video costs, so `analyze` reads it after each
 # call. ponytail: one slot, the service runs one request at a time.
 last_cost: dict = {}
+
+
+class NoVisionError(Exception):
+    """The chosen model takes no images; raised by the backends when the
+    server says so, caught by frames, which then keeps the pictures
+    without labels instead of failing the run."""
 
 
 class LlmError(Exception):
@@ -94,13 +115,52 @@ def check(settings: Settings) -> str | None:
             models(settings)
         if not model_name(settings):
             return (
-                f"no model set for {backend(settings)}; `corganshelper models` "
-                "lists what it offers, `corganshelper config --set model=<name>` "
+                f"no model set for {backend(settings)}; `video-tldr models` "
+                "lists what it offers, `video-tldr config --set model=<name>` "
                 "picks one"
             )
     except LlmError as error:
         return str(error)
     return None
+
+
+def status(settings: Settings) -> dict:
+    """`ok` and one line for the popup: where the model runs and which
+    one answers. A local server is asked, so this takes a request."""
+    trouble = check(settings)
+    if trouble:
+        return {"ok": False, "detail": trouble}
+    name = backend(settings)
+    model = model_name(settings)
+    if name == "claude":
+        return {"ok": True, "detail": f"claude CLI at {claude_binary()}, model {model}"}
+    if name in ("anthropic", "openai"):
+        return {"ok": True, "detail": f"{name} API, key set, model {model}"}
+    return local_status(settings, name, model)
+
+
+def local_status(settings: Settings, name: str, model: str) -> dict:
+    """A local server is the one that can be set up wrong. A context too
+    small for the transcript and the model's thinking emptied two runs, and
+    a model without eyes failed a third after eight minutes of work."""
+    detail = f"{name} at {endpoint(settings)[1]}, model {model}"
+    able = capabilities(settings)
+    ok = True
+    context = able["context"]
+    if context is not None and context < MIN_CONTEXT:
+        ok = False
+        detail += (
+            f", context {context} tokens is too small for a transcript and "
+            f"the model's thinking: {CONTEXT_HINT[name]}, {MIN_CONTEXT} or more"
+        )
+    elif context:
+        detail += f", context {context} tokens"
+    if able["vision"] is False:
+        detail += ", no image input: pictures stay unlabelled"
+    rate = last_cost.get("tokens_per_second")
+    if rate:
+        detail += f", {rate} tokens/s last request"
+    return {"ok": ok, "detail": detail}
 
 
 def models(settings: Settings) -> list[str]:
@@ -131,11 +191,202 @@ def is_chat_model(name: str) -> bool:
     return not any(part in name.lower() for part in NOT_CHAT)
 
 
+# How a server says that it does not accept the key: the HTTP status, the
+# word the vendors use, and the code OpenAI puts in the body.
+REFUSED = ("401", "nauthorized", "invalid_api_key", "invalid x-api-key")
+
+
+def refused_key(text: str) -> bool:
+    return any(part in text for part in REFUSED)
+
+
 def reachable_message(name: str, error: Exception) -> str:
     text = f"{name}: {error}"
     if name in START_HINT and "onnect" in text:
         text += f"; is the server running? {START_HINT[name]}"
+    elif refused_key(text):
+        # The message the vendor sends says "Unauthorized" and nothing
+        # about where the key lives (seen 2026-09-10 on a job that had
+        # already fetched and transcribed the video).
+        text += (
+            "; the server did not accept the key. Check it in the settings, "
+            f"together with the address, or run `video-tldr config --set "
+            f"{name}_api_key=<key>`"
+        )
     return text
+
+
+def fetch_json(url: str, payload: dict | None = None) -> dict:
+    """One GET, or a POST when there is a payload, against a local server's
+    own REST API. urllib, because the service already fetches this way and
+    an HTTP client is not worth a dependency."""
+    body = json.dumps(payload).encode() if payload is not None else None
+    request = urllib.request.Request(
+        url, data=body, headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(request, timeout=ASK_SECONDS) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def rest_base(url: str) -> str:
+    """A local server serves its own API next to the OpenAI one, so the
+    `/v1` from the configured URL comes off."""
+    return (url or "").rstrip("/").removesuffix("/v1")
+
+
+def capabilities(settings: Settings) -> dict:
+    """What the chosen model can do: `vision`, `context` in tokens and one
+    line for a human. `None` means the server did not say, and an
+    unreachable server is one of those answers, not an error: the caller
+    asks before the request, when nothing has failed yet."""
+    name = backend(settings)
+    if name not in LOCAL:
+        # The vendors' current models all read pictures, and the context is
+        # the model's own, not something this machine set.
+        return {"vision": True, "context": None, "detail": f"{name} API, takes images"}
+    try:
+        if name == "lmstudio":
+            return lmstudio_capabilities(settings)
+        return ollama_capabilities(settings)
+    except Exception as error:  # noqa: BLE001 - urllib, socket, JSON: no answer
+        return {
+            "vision": None,
+            "context": None,
+            "detail": reachable_message(name, error),
+        }
+
+
+def lmstudio_capabilities(settings: Settings) -> dict:
+    """LM Studio answers `/api/v0/models` with the fields measured on this
+    machine on 2026-09-10: `id`, `type` (`llm`, `vlm` or `embeddings`),
+    `state` (`loaded` or `not-loaded`), `max_context_length` and, while the
+    model is loaded, `loaded_context_length`. There is a `capabilities`
+    list too, but it held `tool_use` and nothing else, not even for a model
+    that reads pictures -- `type` is what answers the picture question."""
+    wanted = model_name(settings)
+    listing = fetch_json(rest_base(settings.config["lmstudio_url"]) + "/api/v0/models")
+    entries = listing.get("data") or []
+    if wanted:
+        entry = next((e for e in entries if e.get("id") == wanted), None)
+    else:
+        entry = next((e for e in entries if e.get("state") == "loaded"), None)
+    if entry is None:
+        return {
+            "vision": None,
+            "context": None,
+            "detail": f"lmstudio lists no model called {wanted or '(none loaded)'}",
+        }
+    # The loaded length is the one that has to hold the prompt; the maximum
+    # is what the model could do if it were loaded with it.
+    context = entry.get("loaded_context_length") or entry.get("max_context_length")
+    return capability_line(entry.get("id", wanted), entry.get("type") == "vlm", context)
+
+
+def ollama_capabilities(settings: Settings) -> dict:
+    """Ollama answers `/api/show` with a `capabilities` list that names
+    `vision`, and a `model_info` map whose context sits under an
+    architecture key such as `qwen3.context_length`. Not measured: no
+    ollama server ran on this machine on 2026-09-10, so this follows
+    ollama's API document and the shape may differ."""
+    wanted = model_name(settings)
+    shown = fetch_json(
+        rest_base(settings.config["ollama_url"]) + "/api/show", {"model": wanted}
+    )
+    info = shown.get("model_info") or {}
+    context = next(
+        (v for k, v in info.items() if k.endswith(".context_length") and v), None
+    )
+    return capability_line(
+        wanted, "vision" in (shown.get("capabilities") or []), context
+    )
+
+
+def capability_line(model: str, vision: bool, context: int | None) -> dict:
+    detail = f"{model}: {'vision' if vision else 'text only'}"
+    if context:
+        detail += f", context {context} tokens"
+    return {"vision": vision, "context": context, "detail": detail}
+
+
+def reasoning_hint(settings: Settings) -> dict:
+    """The request extra that keeps a local thinking model from spending a
+    whole answer on its reasoning. Thirteen picture requests took 815
+    seconds that way (2026-09-10).
+
+    Measured the same day against LM Studio with a qwen35 model, 80 output
+    tokens each: `reasoning_effort: "none"` came back with the answer and 0
+    reasoning tokens, while `reasoning: {"effort": "low"}`,
+    `reasoning_effort: "low"` and a `/no_think` system line each still
+    burned all 80 on thinking. A field the server does not know is ignored,
+    not refused, so a model without the switch loses nothing.
+
+    Ollama is not in here: no ollama server ran on this machine that day,
+    and a field nobody measured is a guess, not a setting."""
+    if backend(settings) == "lmstudio":
+        return {"reasoning_effort": "none"}
+    return {}
+
+
+def no_vision(error: Exception) -> bool:
+    """A picture sent to a text model. LM Studio has two wordings for it,
+    both measured on 2026-09-10: "The provided messages contain images,
+    but <model> does not support image inputs", and, for another model,
+    the misleading "'url' field must be a base64 encoded image" on a data
+    URL that a vision model of the same server accepts. Every server
+    words this differently, so halves are matched, not sentences."""
+    text = str(error).lower()
+    return ("image" in text and "not support" in text) or (
+        "url" in text and "base64 encoded image" in text
+    )
+
+
+# openai, anthropic and httpx each name their own; the backends wrap all of
+# them in an LlmError, so the name is what is left to go by. Importing the
+# three SDKs here only to name an exception would be worse.
+CONNECTION_ERRORS = frozenset(
+    {
+        "APIConnectionError",
+        "APITimeoutError",
+        "ConnectError",
+        "ConnectTimeout",
+        "PoolTimeout",
+        "ReadError",
+        "ReadTimeout",
+        "RemoteProtocolError",
+        "URLError",
+    }
+)
+
+
+def is_connection_error(error: BaseException) -> bool:
+    """Did the request fail on the wire rather than at the model? The cause
+    chain under the LlmError is what tells a refused socket from a refused
+    prompt."""
+    seen: BaseException | None = error
+    for _ in range(10):  # a cause chain can be a cycle; ten links are plenty
+        if seen is None:
+            return False
+        if isinstance(seen, OSError):  # socket errors and everything under them
+            return True
+        if type(seen).__name__ in CONNECTION_ERRORS:
+            return True
+        seen = seen.__cause__ or seen.__context__
+    return False
+
+
+def record_cost(input_tokens: int, output_tokens: int, usd: float, seconds: float):
+    """What the last request cost and how long it took. tokens/s is the
+    number that tells a model loaded on the wrong device from a fast one;
+    it is 0 when the request was too short to measure or the server counted
+    no tokens."""
+    rate = round(output_tokens / seconds, 1) if seconds > 0 and output_tokens else 0
+    last_cost.update(
+        input=input_tokens,
+        output=output_tokens,
+        usd=usd,
+        seconds=round(seconds, 1),
+        tokens_per_second=rate,
+    )
 
 
 def anthropic_client(settings: Settings):
@@ -164,10 +415,9 @@ def complete(
     instruction has to name them by path, and the call then needs more than
     one turn. The API backends receive them inline."""
     name = backend(settings)
-    # A part of a long transcript failed once with an empty error while the
-    # parts around it went through (2026-09-09), and one lost part throws
-    # away every other request of that video. So: one more try.
-    for attempt in range(ATTEMPTS):
+    attempt = 0
+    while True:
+        attempt += 1
         try:
             if name == "claude":
                 return complete_claude(
@@ -176,9 +426,25 @@ def complete(
             if name == "anthropic":
                 return complete_anthropic(instruction, data, schema, settings, images)
             return complete_openai(instruction, data, schema, settings, images)
-        except LlmError:
-            if attempt == ATTEMPTS - 1:
+        # A NoVisionError is not caught here: a second request does not give
+        # the model eyes, and frames is waiting for it to keep the run alive.
+        except LlmError as error:
+            # A part of a long transcript failed once with an empty error
+            # while the parts around it went through (2026-09-09), and one
+            # lost part throws away every other request of that video. So:
+            # one more try. A connection that dropped gets two, with a pause:
+            # a server busy loading a model answers nothing for a while and
+            # then answers again.
+            wire = is_connection_error(error)
+            limit = CONNECTION_ATTEMPTS if wire else ATTEMPTS
+            if refused_key(str(error)):
+                # A key the server refuses once is refused again; the
+                # second request only costs the owner time.
                 raise
+            if attempt >= limit:
+                raise LlmError(f"{error} (after {attempt} attempts)") from error
+            if wire:
+                time.sleep(RETRY_PAUSE_SECONDS)
 
 
 def complete_claude(
@@ -216,6 +482,7 @@ def complete_claude(
             command += ["--add-dir", folder]
     else:
         command += ["--tools", "", "--max-turns", str(max_turns)]
+    started = time.monotonic()
     try:
         run = subprocess.run(
             command,
@@ -228,10 +495,10 @@ def complete_claude(
         )
     except subprocess.TimeoutExpired as error:
         raise LlmError(f"claude gave no answer within {TIMEOUT_SECONDS}s") from error
-    return parse_result(run.stdout, run.stderr)
+    return parse_result(run.stdout, run.stderr, time.monotonic() - started)
 
 
-def parse_result(stdout: str, stderr: str = "") -> dict:
+def parse_result(stdout: str, stderr: str = "", seconds: float = 0.0) -> dict:
     """The CLI prints one JSON object; the structured answer sits in
     `structured_output`, an error in `result` with `is_error` set."""
     try:
@@ -248,8 +515,8 @@ def parse_result(stdout: str, stderr: str = "") -> dict:
         noise = f" ({stderr.strip()})" if stderr.strip() else ""
         raise LlmError(f"claude reported an error: {text}{hint}{noise}")
     usage = envelope.get("usage") or {}
-    last_cost.update(
-        input=sum(
+    record_cost(
+        sum(
             usage.get(key, 0)
             for key in (
                 "input_tokens",
@@ -257,8 +524,9 @@ def parse_result(stdout: str, stderr: str = "") -> dict:
                 "cache_read_input_tokens",
             )
         ),
-        output=usage.get("output_tokens", 0),
-        usd=envelope.get("total_cost_usd", 0.0),
+        usage.get("output_tokens", 0),
+        envelope.get("total_cost_usd", 0.0),
+        seconds,
     )
     structured = envelope.get("structured_output")
     if isinstance(structured, dict):
@@ -298,6 +566,7 @@ def complete_anthropic(
     client = anthropic_client(settings)
     content = [image_part(p, "anthropic") for p in images or []]
     content.append({"type": "text", "text": data})
+    started = time.monotonic()
     try:
         response = client.messages.create(
             model=model_name(settings),
@@ -307,15 +576,18 @@ def complete_anthropic(
             output_config={"format": {"type": "json_schema", "schema": schema}},
         )
     except anthropic.AnthropicError as error:
+        if images and no_vision(error):
+            raise NoVisionError(str(error)) from error
         raise LlmError(f"anthropic: {error}") from error
     usage = response.usage
-    last_cost.update(
-        input=usage.input_tokens
+    record_cost(
+        usage.input_tokens
         + (getattr(usage, "cache_creation_input_tokens", 0) or 0)
         + (getattr(usage, "cache_read_input_tokens", 0) or 0),
-        output=usage.output_tokens,
+        usage.output_tokens,
         # The API does not price the answer; the tokens are what is known.
-        usd=0.0,
+        0.0,
+        time.monotonic() - started,
     )
     text = next((b.text for b in response.content if b.type == "text"), "")
     return loads(text, "anthropic")
@@ -339,6 +611,7 @@ def complete_openai(
     client = openai.OpenAI(api_key=key, base_url=url, timeout=TIMEOUT_SECONDS)
     content: list[dict] = [image_part(p, "openai") for p in images or []]
     content.append({"type": "text", "text": data})
+    started = time.monotonic()
     try:
         response = client.chat.completions.create(
             model=model,
@@ -350,17 +623,21 @@ def complete_openai(
                 "type": "json_schema",
                 "json_schema": {"name": "result", "schema": schema, "strict": True},
             },
+            extra_body=reasoning_hint(settings) or None,
         )
     except openai.OpenAIError as error:
+        if images and no_vision(error):
+            raise NoVisionError(str(error)) from error
         raise LlmError(reachable_message(name, error)) from error
     choice = response.choices[0]
     if getattr(choice.message, "refusal", None):
         raise LlmError(f"{name} refused: {choice.message.refusal}")
     usage = response.usage
-    last_cost.update(
-        input=usage.prompt_tokens if usage else 0,
-        output=usage.completion_tokens if usage else 0,
-        usd=0.0,
+    record_cost(
+        usage.prompt_tokens if usage else 0,
+        usage.completion_tokens if usage else 0,
+        0.0,
+        time.monotonic() - started,
     )
     if not (choice.message.content or "").strip():
         # LM Studio answered with nothing when the prompt was longer than
@@ -371,7 +648,7 @@ def complete_openai(
             f"{name} returned an empty answer (finish_reason "
             f"{choice.finish_reason}, {last_cost['input']} prompt tokens); "
             "a local model needs a context window that holds the prompt "
-            "and its thinking, load it with 32768 tokens or more"
+            f"and its thinking, load it with {MIN_CONTEXT} tokens or more"
         )
     return loads(choice.message.content, name)
 

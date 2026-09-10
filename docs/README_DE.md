@@ -1,23 +1,43 @@
-# corganshelper
+# video-tldr
+
+<p align="center"><img src="assets/logo-light.png" alt="video-tldr" width="320"></p>
+
+**Watch it. Vault it.**
 
 _[English version](../README.md)_
 
-Eine Manifest-V3-Erweiterung für Firefox und Chrome, dazu ein lokaler
-Dienst, der aus einem YouTube-Video eine Zusammenfassung macht.
+Zu lang zum Lesen? Eine Erweiterung für Firefox und Chrome mit einem
+lokalen Dienst, die aus dem YouTube-Video im aktiven Tab eine
+Zusammenfassung mit Bildern macht.
 
 ## Was es kann
 
-- **Video-Zusammenfassung.** Ein Klick auf das Symbol in der Werkzeugleiste
-  übergibt das YouTube-Video im aktiven Tab an einen lokalen Dienst. Der
-  holt Titel, Beschreibung, Kapitel und Untertitel, transkribiert den Ton,
-  wenn Untertitel fehlen, lässt ein Sprachmodell den Inhalt einordnen und
-  zusammenfassen, zieht Standbilder an den sehenswerten Stellen, liest die
-  Installationsschritte aus verlinkten GitHub-Repositories und schreibt das
-  Ergebnis als Markdown, als Notiz in einen Obsidian-Vault, als PDF und als
-  Word-Datei. Das Sprachmodell läuft über die Claude-Code-CLI, die API von
+- **Video-Zusammenfassung.** Das Symbol in der Werkzeugleiste öffnet ein
+  kleines Fenster mit zwei Knöpfen. „Schnell" und „Gründlich" übergeben
+  das Video an einen lokalen Dienst. Der holt Titel, Beschreibung,
+  Kapitel und Untertitel, transkribiert den Ton, wenn Untertitel fehlen,
+  lässt ein Sprachmodell den Inhalt einordnen und zusammenfassen, zieht
+  Standbilder an den sehenswerten Stellen, liest die Kommandos von diesen
+  Bildern und die Installationsschritte aus verlinkten
+  GitHub-Repositories und schreibt das Ergebnis als Markdown, als Notiz
+  in einen Obsidian-Vault mit eingebettetem Video, als PDF und als
+  Word-Datei.
+- **Was das Fenster zeigt.** Jeden Schritt mit seinen Sekunden, einen
+  Fortschrittsbalken und die Restzeit aus früheren Läufen, Modell und
+  Transkribierer, das Dienst-Log und Knöpfe, die die Notiz in Obsidian
+  oder den Download-Ordner öffnen. Ein zweites Video stellt sich hinten
+  an, ein Lauf lässt sich abbrechen. Drei Lampen sagen vor dem Klick, ob
+  Dienst, Modell und Transkribierer bereit sind.
+- **Schalter je Lauf.** Zeitstempel ins Video, die Kernbotschaft als
+  Zwei-Minuten-Lesestück, und die Arbeitsdateien danach löschen. Wie die
+  Notiz formuliert ist, ist eine eigene Wahl: normal, knapp, ohne
+  Werbewörter, technisch, im Plauderton, oder alle auf einmal zum
+  Vergleichen.
+- **Wo es läuft.** Das Sprachmodell über die Claude-Code-CLI, die API von
   Anthropic oder OpenAI, LM Studio oder Ollama; die Transkription über
-  Whisper, Parakeet, Canary oder OpenAI. Die Wahl steht in den Optionen der
-  Erweiterung.
+  Whisper, Parakeet, Canary oder OpenAI. Die Einstellungen zeigen, was
+  jedes Modell auf deinem Rechner gebraucht hat, und lassen mehrere am
+  selben Video gegeneinander antreten.
 - **Open all links.** Text markieren, im Kontextmenü „Open all links"
   wählen, und jeder Link in der Markierung öffnet sich als Tab in einem
   neuen Fenster: YouTube-Weiterleitungen ausgepackt, Sponsor- und
@@ -26,30 +46,49 @@ Dienst, der aus einem YouTube-Video eine Zusammenfassung macht.
 
 ## Installation
 
-Bis zum ersten Release aus dem Quelltext bauen:
+Zwei Teile: der Dienst und die Erweiterung, die mit ihm spricht.
+
+Der Dienst kommt aus einem Release. Er braucht
+[uv](https://docs.astral.sh/uv/), das sein Python selbst mitbringt:
+
+```
+irm https://raw.githubusercontent.com/corgan2222/video-tldr/main/install.ps1 | iex
+```
+
+Das wählt die CUDA-Bibliotheken, wenn eine Karte da ist, und sonst allein
+die ONNX-Laufzeit, legt `video-tldr` auf den PATH und trägt keinen
+Autostart ein: die Erweiterung startet den Dienst, wenn sie ihn braucht.
+`-Root D:\video-tldr` legt Programm, Umgebung und Daten unter ein
+Verzeichnis statt an drei übliche Orte. Die Sprachmodelle kommen beim
+ersten Lauf dazu, mehrere Gigabyte.
+
+Die Erweiterung ist die `.zip` desselben Releases: in Firefox als
+temporäres Add-on laden (`about:debugging`, „Dieser Firefox") oder
+entpacken und den Ordner in Chrome laden (`chrome://extensions`,
+Entwicklermodus).
+
+Bis zum ersten Release beides aus dem Quelltext bauen. Die Erweiterung:
 
 ```
 npm ci
 npm run build
 ```
 
-`dist/` in Firefox als temporäres Add-on laden (`about:debugging`, „Dieser
-Firefox") oder in Chrome als entpackte Erweiterung (`chrome://extensions`,
-Entwicklermodus). Die Video-Zusammenfassung braucht den lokalen Dienst aus
+Dann `dist/` laden. Der Dienst liegt in
 [`service/`](../service/README.md); dessen README beschreibt Einrichtung
 und Modellwahl.
 
 ## Benutzung
 
-1. Dienst starten: `cd service && uv run corganshelper serve`. Er druckt
-   ein Token.
-2. Optionen der Erweiterung öffnen, Dienst-URL und Token eintragen,
-   „Connect" drücken, Sprache, Ausgaben und Modell wählen, „Save".
-3. Ein YouTube-Video öffnen und auf das Symbol klicken. Das Badge zeigt den
-   Schritt, an dem der Dienst gerade ist; eine Benachrichtigung meldet,
-   wenn die Zusammenfassung fertig ist, und ein Klick darauf öffnet die
-   Notiz.
-4. Ohne Browser: `uv run corganshelper run <url>` macht dasselbe von der
+1. Dienst starten: `cd service && uv run video-tldr serve`.
+2. Auf das Symbol klicken, „Settings" öffnen, „Connect" drücken, Sprache,
+   Ausgaben und Modell wählen, „Save". Ein Token braucht es nur, wenn der
+   Dienst eines bekommen hat.
+3. Ein YouTube-Video öffnen, auf das Symbol klicken, „Fast" oder
+   „Thorough" drücken. Das Fenster zeigt die Schritte, während sie
+   laufen; eine Benachrichtigung meldet, wenn die Zusammenfassung fertig
+   ist, und ein Klick darauf öffnet die Notiz.
+4. Ohne Browser: `uv run video-tldr run <url>` macht dasselbe von der
    Kommandozeile.
 
 ---

@@ -1,7 +1,9 @@
 // A Manifest V3 service worker restarts between events, so nothing here
 // relies on module-level state surviving from one event to the next: the
 // running jobs live in storage.local, and an alarm wakes the worker to
-// poll them.
+// poll them. The toolbar icon opens popup.html; the popup asks this
+// worker to start, cancel or open a job, because only the worker
+// outlives the popup.
 //
 // The manifest lists this file under both `service_worker` and `scripts`:
 // Chrome reads the former, Firefox the latter, and each ignores the key it
@@ -11,38 +13,65 @@
 // where the manifest pins `strict_min_version`.
 //
 // What happens goes to the console of this worker: about:debugging, This
-// Firefox, Inspect next to corganshelper (chrome://extensions, service
+// Firefox, Inspect next to video-tldr (chrome://extensions, service
 // worker link, in Chrome).
 import { api } from './api.js';
+import { t } from './i18n.js';
 import { DEFAULT_BLOCKLIST, planOpen, type Selection } from './links.js';
 import {
   badgeFor,
   DEFAULT_CONNECTION,
   failureBadge,
-  HOST_PATTERN,
+  iconSet,
+  NAME,
   request,
+  videoId,
   type Badge,
   type Connection,
   type Job,
+  type Profile,
+  type RunOptions,
 } from './service.js';
 
 const MENU_ID = 'open-all-links';
 const SETTINGS_MENU_ID = 'settings';
+const SEND_MENU_ID = 'send-to-video-tldr';
 const POLL_ALARM = 'poll-job';
+const BLINK_ALARM = 'blink';
 // Chrome's floor for a repeating alarm; a job takes minutes anyway.
 const POLL_MINUTES = 0.5;
+// How often the icon flips while it blinks, and how long it does.
+const BLINK_MS = 500;
+const BLINK_TIMES = 12;
+
+// What the popup may ask of this worker.
+export type Ask =
+  | { type: 'start'; url: string; profile: Profile; options?: RunOptions }
+  | { type: 'cancel'; id: string }
+  | { type: 'open'; id: string; what?: 'obsidian' | 'folder' | 'auto' };
 
 api.runtime.onInstalled.addListener(() => {
   api.contextMenus.create({
     id: MENU_ID,
-    title: 'Open all links',
+    title: t('openAllLinks'),
     contexts: ['selection'],
   });
-  // A right click on the toolbar icon, for the day the token is set and
-  // the left click goes straight to the service.
+  // On a link to a video, and on the video page itself: hand it over
+  // without opening the tab first.
+  api.contextMenus.create({
+    id: SEND_MENU_ID,
+    title: t('sendToVideoTldr'),
+    contexts: ['link', 'video', 'page'],
+    targetUrlPatterns: [
+      '*://*.youtube.com/*',
+      '*://youtu.be/*',
+      '*://*.youtu.be/*',
+    ],
+    documentUrlPatterns: ['*://*.youtube.com/*', '*://youtu.be/*'],
+  });
   api.contextMenus.create({
     id: SETTINGS_MENU_ID,
-    title: 'Settings',
+    title: t('settings'),
     contexts: ['action'],
   });
 });
@@ -68,46 +97,102 @@ async function showBadge(badge: Badge): Promise<void> {
   await api.action.setTitle({ title: badge.title });
 }
 
+// Grey while the service does not answer, coloured while it does.
+async function showIcon(connected: boolean): Promise<void> {
+  await api.action.setIcon({ path: iconSet(connected) });
+  await api.storage.local.set({ connected });
+}
+
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// The toolbar icon hands the active tab's URL to the service. Firefox
-// grants a host permission only when asked, Chrome at install time; asked
-// first thing in the click handler, both answer at once when it is granted.
-// First thing on purpose: Firefox counts the request as user input only
-// until the first await, so nothing may run before it.
-api.action.onClicked.addListener(async (tab) => {
-  const granted = await api.permissions.request({ origins: [HOST_PATTERN] });
-  if (!granted) {
-    await showBadge(failureBadge('no permission to reach 127.0.0.1'));
+async function startJob(
+  url: string,
+  profile: Profile,
+  options?: RunOptions,
+): Promise<Job> {
+  const job = await request<Job>(await connection(), 'POST', '/jobs', {
+    url,
+    profile,
+    options,
+  });
+  console.info(`${NAME}: job`, job.id, job.status, profile, url, options);
+  const jobs = await trackedJobs();
+  await api.storage.local.set({
+    jobs: [...jobs.filter((id) => id !== job.id), job.id],
+  });
+  await showIcon(true);
+  await showBadge(badgeFor(job));
+  await api.alarms.create(POLL_ALARM, { periodInMinutes: POLL_MINUTES });
+  return job;
+}
+
+async function answer(ask: Ask): Promise<unknown> {
+  switch (ask.type) {
+    case 'start':
+      return { job: await startJob(ask.url, ask.profile, ask.options) };
+    case 'cancel':
+      return await request(
+        await connection(),
+        'POST',
+        `/jobs/${ask.id}/cancel`,
+      );
+    case 'open':
+      return await request(await connection(), 'POST', `/jobs/${ask.id}/open`, {
+        what: ask.what ?? 'auto',
+      });
+  }
+}
+
+// The popup's messages. `sendResponse` plus `return true` is the form
+// both browsers accept; a returned promise would satisfy Firefox only.
+api.runtime.onMessage.addListener((ask: Ask, _sender, sendResponse) => {
+  answer(ask).then(sendResponse, (error: unknown) => {
+    console.warn(`${NAME}: ${ask.type} failed:`, message(error));
+    void showBadge(failureBadge(message(error)));
+    sendResponse({ error: message(error) });
+  });
+  return true;
+});
+
+api.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === SETTINGS_MENU_ID) {
+    void api.runtime.openOptionsPage();
     return;
   }
-  const to = await connection();
-  if (!to.token) {
-    // Nothing to talk to yet: the click is the way to the settings.
-    console.info('corganshelper: no token stored, opening the options');
-    await api.runtime.openOptionsPage();
+  if (info.menuItemId !== SEND_MENU_ID) return;
+  const url = info.linkUrl ?? info.srcUrl ?? info.pageUrl ?? tab?.url ?? '';
+  if (!videoId(url)) {
+    await showBadge(failureBadge(`not a YouTube video: ${url}`));
     return;
   }
   try {
-    const job = await request<Job>(to, 'POST', '/jobs', { url: tab.url });
-    console.info('corganshelper: job', job.id, job.status, tab.url);
-    const jobs = await trackedJobs();
-    await api.storage.local.set({
-      jobs: [...jobs.filter((id) => id !== job.id), job.id],
-    });
-    await showBadge(badgeFor(job));
-    await api.alarms.create(POLL_ALARM, { periodInMinutes: POLL_MINUTES });
+    await startJob(url, 'fast');
   } catch (error) {
-    console.warn('corganshelper: POST /jobs failed:', message(error));
     await showBadge(failureBadge(message(error)));
   }
 });
 
-api.contextMenus.onClicked.addListener((info) => {
-  if (info.menuItemId === SETTINGS_MENU_ID) void api.runtime.openOptionsPage();
-});
+// A finished job should catch the eye without stealing focus: the icon
+// flips between the coloured and the grey one for a few seconds.
+async function blink(): Promise<void> {
+  await api.storage.local.set({ blinks: BLINK_TIMES });
+  await api.alarms.create(BLINK_ALARM, { periodInMinutes: BLINK_MS / 60000 });
+}
+
+async function blinkStep(): Promise<void> {
+  const { blinks } = (await api.storage.local.get({ blinks: 0 })) as {
+    blinks: number;
+  };
+  if (blinks <= 0) {
+    await api.alarms.clear(BLINK_ALARM);
+    await showIcon(true);
+    return;
+  }
+  await api.action.setIcon({ path: iconSet(blinks % 2 === 0) });
+  await api.storage.local.set({ blinks: blinks - 1 });
+}
 
 async function notify(job: Job): Promise<void> {
   const what = job.title ?? job.id;
@@ -116,13 +201,14 @@ async function notify(job: Job): Promise<void> {
     iconUrl: api.runtime.getURL('icons/128.png'),
     title:
       job.status === 'done'
-        ? 'corganshelper: summary ready'
-        : `corganshelper: ${job.error?.step ?? 'job'} failed`,
+        ? `${NAME}: ${t('done')}`
+        : `${NAME}: ${job.error?.step ?? 'job'} ${t('error')}`,
     message:
       job.status === 'done'
-        ? `${what}. Click to open it.`
+        ? `${what}. ${t('openNote')}`
         : `${what}: ${job.error?.message ?? 'unknown error'}`,
   });
+  if (job.status === 'done') await blink();
 }
 
 // One round over every tracked job. A finished one gets its notification
@@ -142,13 +228,18 @@ async function poll(): Promise<void> {
     try {
       job = await request<Job>(to, 'GET', `/jobs/${id}`);
     } catch (error) {
-      console.warn('corganshelper: GET /jobs failed:', id, message(error));
+      console.warn(`${NAME}: GET /jobs failed:`, id, message(error));
       badge = failureBadge(message(error));
+      await showIcon(false);
       continue;
     }
-    console.info('corganshelper: job', job.id, job.status, job.step);
+    console.info(`${NAME}: job`, job.id, job.status, job.step);
     if (job.status === 'done' || job.status === 'error') {
       await notify(job);
+      badge ??= badgeFor(job);
+      continue;
+    }
+    if (job.status === 'cancelled') {
       badge ??= badgeFor(job);
       continue;
     }
@@ -162,6 +253,7 @@ async function poll(): Promise<void> {
 
 api.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === POLL_ALARM) void poll();
+  if (alarm.name === BLINK_ALARM) void blinkStep();
 });
 
 // The notification's id carries the outcome: only a finished summary has
@@ -172,12 +264,24 @@ api.notifications.onClicked.addListener(async (id) => {
   await api.notifications.clear(id);
   if (status !== 'done' || !jobId) return;
   try {
-    await request(await connection(), 'POST', `/jobs/${jobId}/open`);
+    await answer({ type: 'open', id: jobId });
   } catch (error) {
-    console.warn('corganshelper: open failed:', jobId, message(error));
+    console.warn(`${NAME}: open failed:`, jobId, message(error));
     await showBadge(failureBadge(message(error)));
   }
 });
+
+// On every start of the worker: ask the service once, so the icon says
+// whether it is there before the first click.
+async function checkService(): Promise<void> {
+  try {
+    await request(await connection(), 'GET', '/health');
+    await showIcon(true);
+  } catch {
+    await showIcon(false);
+  }
+}
+void checkService();
 
 // ----------------------------------------------------------- open all links
 
@@ -220,7 +324,7 @@ api.contextMenus.onClicked.addListener(async (info, tab) => {
   }
   await api.action.setBadgeText({ text: String(plan.open.length) });
   await api.action.setTitle({
-    title: `corganshelper: ${plan.open.length} opened, ${plan.known} known, ${plan.blocked} blocked`,
+    title: `${NAME}: ${plan.open.length} opened, ${plan.known} known, ${plan.blocked} blocked`,
   });
   // The worker may be gone before this fires; then the badge stays until
   // the next click, which is fine.

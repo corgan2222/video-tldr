@@ -1,6 +1,6 @@
 """Where the service keeps its data, and the knobs it reads.
 
-The knobs live in `<home>/config.json`, written by `corganshelper config`
+The knobs live in `<home>/config.json`, written by `video-tldr config`
 and later by the extension's options page. An environment variable
 overrides the file, a command line flag overrides both. API keys stay in
 that file or in the environment; the file lives next to the data, outside
@@ -11,11 +11,20 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_HOME = "D:/corganshelper"
+# Under the home directory, not under LOCALAPPDATA: a packaged host
+# virtualises the latter, so a write lands in its LocalCache and the path
+# the user reads in the settings shows nothing. VIDEO_TLDR_HOME moves it,
+# which is what a machine with the models on another drive wants.
+DEFAULT_HOME = Path.home() / ".video-tldr"
 CONFIG_NAME = "config.json"
+# The folder in the download folder that holds one folder per video, and
+# the folder inside that one for what only a run needs.
+LIBRARY = "video-tldr"
+WORK = "tmp"
 
 LLM_BACKENDS = ["claude", "anthropic", "openai", "lmstudio", "ollama"]
 
@@ -75,21 +84,36 @@ LANGUAGES = {"de": "German", "en": "English"}
 # Every key config.json may carry, with the environment variable that
 # overrides it. The vendor variables are the ones their SDKs read anyway.
 KEYS = {
-    "llm": "CORGANSHELPER_LLM",
-    "model": "CORGANSHELPER_MODEL",
-    "stt": "CORGANSHELPER_STT",
-    "language": "CORGANSHELPER_LANGUAGE",
+    "llm": "VIDEO_TLDR_LLM",
+    "model": "VIDEO_TLDR_MODEL",
+    "stt": "VIDEO_TLDR_STT",
+    "language": "VIDEO_TLDR_LANGUAGE",
     "openai_api_key": "OPENAI_API_KEY",
     "openai_base_url": "OPENAI_BASE_URL",
     "anthropic_api_key": "ANTHROPIC_API_KEY",
     "lmstudio_url": "LMSTUDIO_URL",
     "ollama_url": "OLLAMA_URL",
-    "formats": "CORGANSHELPER_FORMATS",
-    "obsidian_vault": "CORGANSHELPER_OBSIDIAN_VAULT",
-    "obsidian_folder": "CORGANSHELPER_OBSIDIAN_FOLDER",
-    "browser": "CORGANSHELPER_BROWSER",
-    "token": "CORGANSHELPER_TOKEN",
+    "formats": "VIDEO_TLDR_FORMATS",
+    "obsidian_vault": "VIDEO_TLDR_OBSIDIAN_VAULT",
+    "obsidian_folder": "VIDEO_TLDR_OBSIDIAN_FOLDER",
+    "browser": "VIDEO_TLDR_BROWSER",
+    "token": "VIDEO_TLDR_TOKEN",
+    # Asked for on 2026-09-10: where the outputs go, a look for the PDF,
+    # and four switches the popup offers per run (they travel as
+    # `options` of a job, the stored value is the default).
+    "download_dir": "VIDEO_TLDR_DOWNLOAD_DIR",
+    "pdf_template": "VIDEO_TLDR_PDF_TEMPLATE",
+    "cleanup": "VIDEO_TLDR_CLEANUP",
+    "timestamps": "VIDEO_TLDR_TIMESTAMPS",
+    "condensed": "VIDEO_TLDR_CONDENSED",
+    "style": "VIDEO_TLDR_STYLE",
 }
+
+# How the note is worded. `normal` is the plain prompt; the others add a
+# style instruction to analyze, and `all` writes one note per style.
+STYLES = ["normal", "caveman", "noslop", "engineer", "human", "all"]
+EXTRA_STYLES = [s for s in STYLES if s not in ("normal", "all")]
+SWITCH = ["on", "off"]
 DEFAULTS = {
     "llm": "claude",
     "model": "",
@@ -108,13 +132,62 @@ DEFAULTS = {
     "obsidian_folder": "Videos",
     # Chrome or Edge for the PDF; empty means the usual places are searched.
     "browser": "",
-    # What the extension sends with every request; `serve` makes one up
-    # when this is empty and prints it.
+    # What the extension sends with every request; optional, see serve.
     "token": "",
+    # Empty means the user's Downloads folder (default_download_dir).
+    "download_dir": "",
+    # An HTML file with a `{{content}}` placeholder, or a CSS file; empty
+    # means the built-in look of the PDF.
+    "pdf_template": "",
+    # Delete work/<id>/ once the outputs are written.
+    "cleanup": "off",
+    # Timestamp links into the video in the note.
+    "timestamps": "on",
+    # Boil the video down to its core message, a two-minute read.
+    "condensed": "off",
+    "style": "normal",
 }
 SECRETS = ("openai_api_key", "anthropic_api_key", "token")
 MASK = "*" * 8
-CHOICES = {"llm": LLM_BACKENDS, "stt": STT_ENGINES, "language": list(LANGUAGES)}
+CHOICES = {
+    "llm": LLM_BACKENDS,
+    "stt": STT_ENGINES,
+    "language": list(LANGUAGES),
+    "cleanup": SWITCH,
+    "timestamps": SWITCH,
+    "condensed": SWITCH,
+    "style": STYLES,
+}
+
+
+def default_download_dir() -> Path:
+    """The user's Downloads folder, where a browser puts what it fetches;
+    the data directory's `out/` when there is none."""
+    downloads = Path.home() / "Downloads"
+    return downloads if downloads.is_dir() else resolve_home(None) / "out"
+
+
+# The two buttons in the extension's popup. `fast` keeps every cached
+# result, takes YouTube's captions and the backend's default model.
+# `thorough` redoes every step, transcribes with the large Whisper even
+# when captions exist, and asks the strongest model where the backend
+# has a known one.
+PROFILES = {
+    "fast": {"stt": "auto", "model": ""},
+    "thorough": {"stt": "whisper-large", "model": ""},
+}
+THOROUGH_MODELS = {"claude": "opus", "anthropic": "claude-opus-5"}
+
+
+def profile_overrides(name: str, config: dict) -> dict:
+    """What a profile changes on top of the stored settings; an empty
+    value changes nothing."""
+    if name not in PROFILES:
+        raise ConfigError(f"profile must be one of {', '.join(PROFILES)}")
+    overrides = dict(PROFILES[name])
+    if name == "thorough":
+        overrides["model"] = THOROUGH_MODELS.get(config["llm"], "")
+    return overrides
 
 
 class ConfigError(Exception):
@@ -130,12 +203,23 @@ class Settings:
     config: dict = field(default_factory=lambda: dict(DEFAULTS))
 
     @property
+    def library(self) -> Path:
+        """Where a video's own folder goes: one folder per video under
+        `video-tldr` in the download folder, so everything that belongs to
+        a video lies together (asked for on 2026-09-10)."""
+        return self.out_dir / LIBRARY
+
+    @property
     def work_dir(self) -> Path:
+        """Where the runs of older versions kept their files; `fetch`
+        moves such a folder into the library when it finds one."""
         return self.home / "work"
 
     @property
     def out_dir(self) -> Path:
-        return self.home / "out"
+        """Where the rendered outputs go: `download_dir`, else Downloads."""
+        chosen = self.config.get("download_dir")
+        return Path(chosen).expanduser() if chosen else default_download_dir()
 
     @property
     def config_path(self) -> Path:
@@ -145,7 +229,7 @@ class Settings:
     def load(cls, home: Path | None = None, overrides: dict | None = None) -> Settings:
         """File, then environment, then `overrides` (the command line)."""
         base = resolve_home(home)
-        cookies = os.environ.get("CORGANSHELPER_COOKIES")
+        cookies = os.environ.get("VIDEO_TLDR_COOKIES")
         config = dict(DEFAULTS)
         config.update(read_config(base / CONFIG_NAME))
         for key, variable in KEYS.items():
@@ -166,7 +250,16 @@ class Settings:
 
 def resolve_home(home: Path | None) -> Path:
     # Absolute: the PDF step turns paths below it into file URLs.
-    return Path(home or os.environ.get("CORGANSHELPER_HOME", DEFAULT_HOME)).resolve()
+    return Path(home or os.environ.get("VIDEO_TLDR_HOME", DEFAULT_HOME)).resolve()
+
+
+# Reading and writing config.json belong together. The options page saves
+# every field on its own, so three requests land within a second, and the
+# service answers each in its own thread: without this lock the last one
+# wrote back what it had read before the others changed it, and two
+# threads renaming their file over the same target answered 500. Both
+# happened to the owner on 2026-09-10.
+_WRITE_LOCK = threading.Lock()
 
 
 def store(home: Path | None, values: dict) -> Path:
@@ -174,16 +267,20 @@ def store(home: Path | None, values: dict) -> Path:
     environment is read here on purpose not at all: a key that lives in a
     variable stays there instead of being copied into the file."""
     path = resolve_home(home) / CONFIG_NAME
-    config = {**DEFAULTS, **read_config(path), **validate(values)}
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # Written beside and renamed over: the service's worker thread reads
-    # this file while the options page writes it, and a truncated file
-    # in between would fail that job with "not valid JSON".
-    staging = path.with_suffix(".json.tmp")
-    staging.write_text(
-        json.dumps({k: config[k] for k in KEYS}, indent=2) + "\n", encoding="utf-8"
-    )
-    os.replace(staging, path)
+    with _WRITE_LOCK:
+        config = {**DEFAULTS, **read_config(path), **validate(values)}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Written beside and renamed over: the service's worker thread
+        # reads this file while the options page writes it, and a
+        # truncated file in between would fail that job with "not valid
+        # JSON". The name carries the process id, so a command line
+        # running next to the service never shares the staging file.
+        staging = path.with_suffix(f".json.{os.getpid()}.tmp")
+        staging.write_text(
+            json.dumps({k: config[k] for k in KEYS}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(staging, path)
     return path
 
 
@@ -229,7 +326,7 @@ def split_formats(text: str) -> list[str]:
 
 
 def parse_assignments(pairs: list[str]) -> dict:
-    """`key=value` arguments of `corganshelper config --set`."""
+    """`key=value` arguments of `video-tldr config --set`."""
     values = {}
     for pair in pairs:
         key, separator, value = pair.partition("=")

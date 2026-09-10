@@ -39,7 +39,7 @@ repos:
         # bigger file, not because a build artefact slipped in.
         args: ['--maxkb=1024']
         # mermaid.min.js ships with the service on purpose, licence next to it.
-        exclude: '^service/src/corganshelper_service/assets/'
+        exclude: '^service/src/video_tldr_service/assets/'
         stages: [pre-commit]
       - id: check-merge-conflict
         stages: [pre-commit]
@@ -53,12 +53,12 @@ repos:
         # Add an exclude: pattern here for recorded test fixtures that must
         # stay byte for byte as they were captured; the shipped minified
         # script is one of those.
-        exclude: '(?i)\.(png|ico|jpg|gif)$|^service/src/corganshelper_service/assets/'
+        exclude: '(?i)\.(png|ico|jpg|gif)$|^service/src/video_tldr_service/assets/'
         stages: [pre-commit]
       - id: trailing-whitespace
         # Two trailing spaces are a line break in Markdown; keep them.
         args: ['--markdown-linebreak-ext=md']
-        exclude: '(?i)\.(png|ico|jpg|gif)$|^service/src/corganshelper_service/assets/'
+        exclude: '(?i)\.(png|ico|jpg|gif)$|^service/src/video_tldr_service/assets/'
         stages: [pre-commit]
 
   - repo: local

@@ -1,0 +1,367 @@
+/* One look for the popup and the settings. The browser's own colours
+   (Canvas, CanvasText, LinkText) carry the light and the dark theme, so
+   there is no second palette to keep in step. Spacing is a scale of
+   four: 4, 8, 12, 16, 24. */
+:root {
+  color-scheme: light dark;
+  --gap: 8px;
+  --gap-l: 16px;
+  --radius: 6px;
+  --line: color-mix(in srgb, CanvasText 20%, transparent);
+  --sunken: color-mix(in srgb, CanvasText 6%, transparent);
+  --muted: color-mix(in srgb, CanvasText 65%, transparent);
+  --accent: #1a73e8;
+  --good: #188038;
+  /* Amber for what still works but not fully: a model that answers and
+     cannot read pictures is not the same as a server that is silent. */
+  --warn: #b25f00;
+  --bad: #d93025;
+}
+
+/* The signal colours carry text as well as dots, and a dark window
+   swallows them: each gets a lighter shade there. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --good: #6dd58c;
+    --warn: #fcad70;
+    --bad: #f28b82;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Nothing may push the window wider than it is: a flex or grid child
+   defaults to its content's width, and a long model name or file path
+   would do exactly that. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  font:
+    13px/1.5 system-ui,
+    sans-serif;
+  margin: 0;
+  padding: var(--gap-l);
+  background: Canvas;
+  color: CanvasText;
+}
+
+/* ------------------------------------------------------------- header */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: var(--gap-l);
+}
+
+.brand img {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+
+.brand h1 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.brand .tagline {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.brand .spacer {
+  flex: 1;
+}
+
+a {
+  color: LinkText;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------ blocks, labels */
+
+h2 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 24px 0 var(--gap);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+label {
+  display: block;
+  margin: 0 0 4px;
+  font-weight: 500;
+}
+
+.field {
+  margin-bottom: var(--gap-l);
+}
+
+/* An explanation, not a label: smaller, quieter, tied to the field above
+   it by a line down its left side. */
+.help {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+
+.help code {
+  font-size: 11px;
+}
+
+textarea,
+input[type='text'],
+input[type='url'],
+input[type='number'],
+input[type='password'],
+select {
+  width: 100%;
+  padding: 5px 8px;
+  font:
+    12px/1.4 ui-monospace,
+    monospace;
+  color: CanvasText;
+  background: Canvas;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+button {
+  font: inherit;
+  padding: 5px 12px;
+  color: CanvasText;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 500;
+}
+
+.row {
+  display: flex;
+  gap: var(--gap);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.row > input,
+.row > select {
+  flex: 1;
+  min-width: 0;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px var(--gap-l);
+}
+
+.checks label,
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  background: var(--sunken);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* -------------------------------------------------------------- lights */
+
+.lights {
+  list-style: none;
+  margin: 0 0 var(--gap-l);
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.light {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.light::before {
+  content: '●';
+  flex: none;
+  color: var(--muted);
+}
+
+.light.ok::before {
+  color: var(--good);
+}
+
+.light.warn::before {
+  color: var(--warn);
+}
+
+.light.bad::before {
+  color: var(--bad);
+}
+
+.light .what {
+  font-weight: 500;
+  flex: none;
+}
+
+.light .detail {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* -------------------------------------------------------------- tables */
+
+/* A table with six columns is wider than a popup; it scrolls in its own
+   box rather than pushing the whole window sideways. */
+.table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: var(--gap) 0 var(--gap-l);
+}
+
+th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  padding: 3px 8px 3px 0;
+  white-space: nowrap;
+}
+
+td {
+  padding: 3px 8px 3px 0;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 8%, transparent);
+}
+
+th.n,
+td.n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding-right: 0;
+}
+
+tr:last-child td {
+  border-bottom: 0;
+}
+
+/* --------------------------------------------------------------- boxes */
+
+.box {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--gap) 12px;
+  margin-bottom: var(--gap-l);
+}
+
+.box.bad {
+  border-color: var(--bad);
+}
+
+details {
+  border-top: 1px solid var(--line);
+  padding-top: var(--gap);
+  margin-top: var(--gap-l);
+}
+
+summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+pre {
+  font:
+    11px/1.45 ui-monospace,
+    monospace;
+  max-height: 180px;
+  overflow: auto;
+  margin: var(--gap) 0 0;
+  padding: var(--gap);
+  background: var(--sunken);
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  min-height: 1.5em;
+  font-size: 12px;
+  color: var(--muted);
+  margin: var(--gap) 0 0;
+}
+
+.status.bad {
+  color: var(--bad);
+}
+
+.status.ok {
+  color: var(--good);
+}
+
+.status.warn {
+  color: var(--warn);
+}

@@ -1,8 +1,8 @@
 import pytest
 import yt_dlp
 
-from corganshelper_service.config import Settings
-from corganshelper_service.fetch import FetchError, fetch
+from video_tldr_service.config import Settings
+from video_tldr_service.fetch import FetchError, fetch, work_folder
 
 
 class Refusing:
@@ -30,5 +30,5 @@ def test_the_bot_check_becomes_a_message_that_names_the_way_out(tmp_path, monkey
     with pytest.raises(FetchError) as caught:
         fetch("https://youtu.be/BT4ywlPr6Pk", settings)
 
-    assert "CORGANSHELPER_COOKIES" in str(caught.value)
-    assert not (settings.work_dir / "BT4ywlPr6Pk" / "fetch.json").exists()
+    assert "VIDEO_TLDR_COOKIES" in str(caught.value)
+    assert not (work_folder(settings, "BT4ywlPr6Pk") / "fetch.json").exists()
