@@ -218,7 +218,7 @@ async function ask(what: object): Promise<unknown> {
   const reply = (await api.runtime.sendMessage(what)) as
     { error?: string } | undefined;
   if (reply?.error) {
-    say(reply.error, true);
+    say(reply.error, 'bad');
     throw new Error(reply.error);
   }
   say('');
@@ -294,7 +294,7 @@ async function refresh(): Promise<void> {
         offline(true);
         return;
       }
-      if (id !== currentId) say(message(error), true);
+      if (id !== currentId) say(message(error), 'bad');
     }
   }
   offline(false);
@@ -333,7 +333,7 @@ async function start(profile: Profile): Promise<void> {
   // until the first await, so nothing may run before it.
   const granted = await api.permissions.request({ origins: [HOST_PATTERN] });
   if (!granted) {
-    say('No permission to reach 127.0.0.1.', true);
+    say('No permission to reach 127.0.0.1.', 'bad');
     return;
   }
   try {
@@ -358,12 +358,13 @@ function light(id: string, name: string, state?: Light): void {
   dot.title = state?.detail ?? t('notChecked');
   const what = element('span', name, 'what');
   dot.replaceChildren(what);
-  if (state && !state.ok) say(state.detail, true);
+  if (state && !state.ok) say(state.detail, 'bad');
 }
 
-function say(text: string, bad = false): void {
+// Green for a result, amber for one with a limit to it, red for a stop.
+function say(text: string, tone: '' | 'ok' | 'warn' | 'bad' = ''): void {
   status.textContent = text;
-  status.className = bad ? 'status bad' : 'status';
+  status.className = tone ? `status ${tone}` : 'status';
 }
 
 async function showLights(): Promise<void> {
@@ -375,7 +376,7 @@ async function showLights(): Promise<void> {
     // A model that takes no images or has too small a context: the run
     // would fail late, so the reason belongs here, before the click.
     if (health.capabilities && !health.capabilities.ok) {
-      say(health.capabilities.detail, true);
+      say(health.capabilities.detail, 'warn');
     }
   } catch (error) {
     offline(error instanceof NoServiceError);
@@ -436,14 +437,14 @@ logDetails.addEventListener('toggle', () => void refresh());
 statsDetails.addEventListener('toggle', showStats);
 pick('#copy-command').addEventListener('click', async () => {
   await navigator.clipboard.writeText(t('noServiceCommand'));
-  say(t('copied'));
+  say(t('copied'), 'ok');
 });
 // The language of the note is changed often, so it is saved right here.
 languageBox.addEventListener('change', () => {
   void request(connection, 'PUT', '/config', {
     language: languageBox.value,
   }).catch((error: unknown) => {
-    say(message(error), true);
+    say(message(error), 'bad');
   });
 });
 
