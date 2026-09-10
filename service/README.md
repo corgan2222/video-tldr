@@ -1,8 +1,8 @@
 # corganshelper service
 
 The local service the browser extension talks to. Every pipeline step is a
-command line entry point that runs the same code the HTTP service will run;
-`serve` is the last step to land.
+command line entry point that runs the same code the HTTP service runs;
+`run` chains them, `serve` offers them to the extension.
 
 ```
 cd service
@@ -15,6 +15,9 @@ uv run corganshelper enrich https://www.youtube.com/watch?v=BT4ywlPr6Pk
 uv run corganshelper frames https://www.youtube.com/watch?v=BT4ywlPr6Pk
 uv run corganshelper render https://www.youtube.com/watch?v=BT4ywlPr6Pk
 uv run corganshelper render --format obsidian --format pdf https://youtu.be/BT4ywlPr6Pk
+uv run corganshelper run https://youtu.be/BT4ywlPr6Pk          # all of the above
+uv run corganshelper run --batch urls.txt                      # one URL per line
+uv run corganshelper serve                                     # for the extension
 ```
 
 `enrich` reads the README of up to three GitHub repositories the
@@ -37,6 +40,37 @@ of wheels), `cpu` the ONNX runtime alone. `CORGANSHELPER_WHISPER` picks the
 device for both local models, `cuda:0` by default, `cuda:1` for the second
 card, `cpu` for none.
 
+`run` walks every step for one video and prints what each cost: the
+seconds per step, the pictures kept, the tokens spent, the files written.
+The note is rendered once right after `analyze`, so a video that fails in
+`frames` still has a summary. A step that already has its result is
+skipped; `--force` redoes them all. `run --batch FILE` takes one URL per
+line and prints a Markdown table, one row per video, as each finishes.
+
+## Serving the extension
+
+`corganshelper serve` listens on `http://127.0.0.1:8765` (`--port`
+changes that) and prints a token; paste both into the extension's
+options. The extension hands over the URL of the active tab, the service
+runs `run` on it, one job at a time, and the extension polls the job
+until it is done. A click on the notification asks the service to open
+the result: the note in Obsidian when that format was written, else the
+first document among PDF, Word and Markdown.
+
+| Request                    | Answer                                                            |
+| -------------------------- | ----------------------------------------------------------------- |
+| `POST /jobs {"url": ...}`  | `202` and the job; `400` when the URL is no YouTube video         |
+| `GET /jobs/<id>`           | the job: `status` (queued, running, done, error), `step`, results |
+| `POST /jobs/<id>/open`     | `{"opened": ...}`; `409` until the job is done                    |
+| `GET /config`              | the settings (secrets masked) and the choices for each of them    |
+| `PUT /config {key: value}` | writes the keys given to `config.json`, answers like `GET`        |
+
+Every request must carry `Authorization: Bearer <token>` and a `Host`
+header of `127.0.0.1:<port>`; an `Origin` header is accepted only from
+`moz-extension://` and `chrome-extension://`. The service sends no CORS
+headers, so a web page cannot reach it. The token lives in `config.json`
+as `token`; delete it there to have `serve` make a new one.
+
 ## Choosing the model
 
 `corganshelper config` shows the settings, `corganshelper config --set
@@ -55,6 +89,7 @@ environment; the file lives next to the data, outside the repository.
 | `obsidian_vault`, `obsidian_folder`             | a path, a folder inside it                                                                                                            | where the Obsidian note goes, pictures under `_bilder` in that folder; default folder `Videos`                                                                              |
 | `browser`                                       | path to `chrome.exe` or `msedge.exe`                                                                                                  | prints the PDF; empty searches the usual places                                                                                                                             |
 | `lmstudio_url`, `ollama_url`, `openai_base_url` | URLs                                                                                                                                  | where the OpenAI-protocol servers listen                                                                                                                                    |
+| `token`                                         | what the extension sends with every request                                                                                           | made up by `serve` when empty and printed once                                                                                                                              |
 
 `probe` says what keeps the chosen backend from answering. A local model
 needs a context window that holds the transcript and its own thinking;
