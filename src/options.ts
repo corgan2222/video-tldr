@@ -1,4 +1,4 @@
-import { api } from './api.js';
+import { api, askAccess } from './api.js';
 import { t, translate } from './i18n.js';
 import { DEFAULT_BLOCKLIST } from './links.js';
 import {
@@ -471,6 +471,12 @@ modelChoice.addEventListener('change', () => {
 });
 
 pick('#connect').addEventListener('click', async () => {
+  // First, before any other await: Firefox counts the click as user input
+  // only until then, and the host permission is optional now.
+  if (!(await askAccess())) {
+    say(t('noAccess'), true);
+    return;
+  }
   await api.storage.local.set(connection());
   await loadService();
 });
