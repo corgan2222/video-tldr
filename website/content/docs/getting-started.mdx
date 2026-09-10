@@ -1,18 +1,67 @@
 ---
 title: Getting started
-description: Clone the repository and build video-tldr from source.
+description: Install the service and the extension, then summarise your first video.
 ---
 
-## Clone
+video-tldr is two parts. A local service does the work — fetching,
+transcribing, summarising — and a browser extension talks to it over
+`127.0.0.1`. Nothing leaves the machine except what your chosen language
+model backend sends.
+
+## Install the service
+
+The service comes from a release and needs
+[uv](https://docs.astral.sh/uv/), which carries its own Python:
+
+```powershell
+irm https://raw.githubusercontent.com/corgan2222/video-tldr/main/install.ps1 | iex
+```
+
+That picks the CUDA libraries when the machine has an NVIDIA card and the
+ONNX runtime alone when it has none, then puts `video-tldr` on your PATH.
+The speech models download on first use, several gigabytes of them.
+
+`-Root D:\video-tldr` keeps the program, its environment and its data
+under one directory instead of three standard places.
+
+## Install the extension
+
+The extension is the `.zip` attached to the same release. In Firefox,
+load it as a temporary add-on through `about:debugging` ("This Firefox").
+In Chrome, unpack it and load the folder through `chrome://extensions`
+with developer mode on.
+
+## Run it
+
+The installer registers no autostart. Start the service yourself:
+
+```powershell
+video-tldr serve
+```
+
+Then click the toolbar icon, open Settings, press Connect, and choose the
+language, the outputs and the model. Open a YouTube video, click the icon
+and press Fast or Thorough.
+
+Whenever the service is not answering, the extension says so and shows
+the command with a button that copies it.
+
+Without a browser, `video-tldr run <url>` does the same from the command
+line.
+
+## Build from source
+
+Until the first release is published, both parts come from the
+repository:
 
 ```bash
 git clone https://github.com/corgan2222/video-tldr.git
 cd video-tldr
+npm ci
+npm run build
 ```
 
-## Build
-
-The exact build, test and lint commands live in the repository's own
-[README](https://github.com/corgan2222/video-tldr#readme) and `AGENTS.md` — they depend on the
-language and tooling this project uses. Once the project builds, this page
-is a good place to add anything a newcomer needs beyond that.
+Load `dist/` as the extension, and run the service with
+`uv run --project service video-tldr serve`. The
+[service README](https://github.com/corgan2222/video-tldr/blob/main/service/README.md)
+covers its setup and the model choice.

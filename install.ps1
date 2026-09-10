@@ -7,8 +7,9 @@
 #
 # What this does: pick the extra that fits the machine, stop a running
 # service so Windows frees its script, install the wheel with uv, and put
-# the shim on the PATH. It registers no autostart and no service; the
-# extension starts the service when it needs one.
+# the shim on the PATH. It registers no autostart and no service: the
+# user starts it with `video-tldr serve`, and the extension shows that
+# command whenever the service is not answering.
 
 [CmdletBinding()]
 param(
