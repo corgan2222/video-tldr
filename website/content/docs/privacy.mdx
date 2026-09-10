@@ -1,0 +1,67 @@
+---
+title: Privacy
+description: What video-tldr reads, where it sends it, and what it keeps.
+---
+
+video-tldr has no server. There is no account, no telemetry, no analytics,
+and no endpoint belonging to this project that your data could reach.
+
+## What the extension reads
+
+- **The address of the tab you are on**, when you click the toolbar icon
+  or pick a video from the context menu. It needs the URL to hand the
+  video over, and it checks that the URL is a YouTube video before doing
+  anything with it.
+- **Text you selected**, only for "Open all links", and only for as long
+  as it takes to open those links.
+
+It reads nothing while you browse. There is no content script running on
+pages in the background.
+
+## Where it sends it
+
+To `http://127.0.0.1`, and nowhere else. That address is your own
+machine. The permission for it is optional: the extension asks the first
+time you use it, and until you allow it, no request leaves the extension
+at all.
+
+## What the service does with it
+
+The service runs on your machine and fetches the video, its captions and
+its metadata from YouTube, the same way any download tool would. Then it
+sends the transcript, and the pictures if you asked for them, to the
+language model you picked in the settings:
+
+- **Claude Code CLI, the Anthropic API or the OpenAI API** — the text
+  leaves your machine and reaches that company, under their terms. This
+  is the part to think about if the video is confidential.
+- **LM Studio or Ollama** — the model runs on your machine, and nothing
+  leaves it.
+
+Which one it is, is your choice and nobody else's default. `video-tldr
+config` prints the one in force.
+
+## What it keeps, and where
+
+Everything stays in the data directory, by default
+`%LOCALAPPDATA%\video-tldr`:
+
+- `config.json` — your settings, including any API key you entered
+- `work/<video id>/` — what a run needed: metadata, transcript, frames
+- `models/` — the speech models, once they are downloaded
+- `serve.log` — what the service did, for finding out why a run failed
+
+The finished summaries go where you told the settings to put them: the
+downloads folder, an Obsidian vault, or both. Nothing is deleted behind
+your back; `cleanup` in the settings empties the work files if you want
+that, and deleting the data directory removes every trace.
+
+The extension itself stores your connection settings and the recent runs
+in the browser's own extension storage. Uninstalling the extension takes
+those with it.
+
+## Keys
+
+An API key you enter is written to `config.json` on your machine and sent
+only to the service it belongs to. The settings page never shows a key
+back to you in full, and never writes a masked one over a real one.
