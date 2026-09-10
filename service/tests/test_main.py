@@ -107,3 +107,20 @@ def test_render_passes_the_format_flags_through_and_none_without_them(
     assert "summary" in capsys.readouterr().out
     with pytest.raises(SystemExit):
         cli.main(["--home", str(tmp_path), "render", "--format", "xls", url])
+
+
+def test_a_port_windows_reserved_says_how_to_find_out(tmp_path, monkeypatch, capsys):
+    """WinError 10013 reads like a permission problem, and the ranges move
+    on every reboot: 8765 was free on 2026-09-09 and reserved a day later.
+    The message has to name the command that shows the ranges."""
+    blocked = OSError("access denied")
+    blocked.winerror = cli.WSAEACCES
+
+    def refuse(*args, **kwargs):
+        raise blocked
+
+    monkeypatch.setattr(cli, "serve", refuse)
+    assert cli.main(["--home", str(tmp_path), "serve"]) == 1
+    complaint = capsys.readouterr().err
+    assert "excludedportrange" in complaint
+    assert "--port" in complaint
