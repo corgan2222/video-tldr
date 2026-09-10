@@ -84,22 +84,26 @@ def repositories(links: list[dict]) -> list[str]:
 
 def readme(repo: str) -> tuple[str | None, str]:
     """(text, name) of the first README that answers at HEAD, or (None,
-    reason). A 404 tries the next name; anything else gives up on the
-    repository, one connection reset per run is what GitHub's raw host
-    did on 2026-09-09."""
+    reason). A 404 tries the next name. A dropped connection is tried
+    once more: GitHub's raw host closed one per run on 2026-09-09 and
+    again on 2026-09-10, and each cost a repository. Anything else gives
+    up on the repository."""
     for name in README_NAMES:
         url = f"https://raw.githubusercontent.com/{repo}/HEAD/{name}"
-        try:
-            with urllib.request.urlopen(url, timeout=TIMEOUT_SECONDS) as response:
-                text = response.read().decode("utf-8", "replace")
-                if not text.strip():
-                    return None, f"{name} is empty"
-                return text[:SIZE_LIMIT], name
-        except urllib.error.HTTPError as error:
-            if error.code != 404:
-                return None, f"{name}: HTTP {error.code}"
-        except (urllib.error.URLError, OSError) as error:
-            return None, f"{name}: {getattr(error, 'reason', error)}"
+        for attempt in range(2):
+            try:
+                with urllib.request.urlopen(url, timeout=TIMEOUT_SECONDS) as response:
+                    text = response.read().decode("utf-8", "replace")
+                    if not text.strip():
+                        return None, f"{name} is empty"
+                    return text[:SIZE_LIMIT], name
+            except urllib.error.HTTPError as error:
+                if error.code != 404:
+                    return None, f"{name}: HTTP {error.code}"
+                break
+            except (urllib.error.URLError, OSError) as error:
+                if attempt:
+                    return None, f"{name}: {getattr(error, 'reason', error)}"
     return None, "no README at HEAD"
 
 

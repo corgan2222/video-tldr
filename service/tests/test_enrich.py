@@ -64,6 +64,19 @@ def test_readme_tries_the_next_name_on_404_and_gives_up_otherwise(monkeypatch):
     assert readme("c/d") == (None, "no README at HEAD")
     assert readme("e/f") == (None, "README.md is empty")
 
+    # One dropped connection is tried again, a second one ends it.
+    calls = []
+
+    def resetting_once(url, timeout=None):
+        calls.append(url)
+        if len(calls) == 1:
+            raise urllib.error.URLError("connection reset")
+        return Answer(b"second time lucky")
+
+    monkeypatch.setattr(urllib.request, "urlopen", resetting_once)
+    assert readme("a/b") == ("second time lucky", "README.md")
+    assert len(calls) == 2
+
     def resetting(url, timeout=None):
         raise urllib.error.URLError("connection reset")
 
