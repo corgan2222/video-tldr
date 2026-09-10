@@ -373,6 +373,15 @@
   "modelAdvice": {
     "message": "Gut: ein Bildmodell (LM Studio nennt es vlm) mit 32768 Token Kontext oder mehr. Schlecht: ein Whisper- oder Embedding-Modell, das gar nicht schreiben kann; ein Modell unter 32768 Token, dem mitten im Transkript der Platz ausgeht; ein stark quantisiertes, das hier achtmal langsamer läuft."
   },
+  "checkModel": {
+    "message": "Modell prüfen"
+  },
+  "checkModelHelp": {
+    "message": "Fragt das Backend sofort, mit dem, was hier steht: ob der Server antwortet, ob er den Schlüssel nimmt und ob das Modell Bilder liest. Besser hier als mitten im Lauf."
+  },
+  "checking": {
+    "message": "frage das Backend…"
+  },
   "modelDefault": {
     "message": "Voreinstellung des Backends"
   },

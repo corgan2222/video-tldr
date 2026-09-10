@@ -75,9 +75,10 @@ def runner():
 @pytest.fixture
 def service(tmp_path, runner):
     # With a token set, so the tests below see the check; without one the
-    # service answers everyone on 127.0.0.1 (test below).
+    # service answers everyone on 127.0.0.1 (test below). The backend
+    # check answers "all well" here; the two tests about it set their own.
     store(tmp_path, {"token": "secret"})
-    return Service(tmp_path, runner=runner)
+    return Service(tmp_path, runner=runner, checker=lambda _: None)
 
 
 @pytest.fixture
@@ -194,6 +195,40 @@ def test_thorough_redoes_everything_with_the_large_whisper_and_the_best_model(
     code, answer = call(server, "POST", "/jobs", {"url": URL, "profile": "quick"})
     assert code == 400
     assert "profile must be one of fast, thorough" in answer["error"]
+
+
+def test_a_backend_that_refuses_the_key_stops_the_job_at_the_gate(server, runner):
+    """Asked for on 2026-09-10: a 401 arrived after fetch and transcribe
+    had already run, and the popup showed it as a failed step."""
+    server.service.checker = lambda _: "openai: the server did not accept the key"
+
+    code, answer = call(server, "POST", "/jobs", {"url": URL})
+
+    assert code == 400
+    assert answer["error"] == "openai: the server did not accept the key"
+    assert runner.calls == 0
+    assert call(server, "GET", f"/jobs/{'x_x_x_x_x_x'}")[0] == 404
+
+
+def test_a_video_whose_model_steps_are_cached_needs_no_backend(server, runner):
+    """Every answer of the model is on disk, so the run asks no server;
+    a check at the gate must not turn such a job away."""
+    asked = []
+    server.service.checker = lambda _: asked.append(1) or "lmstudio: no answer"
+    work = work_folder(server.service.settings(), "x_x_x_x_x_x")
+    work.mkdir(parents=True)
+    for name in ("analysis.json", "enrich.json", "frames.json"):
+        (work / name).write_text("{}", encoding="utf-8")
+
+    code, job = call(server, "POST", "/jobs", {"url": URL})
+
+    assert code == 202
+    assert asked == []
+    wait_for(server, job["id"], "done")
+    # A video with nothing on disk is the other case: that one is asked.
+    code, answer = call(server, "POST", "/jobs", {"url": SECOND_URL})
+    assert code == 400 and asked == [1]
+    assert answer["error"] == "lmstudio: no answer"
 
 
 def test_open_starts_the_note_in_obsidian_first(server, runner, monkeypatch):

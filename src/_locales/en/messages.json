@@ -373,6 +373,15 @@
   "modelAdvice": {
     "message": "Good: a vision model (LM Studio calls it vlm) with 32768 tokens of context or more. Poor: a Whisper or embedding model, which cannot write at all; a model under 32768 tokens, which runs out mid-transcript; a heavily quantised one, which is eight times slower here."
   },
+  "checkModel": {
+    "message": "Check the model"
+  },
+  "checkModelHelp": {
+    "message": "Asks the backend now, with what stands here: whether the server answers, whether it takes the key, and whether the model reads pictures. Better to find out here than in the middle of a run."
+  },
+  "checking": {
+    "message": "asking the backend…"
+  },
   "modelDefault": {
     "message": "the backend's default"
   },

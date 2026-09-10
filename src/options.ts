@@ -45,6 +45,7 @@ const statsNote = pick<HTMLElement>('#stats-note');
 const benchModels = pick<HTMLElement>('#bench-models');
 const benchStatus = pick<HTMLElement>('#bench-status');
 const benchResult = pick<HTMLElement>('#bench-result');
+const checkResult = pick<HTMLElement>('#check-result');
 
 // Every key of config.json this page edits, by element. A select takes
 // its choices from the service, so a value added there shows up here
@@ -304,19 +305,40 @@ function light(id: string, name: string, state?: Light): void {
   item.replaceChildren(what, detail);
 }
 
-async function loadHealth(): Promise<void> {
+async function loadHealth(): Promise<Health | undefined> {
   try {
     const health = await request<Health>(connection(), 'GET', '/health');
     light('service', t('lightService'), health.service);
     light('llm', t('lightLlm'), health.llm);
     light('stt', t('lightStt'), health.stt);
     light('capabilities', t('lightCapabilities'), health.capabilities);
+    return health;
   } catch (error) {
     light('service', t('lightService'), { ok: false, detail: message(error) });
     light('llm', t('lightLlm'));
     light('stt', t('lightStt'));
     light('capabilities', t('lightCapabilities'));
+    checkResult.textContent = message(error);
+    checkResult.className = 'status bad';
+    return undefined;
   }
+}
+
+// Ask the backend now, with what stands in the fields, instead of finding
+// out in the middle of a run: the service answers `GET /health` by asking
+// the server for its models, which a refused key fails.
+async function checkBackend(): Promise<void> {
+  checkResult.textContent = t('checking');
+  checkResult.className = 'status';
+  const backend = field('llm').value;
+  for (const key of ['llm', 'model', ...(BACKEND_FIELDS[backend] ?? [])]) {
+    await saveOne(key);
+  }
+  const [, health] = await Promise.all([loadModels(), loadHealth()]);
+  if (!health) return;
+  const able = health.capabilities;
+  checkResult.textContent = able && !able.ok ? able.detail : health.llm.detail;
+  checkResult.className = health.llm.ok ? 'status' : 'status bad';
 }
 
 async function loadService(): Promise<void> {
@@ -391,19 +413,30 @@ async function load(): Promise<void> {
   await loadService();
 }
 
+// What the language model hangs on: a change to one of these makes the
+// lights stale, so they are asked again right away.
+const MODEL_FIELDS = new Set([
+  'llm',
+  'model',
+  ...Object.values(BACKEND_FIELDS).flat(),
+]);
+
 // Every field saves itself when it is left; a select saves on change.
 for (const key of Object.keys(FIELDS)) {
   const element = field(key);
   const event = element instanceof HTMLSelectElement ? 'change' : 'blur';
   element.addEventListener(event, () => {
-    void saveOne(key);
-    if (key === 'llm') {
-      showBackendFields();
-      void loadModels();
-    }
-    if (key === 'stt') showBackendFields();
+    void saveOne(key).then(() => {
+      if (key === 'llm') void loadModels();
+      // After the save, never before it: the service reads the stored
+      // values, so a key checked too early is the one from yesterday.
+      if (MODEL_FIELDS.has(key)) void loadHealth();
+    });
+    if (key === 'llm' || key === 'stt') showBackendFields();
   });
 }
+
+pick('#check-backend').addEventListener('click', () => void checkBackend());
 
 // The model select writes into the hidden field the settings read; the
 // last entry hands over to that field for a name the server does not

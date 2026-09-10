@@ -337,6 +337,48 @@ def test_openai_without_a_key_and_a_local_server_without_a_model_are_named(
     assert llm.models(settings_for(tmp_path)) == ["sonnet", "opus", "haiku"]
 
 
+def test_a_refused_key_names_the_setting_and_is_not_asked_twice(tmp_path, monkeypatch):
+    """What the owner met on 2026-09-10: `Unauthorized`, asked twice over,
+    with nothing in it about where the key is kept."""
+    import openai
+
+    tries = []
+
+    def unauthorised():
+        raise openai.OpenAIError(
+            "Error code: 401 - {'code': 'unauthorized', 'message': 'Unauthorized'}"
+        )
+
+    class Refusing:
+        """A server that turns down the key, on the chat as on the list of
+        models: the second is what the check before a job asks."""
+
+        def __init__(self, api_key=None, base_url=None, timeout=None):
+            class Completions:
+                def create(self, **request):
+                    tries.append(request)
+                    unauthorised()
+
+            self.chat = SimpleNamespace(completions=Completions())
+            self.models = SimpleNamespace(list=unauthorised)
+
+    monkeypatch.setattr(openai, "OpenAI", Refusing)
+    settings = settings_for(
+        tmp_path, llm="openai", openai_api_key="sk-wrong", model="gpt-5-mini"
+    )
+
+    with pytest.raises(LlmError) as caught:
+        llm.complete("i", "d", {}, settings)
+
+    said = str(caught.value)
+    assert "did not accept the key" in said
+    assert "openai_api_key" in said
+    assert "after" not in said  # a wrong key stays wrong; no second try
+    assert len(tries) == 1
+    # The same words reach the check the options page runs before a job.
+    assert "did not accept the key" in (llm.check(settings) or "")
+
+
 def test_status_is_one_line_for_the_popup(tmp_path, fake_openai, monkeypatch):
     monkeypatch.setattr(llm, "claude_binary", lambda: "C:/bin/claude.exe")
     monkeypatch.setattr(llm, "capabilities", lambda settings: UNKNOWN)
