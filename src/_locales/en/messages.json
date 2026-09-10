@@ -137,6 +137,15 @@
   "noServiceHelp": {
     "message": "Start it in a terminal, then press Connect in the settings:"
   },
+  "noAccess": {
+    "message": "No access to the local service yet."
+  },
+  "noAccessHelp": {
+    "message": "video-tldr talks to a service on your own machine, at 127.0.0.1. Nothing else is reached. Allow it once, and this window keeps working."
+  },
+  "grantAccess": {
+    "message": "Allow access"
+  },
   "noServiceCommand": {
     "message": "video-tldr serve"
   },
