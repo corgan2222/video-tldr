@@ -34,7 +34,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$PSNativeCommandUseErrorActionPreference = $false
+# Windows PowerShell 5.1 is what a fresh machine has, and it still offers
+# TLS 1.0 by default on an untouched install; GitHub answers only 1.2 and
+# up, so the download fails with a closed connection and no reason given.
+[Net.ServicePointManager]::SecurityProtocol =
+    [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+# Invoke-WebRequest draws a progress bar per chunk in 5.1, which costs more
+# than the transfer.
+$ProgressPreference = 'SilentlyContinue'
 
 $PackageName = 'video-tldr-service'
 
