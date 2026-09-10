@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The whole history, not just the tip: a key that was committed and
           # removed again is still a key that leaked.
@@ -55,11 +55,11 @@ jobs:
       python: ${{ steps.filter.outputs.python }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: dorny/paths-filter@v4
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           filters: |
@@ -77,6 +77,17 @@ jobs:
               # icons are as much the extension as the TypeScript beside them,
               # and a change to them must not report "nothing here to check".
               - 'src/**'
+              # Tests under tests/ read files outside TypeScript and bind
+              # their wording: install.test.ts reads the stop answers out of
+              # serve.py and the action pins out of every workflow,
+              # version.test.ts reads the hook order out of the pre-commit
+              # config. Without these paths a change there passes its own PR
+              # green and turns a later, unrelated TypeScript PR red
+              # (2026-09-10).
+              - 'service/src/video_tldr_service/serve.py'
+              - 'install.ps1'
+              - '.pre-commit-config.yaml'
+              - '.github/workflows/**'
             python:
               - 'service/**'
               - 'scripts/**'
@@ -91,12 +102,12 @@ jobs:
     # is a required check on main -- a pull request would sit blocked forever
     # waiting for a verdict that never comes.
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.changes.outputs.typescript == 'true'
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         if: needs.changes.outputs.typescript == 'true'
         with:
           node-version: '22'
@@ -135,12 +146,12 @@ jobs:
         working-directory: service
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.changes.outputs.python == 'true'
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         if: needs.changes.outputs.python == 'true'
 
       - name: Install the service and its checkers
