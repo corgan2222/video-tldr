@@ -117,7 +117,9 @@ function iconButton(
 
 function renderJob(job: Job, now: Date): HTMLElement {
   const box = element('div', undefined, 'job');
-  box.append(element('h2', job.title ?? job.id));
+  const title = element('h3', job.title ?? job.id);
+  title.title = job.title ?? job.id;
+  box.append(title);
   const facts = [
     t(job.status),
     job.status === 'queued' && job.position
@@ -127,7 +129,7 @@ function renderJob(job: Job, now: Date): HTMLElement {
     job.model,
     job.stt ? `${t('transcriber')} ${job.stt}` : null,
   ].filter(Boolean) as string[];
-  box.append(element('div', facts.join(' · '), 'note'));
+  box.append(element('div', facts.join(' · '), 'facts'));
 
   const list = element('ul', undefined, 'steps');
   for (const view of stepViews(job, stats, now)) {
@@ -135,14 +137,16 @@ function renderJob(job: Job, now: Date): HTMLElement {
     const mark = { done: '✓', running: '▶', pending: '·', failed: '✗' }[
       view.state
     ];
-    item.append(element('span', `${mark} ${t(view.labelKey)}`));
+    const left = element('span');
+    left.append(element('span', mark, 'mark'), t(view.labelKey));
+    item.append(left);
     const seconds =
       view.seconds === null
         ? ''
         : view.state === 'pending'
           ? `~${formatSeconds(view.seconds)}`
           : formatSeconds(view.seconds);
-    item.append(element('span', seconds));
+    item.append(element('span', seconds, 'secs'));
     list.append(item);
   }
   box.append(list);
@@ -154,7 +158,7 @@ function renderJob(job: Job, now: Date): HTMLElement {
       element(
         'div',
         left === null ? t('noEstimate') : t('aboutLeft', formatSeconds(left)),
-        'note',
+        'facts',
       ),
     );
     const row = element('div', undefined, 'row');
@@ -186,7 +190,7 @@ function renderJob(job: Job, now: Date): HTMLElement {
         : null,
       job.usd ? `${job.usd.toFixed(3)} USD` : null,
     ].filter(Boolean) as string[];
-    box.append(element('div', cost.join(' · '), 'note'));
+    box.append(element('div', cost.join(' · '), 'facts'));
     const row = element('div', undefined, 'row');
     if (job.written?.obsidian) {
       row.append(
@@ -201,9 +205,11 @@ function renderJob(job: Job, now: Date): HTMLElement {
       }),
     );
     box.append(row);
+    const files = element('div', undefined, 'files');
     for (const [kind, path] of Object.entries(job.written ?? {})) {
-      box.append(element('div', `${kind}: ${path}`, 'note'));
+      files.append(element('div', `${kind}: ${path}`));
     }
+    box.append(files);
   }
   return box;
 }
@@ -212,10 +218,10 @@ async function ask(what: object): Promise<unknown> {
   const reply = (await api.runtime.sendMessage(what)) as
     { error?: string } | undefined;
   if (reply?.error) {
-    status.textContent = reply.error;
+    say(reply.error, true);
     throw new Error(reply.error);
   }
-  status.textContent = '';
+  say('');
   await refresh();
   return reply;
 }
@@ -223,11 +229,12 @@ async function ask(what: object): Promise<unknown> {
 function table(head: string[], rows: string[][]): HTMLTableElement {
   const node = document.createElement('table');
   const header = node.insertRow();
-  for (const text of head) {
-    header.append(
-      Object.assign(document.createElement('th'), { textContent: text }),
-    );
-  }
+  head.forEach((text, index) => {
+    const cell = document.createElement('th');
+    cell.textContent = text;
+    if (index > 0) cell.className = 'n';
+    header.append(cell);
+  });
   for (const cells of rows) {
     const row = node.insertRow();
     cells.forEach((text, index) => {
@@ -241,7 +248,7 @@ function table(head: string[], rows: string[][]): HTMLTableElement {
 
 function showStats(): void {
   if (stats.runs === 0) {
-    statsBox.replaceChildren(element('p', t('statsEmpty'), 'note'));
+    statsBox.replaceChildren(element('p', t('statsEmpty'), 'help'));
     return;
   }
   statsBox.replaceChildren(
@@ -285,7 +292,7 @@ async function refresh(): Promise<void> {
         offline(true);
         return;
       }
-      if (id !== currentId) status.textContent = message(error);
+      if (id !== currentId) say(message(error), true);
     }
   }
   offline(false);
@@ -324,7 +331,7 @@ async function start(profile: Profile): Promise<void> {
   // until the first await, so nothing may run before it.
   const granted = await api.permissions.request({ origins: [HOST_PATTERN] });
   if (!granted) {
-    status.textContent = 'No permission to reach 127.0.0.1.';
+    say('No permission to reach 127.0.0.1.', true);
     return;
   }
   try {
@@ -341,12 +348,20 @@ async function start(profile: Profile): Promise<void> {
   }
 }
 
+// A dot with the name beside it; the detail is the tooltip, and a red
+// one puts its reason in the status line, where it can be read.
 function light(id: string, name: string, state?: Light): void {
   const dot = pick<HTMLElement>(`#light-${id}`);
   dot.className = `light ${state ? (state.ok ? 'ok' : 'bad') : 'unknown'}`;
   dot.title = state?.detail ?? t('notChecked');
-  dot.textContent = name;
-  if (state && !state.ok) status.textContent = state.detail;
+  const what = element('span', name, 'what');
+  dot.replaceChildren(what);
+  if (state && !state.ok) say(state.detail, true);
+}
+
+function say(text: string, bad = false): void {
+  status.textContent = text;
+  status.className = bad ? 'status bad' : 'status';
 }
 
 async function showLights(): Promise<void> {
@@ -358,7 +373,7 @@ async function showLights(): Promise<void> {
     // A model that takes no images or has too small a context: the run
     // would fail late, so the reason belongs here, before the click.
     if (health.capabilities && !health.capabilities.ok) {
-      status.textContent = health.capabilities.detail;
+      say(health.capabilities.detail, true);
     }
   } catch (error) {
     offline(error instanceof NoServiceError);
@@ -383,7 +398,7 @@ async function load(): Promise<void> {
     buttons.fast.disabled = false;
     buttons.thorough.disabled = false;
   } else {
-    status.textContent = t('popupOpenVideo');
+    say(t('popupOpenVideo'));
   }
 
   try {
@@ -419,14 +434,14 @@ logDetails.addEventListener('toggle', () => void refresh());
 statsDetails.addEventListener('toggle', showStats);
 pick('#copy-command').addEventListener('click', async () => {
   await navigator.clipboard.writeText(t('noServiceCommand'));
-  status.textContent = t('copied');
+  say(t('copied'));
 });
 // The language of the note is changed often, so it is saved right here.
 languageBox.addEventListener('change', () => {
   void request(connection, 'PUT', '/config', {
     language: languageBox.value,
   }).catch((error: unknown) => {
-    status.textContent = message(error);
+    say(message(error), true);
   });
 });
 

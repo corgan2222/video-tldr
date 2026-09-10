@@ -191,23 +191,15 @@ export interface BenchRow {
   error?: string;
 }
 
-// What each backend is, for the options page; the recommended model
+// What each backend is: the message key its explanation lives under, so
+// the text is translated like every other one. The recommended model
 // comes from the service (config.default_models).
-export const BACKEND_INFO: Record<string, string> = {
-  claude:
-    'The Claude Code CLI on your subscription: no key, no extra bill. ' +
-    'Best at pictures and links. Recommended.',
-  anthropic:
-    'The Anthropic API, paid per token, needs the key below. Same models ' +
-    'as claude, without the subscription.',
-  openai: 'The OpenAI API, paid per token, needs the key below.',
-  lmstudio:
-    'Your own model in LM Studio, free and offline. Load it with a context ' +
-    'of 32768 or more, and pick a model that takes images if you want ' +
-    'labelled pictures.',
-  ollama:
-    'Your own model in Ollama, free and offline. Pick a chat model below ' +
-    'and give it a context of 32768 or more.',
+export const BACKEND_HELP: Record<string, string> = {
+  claude: 'helpBackendClaude',
+  anthropic: 'helpBackendAnthropic',
+  openai: 'helpBackendOpenai',
+  lmstudio: 'helpBackendLmstudio',
+  ollama: 'helpBackendOllama',
 };
 
 // Which extra fields a backend needs; the options page shows only those.

@@ -64,13 +64,11 @@ from urllib.parse import parse_qs, quote
 
 from . import __version__, llm
 from .config import (
+    CHOICES,
     FORMATS,
-    LANGUAGES,
-    LLM_BACKENDS,
     MASK,
     PROFILES,
     SECRETS,
-    STT_ENGINES,
     STT_MODELS,
     ConfigError,
     Settings,
@@ -141,6 +139,26 @@ def pick(kind: str, start: str = "") -> str:
     finally:
         root.destroy()
     return chosen or ""
+
+
+def capability_light(found: dict) -> dict:
+    """`capabilities` says what a model can do; the pages want a green or
+    a red light and a reason. Green when it reads pictures and holds
+    enough context, red with the reason when not, and green with a note
+    when the server did not say."""
+    reasons = []
+    if found.get("vision") is False:
+        reasons.append("takes no pictures, so they stay unlabelled")
+    context = found.get("context")
+    if context is not None and context < llm.MIN_CONTEXT:
+        reasons.append(
+            f"context {context} tokens is below {llm.MIN_CONTEXT}, "
+            "the transcript and the model's own thinking will not fit"
+        )
+    detail = found.get("detail", "")
+    if reasons:
+        return {"ok": False, "detail": f"{detail} — {'; '.join(reasons)}"}
+    return {"ok": True, "detail": detail, **found}
 
 
 def browser_found() -> str:
@@ -222,12 +240,10 @@ class Service:
         settings = self.settings()
         return {
             "settings": settings.shown(),
-            "choices": {
-                "llm": LLM_BACKENDS,
-                "stt": STT_ENGINES,
-                "formats": FORMATS,
-                "language": list(LANGUAGES),
-            },
+            # Every knob the pages offer as a list, so a value added here
+            # shows up in the extension without a release of it. `formats`
+            # is the one that is not a single choice but a comma list.
+            "choices": {**{k: list(v) for k, v in CHOICES.items()}, "formats": FORMATS},
             # Speed class, error rate and languages per transcriber, for
             # the options page to label the choice with.
             "stt_models": STT_MODELS,
@@ -257,7 +273,7 @@ class Service:
             },
             "llm": llm.status(settings),
             "stt": stt_status(settings),
-            "capabilities": capabilities(settings),
+            "capabilities": capability_light(capabilities(settings)),
         }
 
     def models(self, backend: str | None = None) -> list[str]:

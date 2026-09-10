@@ -3,166 +3,84 @@
   <head>
     <meta charset="utf-8" />
     <title>video-tldr</title>
+    <link rel="stylesheet" href="ui.css" />
     <style>
-      /* The browser's own scheme: about:addons embeds this page, and a
-         white box inside a dark browser is what the owner saw first. */
-      :root {
-        color-scheme: light dark;
-      }
       body {
-        font: 13px sans-serif;
-        margin: 0;
-        padding: 12px;
-        min-width: 420px;
-        max-width: 780px;
-        background: Canvas;
-        color: CanvasText;
+        max-width: 720px;
+        margin: 0 auto;
       }
-      header {
-        display: flex;
-        align-items: center;
-        gap: 10px;
+      .brand img {
+        width: auto;
+        height: 40px;
       }
-      header img {
-        height: 32px;
+      /* The logo comes in two versions; the browser's scheme picks one. */
+      .brand .dark {
+        display: none;
       }
-      h1 {
-        font-size: 16px;
-        margin: 0;
+      @media (prefers-color-scheme: dark) {
+        .brand .light {
+          display: none;
+        }
+        .brand .dark {
+          display: block;
+        }
       }
-      .tagline {
-        font-size: 12px;
-        opacity: 0.6;
-        margin: 0;
+      .side-by-side {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 var(--gap-l);
       }
-      h2 {
-        font-size: 14px;
-        margin: 18px 0 4px;
-        padding-bottom: 2px;
-        border-bottom: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
-      }
-      h3 {
-        font-size: 13px;
-        margin: 16px 0 0;
-      }
-      fieldset {
-        border: 0;
-        padding: 0;
-        margin: 0;
-      }
-      label {
-        display: block;
-        margin: 12px 0 4px;
-        font-weight: bold;
-      }
-      textarea,
-      input[type='text'],
-      input[type='url'],
-      input[type='number'],
-      input[type='password'],
-      select {
-        width: 100%;
-        box-sizing: border-box;
-        font: 12px monospace;
-      }
-      .row {
-        margin-top: 8px;
-        display: flex;
-        gap: 8px;
-        align-items: center;
-      }
-      .row input {
-        flex: 1;
-      }
-      #formats label,
-      #bench-models label {
-        display: inline-block;
-        font-weight: normal;
-        margin-right: 12px;
-      }
-      .note {
-        opacity: 0.75;
-      }
-      code {
-        font-family: monospace;
-        background: color-mix(in srgb, CanvasText 10%, transparent);
-        padding: 1px 4px;
-        border-radius: 3px;
-      }
-      .lights {
-        list-style: none;
-        margin: 8px 0;
-        padding: 0;
-      }
-      .lights li {
-        margin: 3px 0;
-      }
-      .light::before {
-        content: '●';
-        margin-right: 6px;
-      }
-      .light.ok::before {
-        color: #188038;
-      }
-      .light.bad::before {
-        color: #d93025;
-      }
-      .light.unknown::before {
-        color: #9aa0a6;
-      }
-      table {
-        border-collapse: collapse;
-        font-size: 12px;
-        margin-top: 6px;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 2px 10px 2px 0;
-      }
-      td.n {
-        text-align: right;
-      }
-      #no-service {
-        border: 1px solid #d93025;
-        border-radius: 4px;
-        padding: 6px 8px;
-        margin: 8px 0;
+      @media (max-width: 560px) {
+        .side-by-side {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
   <body>
-    <header>
-      <img src="icons/128.png" alt="" />
+    <div class="brand">
+      <img class="light" src="logo-light.png" alt="video-tldr" />
+      <img class="dark" src="logo-dark.png" alt="video-tldr" />
       <div>
-        <h1>video-tldr</h1>
         <p class="tagline" data-i18n="tagline"></p>
       </div>
-    </header>
+    </div>
 
-    <h2 data-i18n="summaryHeading"></h2>
-    <label for="service-url" data-i18n="serviceUrl"></label>
-    <input id="service-url" type="url" placeholder="http://127.0.0.1:8765" />
-    <label for="token" data-i18n="token"></label>
-    <input
-      id="token"
-      type="password"
-      autocomplete="off"
-      data-i18n-placeholder="tokenPlaceholder"
-    />
+    <h2 data-i18n="connect"></h2>
+    <div class="side-by-side">
+      <div class="field">
+        <label for="service-url" data-i18n="serviceUrl"></label>
+        <input
+          id="service-url"
+          type="url"
+          placeholder="http://127.0.0.1:8765"
+        />
+      </div>
+      <div class="field">
+        <label for="token" data-i18n="token"></label>
+        <input
+          id="token"
+          type="password"
+          autocomplete="off"
+          data-i18n-placeholder="tokenPlaceholder"
+        />
+      </div>
+    </div>
     <div class="row">
       <button id="connect" data-i18n="connect"></button>
-      <span id="service-status" class="note" data-i18n="notConnected"></span>
+      <span id="service-status" class="status" data-i18n="notConnected"></span>
     </div>
-    <div id="no-service" hidden>
-      <div><strong data-i18n="noService"></strong></div>
-      <div class="note" data-i18n="noServiceHelp"></div>
-      <div class="row">
+
+    <div id="no-service" class="box bad" hidden style="margin-top: 12px">
+      <strong data-i18n="noService"></strong>
+      <p class="help" data-i18n="noServiceHelp"></p>
+      <div class="row" style="margin-top: 8px">
         <code id="start-command"></code>
         <button id="copy-command" data-i18n="copyCommand"></button>
       </div>
     </div>
-    <ul class="lights">
+
+    <ul class="lights" style="margin-top: 12px">
       <li id="light-service" class="light unknown"></li>
       <li id="light-llm" class="light unknown"></li>
       <li id="light-stt" class="light unknown"></li>
@@ -170,58 +88,83 @@
     </ul>
 
     <fieldset id="service-settings">
-      <label for="language" data-i18n="languageOfNote"></label>
-      <select id="language"></select>
-      <p class="note" data-i18n="languageHelp"></p>
-      <label for="style" data-i18n="style"></label>
-      <select id="style"></select>
-      <p class="note" data-i18n="styleHelp"></p>
-      <label data-i18n="outputs"></label>
-      <div id="formats"></div>
-      <label for="download-dir" data-i18n="downloadDir"></label>
-      <div class="row">
-        <input id="download-dir" type="text" />
-        <button id="pick-download" type="button" data-i18n="browse"></button>
+      <h2 data-i18n="summaryHeading"></h2>
+      <div class="side-by-side">
+        <div class="field">
+          <label for="language" data-i18n="languageOfNote"></label>
+          <select id="language"></select>
+          <p class="help" data-i18n="languageHelp"></p>
+        </div>
+        <div class="field">
+          <label for="style" data-i18n="style"></label>
+          <select id="style"></select>
+          <p class="help" data-i18n="styleHelp"></p>
+        </div>
       </div>
-      <p class="note" data-i18n="downloadDirHelp"></p>
-      <label for="obsidian-vault" data-i18n="obsidianVault"></label>
-      <div class="row">
-        <input id="obsidian-vault" type="text" />
-        <button id="pick-vault" type="button" data-i18n="browse"></button>
+      <div class="field">
+        <label data-i18n="outputs"></label>
+        <div id="formats" class="checks"></div>
       </div>
-      <label for="obsidian-folder" data-i18n="obsidianFolder"></label>
-      <input id="obsidian-folder" type="text" placeholder="Videos" />
-      <label for="browser" data-i18n="browserForPdf"></label>
-      <div class="row">
-        <input id="browser" type="text" />
-        <button id="pick-browser" type="button" data-i18n="browse"></button>
+      <div class="field">
+        <label for="download-dir" data-i18n="downloadDir"></label>
+        <div class="row">
+          <input id="download-dir" type="text" />
+          <button id="pick-download" type="button" data-i18n="browse"></button>
+        </div>
+        <p class="help" data-i18n="downloadDirHelp"></p>
       </div>
-      <p class="note" data-i18n="browserHelp"></p>
-      <label for="pdf-template" data-i18n="pdfTemplate"></label>
-      <div class="row">
-        <input id="pdf-template" type="text" />
-        <button id="pick-template" type="button" data-i18n="browse"></button>
+      <div class="side-by-side">
+        <div class="field">
+          <label for="obsidian-vault" data-i18n="obsidianVault"></label>
+          <div class="row">
+            <input id="obsidian-vault" type="text" />
+            <button id="pick-vault" type="button" data-i18n="browse"></button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="obsidian-folder" data-i18n="obsidianFolder"></label>
+          <input id="obsidian-folder" type="text" placeholder="Videos" />
+        </div>
       </div>
-      <p class="note" data-i18n="pdfTemplateHelp"></p>
+      <div class="field">
+        <label for="browser" data-i18n="browserForPdf"></label>
+        <div class="row">
+          <input id="browser" type="text" />
+          <button id="pick-browser" type="button" data-i18n="browse"></button>
+        </div>
+        <p class="help" data-i18n="browserHelp"></p>
+      </div>
+      <div class="field">
+        <label for="pdf-template" data-i18n="pdfTemplate"></label>
+        <div class="row">
+          <input id="pdf-template" type="text" />
+          <button id="pick-template" type="button" data-i18n="browse"></button>
+        </div>
+        <p class="help" data-i18n="pdfTemplateHelp"></p>
+      </div>
 
       <h2 data-i18n="modelHeading"></h2>
-      <p class="note" data-i18n="modelHelp"></p>
-      <label for="llm" data-i18n="backend"></label>
-      <select id="llm"></select>
-      <p class="note" id="backend-info"></p>
-      <div data-field="anthropic_api_key">
+      <p class="help" data-i18n="modelHelp"></p>
+      <div class="field" style="margin-top: 12px">
+        <label for="llm" data-i18n="backend"></label>
+        <select id="llm"></select>
+        <p class="help" id="backend-info"></p>
+      </div>
+      <div class="field" data-field="anthropic_api_key">
         <label for="anthropic-api-key">Anthropic API key</label>
         <input id="anthropic-api-key" type="password" autocomplete="off" />
+        <p class="help" data-i18n="keyNote"></p>
       </div>
-      <div data-field="openai_api_key">
+      <div class="field" data-field="openai_api_key">
         <label for="openai-api-key">OpenAI API key</label>
         <input id="openai-api-key" type="password" autocomplete="off" />
+        <p class="help" data-i18n="keyNote"></p>
       </div>
-      <div data-field="openai_base_url">
+      <div class="field" data-field="openai_base_url">
         <label for="openai-base-url">OpenAI base URL</label>
         <input id="openai-base-url" type="text" />
       </div>
-      <div data-field="lmstudio_url">
+      <div class="field" data-field="lmstudio_url">
         <label for="lmstudio-url">LM Studio URL</label>
         <input
           id="lmstudio-url"
@@ -229,7 +172,7 @@
           placeholder="http://localhost:1234/v1"
         />
       </div>
-      <div data-field="ollama_url">
+      <div class="field" data-field="ollama_url">
         <label for="ollama-url">Ollama URL</label>
         <input
           id="ollama-url"
@@ -237,49 +180,65 @@
           placeholder="http://localhost:11434/v1"
         />
       </div>
-      <p class="note" id="key-note" data-i18n="keyNote"></p>
-      <label for="model" data-i18n="model"></label>
-      <input id="model" type="text" list="models" autocomplete="off" />
-      <datalist id="models"></datalist>
-      <span id="model-hint" class="note"></span>
+      <div class="field">
+        <label for="model-choice" data-i18n="model"></label>
+        <select id="model-choice"></select>
+        <input id="model" type="text" hidden autocomplete="off" />
+        <p class="help" id="model-hint"></p>
+        <p class="help" data-i18n="modelAdvice"></p>
+      </div>
 
       <h2 data-i18n="sttHeading"></h2>
-      <p class="note" data-i18n="sttHelp"></p>
-      <label for="stt" data-i18n="transcriber"></label>
-      <select id="stt"></select>
+      <div class="field">
+        <label for="stt" data-i18n="transcriber"></label>
+        <select id="stt"></select>
+        <p class="help" data-i18n="sttHelp"></p>
+      </div>
     </fieldset>
 
-    <h2 data-i18n="statsHeading"></h2>
-    <p class="note" id="stats-note" data-i18n="statsHelp"></p>
+    <h2 data-i18n="history"></h2>
+    <p class="help" id="stats-note" data-i18n="historyHelp"></p>
     <div id="stats"></div>
 
     <h2 data-i18n="benchHeading"></h2>
-    <p class="note" data-i18n="benchHelp"></p>
-    <label for="bench-url" data-i18n="benchUrl"></label>
-    <input id="bench-url" type="url" placeholder="https://youtu.be/…" />
-    <label data-i18n="benchModels"></label>
-    <div id="bench-models" class="note"></div>
-    <label for="bench-repeat" data-i18n="benchRepeat"></label>
-    <input id="bench-repeat" type="number" min="1" max="5" value="1" />
+    <p class="help" data-i18n="benchHelp"></p>
+    <div class="field" style="margin-top: 12px">
+      <label for="bench-url" data-i18n="benchUrl"></label>
+      <input id="bench-url" type="url" placeholder="https://youtu.be/…" />
+    </div>
+    <div class="field">
+      <label data-i18n="benchModels"></label>
+      <div id="bench-models" class="checks"></div>
+    </div>
+    <div class="side-by-side">
+      <div class="field">
+        <label for="bench-repeat" data-i18n="benchRepeat"></label>
+        <input id="bench-repeat" type="number" min="1" max="5" value="1" />
+      </div>
+    </div>
     <div class="row">
       <button id="bench-start" data-i18n="benchStart"></button>
-      <span id="bench-status" class="note"></span>
+      <span id="bench-status" class="status"></span>
     </div>
     <div id="bench-result"></div>
 
     <h2 data-i18n="linksHeading"></h2>
-    <label for="blocklist" data-i18n="blocklist"></label>
-    <textarea id="blocklist" rows="10"></textarea>
-    <label for="seen" data-i18n="seen"></label>
-    <textarea id="seen" rows="8" readonly></textarea>
-    <div class="row">
-      <span id="seen-count"></span>
-      <button id="clear" data-i18n="forgetAll"></button>
+    <div class="field">
+      <label for="blocklist" data-i18n="blocklist"></label>
+      <textarea id="blocklist" rows="8"></textarea>
+    </div>
+    <div class="field">
+      <label for="seen" data-i18n="seen"></label>
+      <textarea id="seen" rows="6" readonly></textarea>
+      <div class="row" style="margin-top: 8px">
+        <span id="seen-count" class="help" style="border: 0; padding: 0"></span>
+        <button id="clear" data-i18n="forgetAll"></button>
+      </div>
     </div>
 
-    <div class="row">
-      <button id="save" data-i18n="save"></button>
-      <span id="status"></span>
+    <div class="row" style="margin: 24px 0 8px">
+      <button id="save" class="primary" data-i18n="save"></button>
+      <span id="status" class="status"></span>
     </div>
     <script type="module" src="options.js"></script>
   </body>

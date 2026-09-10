@@ -522,11 +522,30 @@ def test_health_says_not_checked_while_the_backend_cannot_tell(server, monkeypat
     code, answer = call(server, "GET", "/health")
 
     assert code == 200
-    assert answer["capabilities"] == {
-        "vision": None,
-        "context": None,
-        "detail": "not checked",
-    }
+    # Nothing known is not a red light: the run may well work.
+    assert answer["capabilities"]["ok"] is True
+    assert answer["capabilities"]["detail"] == "not checked"
+
+
+def test_the_capability_light_turns_red_with_the_reason_in_it(server, monkeypatch):
+    def blind(settings):
+        return {"vision": False, "context": 8192, "detail": "tiny-7b"}
+
+    monkeypatch.setattr(module.llm, "capabilities", blind)
+
+    _, answer = call(server, "GET", "/health")
+
+    assert answer["capabilities"]["ok"] is False
+    detail = answer["capabilities"]["detail"]
+    assert "takes no pictures" in detail
+    assert "context 8192 tokens is below 32768" in detail
+
+    monkeypatch.setattr(
+        module.llm,
+        "capabilities",
+        lambda settings: {"vision": True, "context": 32768, "detail": "big"},
+    )
+    assert call(server, "GET", "/health")[1]["capabilities"]["ok"] is True
 
 
 def test_pick_opens_a_dialog_on_this_desktop_and_returns_the_path(server, monkeypatch):

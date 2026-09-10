@@ -3,214 +3,158 @@
   <head>
     <meta charset="utf-8" />
     <title>video-tldr</title>
+    <link rel="stylesheet" href="ui.css" />
     <style>
-      :root {
-        color-scheme: light dark;
-      }
       body {
-        font: 13px sans-serif;
-        margin: 0;
-        padding: 10px 12px;
-        width: 400px;
-        background: Canvas;
-        color: CanvasText;
+        width: 420px;
+        padding: 12px;
       }
-      header {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-      }
-      h1 {
-        font-size: 15px;
-        margin: 0;
-      }
-      .tagline {
-        font-size: 11px;
-        opacity: 0.6;
-        margin: 0 0 6px;
-      }
-      a {
-        color: LinkText;
-        cursor: pointer;
-      }
+      /* Two lines at most, then an ellipsis: a YouTube title is long. */
       #video {
-        font-weight: bold;
-        margin: 6px 0;
-        white-space: nowrap;
+        font-weight: 600;
+        font-size: 14px;
+        line-height: 1.35;
+        margin: 0 0 var(--gap);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
         overflow: hidden;
-        text-overflow: ellipsis;
       }
-      .row {
+      .lights.compact {
         display: flex;
-        gap: 8px;
-        align-items: center;
-        flex-wrap: wrap;
+        gap: var(--gap-l);
+        margin-bottom: var(--gap);
       }
-      button {
-        font: inherit;
-        padding: 4px 12px;
-      }
-      button.icon {
-        padding: 4px 8px;
-      }
-      label.check {
-        font-weight: normal;
-        white-space: nowrap;
-      }
-      .note {
-        opacity: 0.75;
-        font-size: 12px;
-        margin: 4px 0;
-      }
-      #lights span {
-        margin-right: 10px;
-        cursor: help;
-      }
-      .light::before {
-        content: '●';
-        margin-right: 4px;
-      }
-      .light.ok::before {
-        color: #188038;
-      }
-      .light.bad::before {
-        color: #d93025;
-      }
-      .light.unknown::before {
-        color: #9aa0a6;
+      .lights.compact .light .what {
+        font-weight: 400;
+        color: var(--muted);
       }
       .job {
-        margin-top: 10px;
-        padding-top: 8px;
-        border-top: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+        border-top: 1px solid var(--line);
+        padding-top: var(--gap);
+        margin-top: var(--gap);
       }
-      .job h2 {
+      .job h3 {
         font-size: 13px;
-        margin: 0 0 4px;
+        font-weight: 600;
+        margin: 0 0 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .facts {
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: var(--gap);
+        overflow-wrap: anywhere;
       }
       .steps {
         list-style: none;
-        margin: 4px 0;
+        margin: 0 0 var(--gap);
         padding: 0;
         font-size: 12px;
       }
       .steps li {
         display: flex;
         justify-content: space-between;
-        padding: 1px 0;
+        gap: var(--gap);
+        padding: 2px 0;
+      }
+      .steps .mark {
+        flex: none;
+        width: 1em;
+        display: inline-block;
+      }
+      .steps .secs {
+        flex: none;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
       }
       .steps .pending {
-        opacity: 0.55;
+        color: var(--muted);
       }
       .steps .running {
-        font-weight: bold;
+        font-weight: 600;
       }
+      .steps .failed .mark,
       .steps .failed {
-        color: #d93025;
+        color: var(--bad);
       }
       .bar {
         height: 6px;
         border-radius: 3px;
-        background: color-mix(in srgb, CanvasText 15%, transparent);
+        background: var(--sunken);
         overflow: hidden;
-        margin: 6px 0 2px;
+        margin-bottom: 4px;
       }
       .bar > div {
         height: 100%;
-        background: #1a73e8;
+        background: var(--accent);
         transition: width 0.4s linear;
       }
+      .files {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 6px;
+      }
+      .files div {
+        overflow-wrap: anywhere;
+      }
       .error {
-        color: #d93025;
-        white-space: pre-wrap;
-      }
-      pre {
-        font: 11px monospace;
-        max-height: 160px;
-        overflow: auto;
-        margin: 4px 0 0;
-        padding: 4px;
-        background: color-mix(in srgb, CanvasText 6%, transparent);
-        white-space: pre-wrap;
-        word-break: break-all;
-      }
-      details {
-        margin-top: 10px;
-      }
-      summary {
-        cursor: pointer;
-        font-weight: bold;
-      }
-      table {
-        border-collapse: collapse;
+        color: var(--bad);
         font-size: 12px;
-        margin-top: 4px;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 1px 10px 1px 0;
-      }
-      td.n {
-        text-align: right;
-      }
-      #no-service {
-        border: 1px solid #d93025;
-        border-radius: 4px;
-        padding: 6px 8px;
-        margin: 8px 0;
-      }
-      code {
-        font-family: monospace;
-        background: color-mix(in srgb, CanvasText 10%, transparent);
-        padding: 1px 4px;
-        border-radius: 3px;
+        margin-bottom: var(--gap);
+        overflow-wrap: anywhere;
       }
     </style>
   </head>
   <body>
-    <header>
-      <h1>video-tldr</h1>
+    <div class="brand">
+      <img src="icons/48.png" alt="" />
+      <div>
+        <h1>video-tldr</h1>
+        <p class="tagline" data-i18n="tagline"></p>
+      </div>
+      <span class="spacer"></span>
       <a id="settings" data-i18n="settings"></a>
-    </header>
-    <p class="tagline" data-i18n="tagline"></p>
-    <div id="lights" class="note">
-      <span
-        id="light-service"
-        class="light unknown"
-        data-i18n="lightService"
-      ></span>
-      <span id="light-llm" class="light unknown" data-i18n="lightLlm"></span>
-      <span id="light-stt" class="light unknown" data-i18n="lightStt"></span>
     </div>
 
-    <div id="no-service" hidden>
-      <div><strong data-i18n="noService"></strong></div>
-      <div class="note" data-i18n="noServiceHelp"></div>
-      <div class="row">
+    <ul class="lights compact">
+      <li id="light-service" class="light unknown"></li>
+      <li id="light-llm" class="light unknown"></li>
+      <li id="light-stt" class="light unknown"></li>
+    </ul>
+
+    <div id="no-service" class="box bad" hidden>
+      <strong data-i18n="noService"></strong>
+      <p class="help" data-i18n="noServiceHelp"></p>
+      <div class="row" style="margin-top: 8px">
         <code id="start-command"></code>
         <button id="copy-command" data-i18n="copyCommand"></button>
       </div>
     </div>
 
-    <div id="video">…</div>
+    <p id="video">…</p>
+
     <div class="row">
-      <button id="fast" disabled data-i18n="fast"></button>
+      <button id="fast" class="primary" disabled data-i18n="fast"></button>
       <button id="thorough" disabled data-i18n="thorough"></button>
-      <label class="check" data-i18n-title="timestampsHelp">
+    </div>
+    <div class="checks" style="margin-top: 10px">
+      <label data-i18n-title="timestampsHelp">
         <input type="checkbox" id="timestamps" checked />
         <span data-i18n="timestamps"></span>
       </label>
-      <label class="check" data-i18n-title="condensedHelp">
+      <label data-i18n-title="condensedHelp">
         <input type="checkbox" id="condensed" />
         <span data-i18n="condensed"></span>
       </label>
-      <label class="check" data-i18n-title="cleanupHelp">
+      <label data-i18n-title="cleanupHelp">
         <input type="checkbox" id="cleanup" />
         <span data-i18n="cleanup"></span>
       </label>
     </div>
-    <div class="row" style="margin-top: 6px">
+    <div class="row" style="margin-top: 10px">
       <label class="check">
         <span data-i18n="language"></span>
         <select id="language"></select>
@@ -220,19 +164,19 @@
         <select id="style"></select>
       </label>
     </div>
-    <p class="note" data-i18n="profileHelp"></p>
+    <p class="help" data-i18n="profileHelp"></p>
 
     <div id="jobs"></div>
 
     <details id="stats-box">
-      <summary data-i18n="statsHeading"></summary>
+      <summary data-i18n="history"></summary>
       <div id="stats"></div>
     </details>
     <details id="log-box">
       <summary data-i18n="serviceLog"></summary>
       <pre id="log"></pre>
     </details>
-    <p id="status" class="note"></p>
+    <p id="status" class="status"></p>
     <script type="module" src="popup.js"></script>
   </body>
 </html>

@@ -1,95 +1,196 @@
 {
-  "extensionName": { "message": "video-tldr" },
-  "tagline": { "message": "Watch it. Vault it." },
-  "settings": { "message": "Einstellungen" },
-  "openAllLinks": { "message": "Alle Links öffnen" },
-  "sendToVideoTldr": { "message": "An video-tldr senden" },
-
-  "popupNoVideo": { "message": "Kein YouTube-Video in diesem Tab." },
-  "popupOpenVideo": { "message": "Zuerst ein YouTube-Video öffnen." },
-  "fast": { "message": "Schnell" },
-  "thorough": { "message": "Gründlich" },
-  "cancel": { "message": "Abbrechen" },
+  "extensionName": {
+    "message": "video-tldr"
+  },
+  "tagline": {
+    "message": "Watch it. Vault it."
+  },
+  "settings": {
+    "message": "Einstellungen"
+  },
+  "openAllLinks": {
+    "message": "Alle Links öffnen"
+  },
+  "sendToVideoTldr": {
+    "message": "An video-tldr senden"
+  },
+  "popupNoVideo": {
+    "message": "Kein YouTube-Video in diesem Tab."
+  },
+  "popupOpenVideo": {
+    "message": "Zuerst ein YouTube-Video öffnen."
+  },
+  "fast": {
+    "message": "Schnell"
+  },
+  "thorough": {
+    "message": "Gründlich"
+  },
+  "cancel": {
+    "message": "Abbrechen"
+  },
   "profileHelp": {
     "message": "Schnell behält jedes gespeicherte Zwischenergebnis, nimmt die Untertitel von YouTube und das Modell aus den Einstellungen. Gründlich rechnet jeden Schritt neu, transkribiert mit dem großen Whisper und fragt das stärkste Modell des Backends."
   },
-  "timestamps": { "message": "Zeitstempel" },
+  "timestamps": {
+    "message": "Zeitstempel"
+  },
   "timestampsHelp": {
     "message": "Jeder Abschnitt und jedes Bild verlinkt seine Stelle im Video."
   },
-  "condensed": { "message": "Nur die Kernbotschaft" },
+  "condensed": {
+    "message": "Nur die Kernbotschaft"
+  },
   "condensedHelp": {
     "message": "Dampft das Video auf zwei Minuten Lesezeit ein."
   },
-  "cleanup": { "message": "Arbeitsdateien löschen" },
+  "cleanup": {
+    "message": "Arbeitsdateien löschen"
+  },
   "cleanupHelp": {
     "message": "Löscht die Zwischendateien unter work/, sobald die Ausgaben geschrieben sind."
   },
-  "language": { "message": "Sprache" },
-  "style": { "message": "Stil" },
-  "openNote": { "message": "Notiz in Obsidian öffnen" },
-  "openFolder": { "message": "Download-Ordner öffnen" },
-  "serviceLog": { "message": "Dienst-Log" },
-  "queued": { "message": "wartet" },
-  "running": { "message": "läuft" },
-  "done": { "message": "fertig" },
-  "error": { "message": "Fehler" },
-  "cancelled": { "message": "abgebrochen" },
+  "language": {
+    "message": "Sprache"
+  },
+  "style": {
+    "message": "Stil"
+  },
+  "openNote": {
+    "message": "Notiz in Obsidian öffnen"
+  },
+  "openFolder": {
+    "message": "Download-Ordner öffnen"
+  },
+  "serviceLog": {
+    "message": "Dienst-Log"
+  },
+  "queued": {
+    "message": "wartet"
+  },
+  "running": {
+    "message": "läuft"
+  },
+  "done": {
+    "message": "fertig"
+  },
+  "error": {
+    "message": "Fehler"
+  },
+  "cancelled": {
+    "message": "abgebrochen"
+  },
   "waitingPosition": {
     "message": "wartet, $1 davor",
-    "placeholders": { "1": { "content": "$1" } }
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
   },
   "aboutLeft": {
     "message": "Noch etwa $1.",
-    "placeholders": { "1": { "content": "$1" } }
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
   },
   "noEstimate": {
     "message": "Kein früherer Lauf, aus dem sich das schätzen ließe."
   },
   "took": {
     "message": "dauerte $1",
-    "placeholders": { "1": { "content": "$1" } }
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
   },
   "pictures": {
     "message": "$1 Bilder",
-    "placeholders": { "1": { "content": "$1" } }
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
   },
   "tokens": {
     "message": "$1 Tokens",
-    "placeholders": { "1": { "content": "$1" } }
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
   },
   "tokensPerSecond": {
     "message": "$1 Tokens/s",
-    "placeholders": { "1": { "content": "$1" } }
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
   },
-
-  "noService": { "message": "Der Dienst läuft nicht." },
+  "noService": {
+    "message": "Der Dienst läuft nicht."
+  },
   "noServiceHelp": {
     "message": "Starte ihn in einem Terminal, dann in den Einstellungen auf Verbinden drücken:"
   },
-  "noServiceCommand": { "message": "cd service && uv run video-tldr serve" },
-  "copyCommand": { "message": "Befehl kopieren" },
-  "copied": { "message": "Kopiert." },
-
-  "lightService": { "message": "Dienst" },
-  "lightLlm": { "message": "Sprachmodell" },
-  "lightStt": { "message": "Transkribierer" },
-  "lightCapabilities": { "message": "Fähigkeiten des Modells" },
-  "notChecked": { "message": "noch nicht geprüft" },
-
-  "connect": { "message": "Verbinden" },
-  "notConnected": { "message": "Nicht verbunden." },
-  "save": { "message": "Speichern" },
-  "saved": { "message": "Gespeichert." },
-  "browse": { "message": "Durchsuchen…" },
-  "serviceUrl": { "message": "Adresse des Dienstes" },
-  "token": { "message": "Token (nur wenn der Dienst eines hat)" },
+  "noServiceCommand": {
+    "message": "cd service && uv run video-tldr serve"
+  },
+  "copyCommand": {
+    "message": "Befehl kopieren"
+  },
+  "copied": {
+    "message": "Kopiert."
+  },
+  "lightService": {
+    "message": "Dienst"
+  },
+  "lightLlm": {
+    "message": "Sprachmodell"
+  },
+  "lightStt": {
+    "message": "Transkribierer"
+  },
+  "lightCapabilities": {
+    "message": "Fähigkeiten des Modells"
+  },
+  "notChecked": {
+    "message": "noch nicht geprüft"
+  },
+  "connect": {
+    "message": "Verbinden"
+  },
+  "notConnected": {
+    "message": "Nicht verbunden."
+  },
+  "save": {
+    "message": "Speichern"
+  },
+  "saved": {
+    "message": "Gespeichert."
+  },
+  "browse": {
+    "message": "Durchsuchen…"
+  },
+  "serviceUrl": {
+    "message": "Adresse des Dienstes"
+  },
+  "token": {
+    "message": "Token (nur wenn der Dienst eines hat)"
+  },
   "tokenPlaceholder": {
     "message": "leer, solange config.json kein Token setzt"
   },
-
-  "summaryHeading": { "message": "Zusammenfassung" },
-  "languageOfNote": { "message": "Sprache der Zusammenfassung" },
+  "summaryHeading": {
+    "message": "Zusammenfassung"
+  },
+  "languageOfNote": {
+    "message": "Sprache der Zusammenfassung"
+  },
   "languageHelp": {
     "message": "Notiz, Abschnitte und Bildunterschriften kommen in dieser Sprache. Zitate und Fachbegriffe bleiben, wie sie im Video gesprochen werden."
   },
@@ -99,81 +200,192 @@
   "outputs": {
     "message": "Ausgaben neben der Zusammenfassung (ohne Auswahl bleibt md)"
   },
-  "downloadDir": { "message": "Download-Ordner für die Ausgaben" },
+  "downloadDir": {
+    "message": "Download-Ordner für die Ausgaben"
+  },
   "downloadDirHelp": {
     "message": "Leer heißt: der Download-Ordner deines Browsers, grau angezeigt."
   },
-  "obsidianVault": { "message": "Obsidian-Vault" },
-  "obsidianFolder": { "message": "Ordner im Vault für die Notizen" },
-  "browserForPdf": { "message": "Chrome oder Edge für das PDF" },
+  "obsidianVault": {
+    "message": "Obsidian-Vault"
+  },
+  "obsidianFolder": {
+    "message": "Ordner im Vault für die Notizen"
+  },
+  "browserForPdf": {
+    "message": "Chrome oder Edge für das PDF"
+  },
   "browserHelp": {
     "message": "Leer heißt: der, den der Dienst auf diesem Rechner gefunden hat, grau angezeigt."
   },
-  "pdfTemplate": { "message": "Designvorlage für das PDF" },
+  "pdfTemplate": {
+    "message": "Designvorlage für das PDF"
+  },
   "pdfTemplateHelp": {
     "message": "Eine HTML-Datei mit dem Platzhalter {{content}} oder eine CSS-Datei. Leer heißt: das eingebaute Aussehen."
   },
-
-  "modelHeading": { "message": "Sprachmodell" },
+  "modelHeading": {
+    "message": "Sprachmodell"
+  },
   "modelHelp": {
     "message": "Liest das Transkript und schreibt die Notiz. Zwei Dinge zu wählen: wo es läuft (das Backend) und welches Modell dort. Gründlich fragt stattdessen das stärkste Modell des Backends."
   },
-  "backend": { "message": "Backend" },
-  "model": { "message": "Modell" },
+  "backend": {
+    "message": "Backend"
+  },
+  "model": {
+    "message": "Modell"
+  },
   "keyNote": {
     "message": "Sterne stehen für einen gespeicherten Schlüssel; stehen lassen behält ihn, Feld leeren löscht ihn."
   },
-  "sttHeading": { "message": "Transkription: Sprache zu Text" },
+  "sttHeading": {
+    "message": "Transkription: Sprache zu Text"
+  },
   "sttHelp": {
     "message": "Macht aus dem Ton Text und läuft nur, wenn YouTube keine Untertitel hat oder hier ein Modell statt auto gewählt ist. Diese Modelle laufen auf diesem Rechner oder bei OpenAI; sie sind keine Sprachmodelle und können keine Notiz schreiben. Gründlich transkribiert immer mit whisper-large."
   },
-  "transcriber": { "message": "Transkribierer" },
-
-  "statsHeading": { "message": "Was deine Läufe gebraucht haben" },
+  "transcriber": {
+    "message": "Transkribierer"
+  },
+  "statsHeading": {
+    "message": "Was deine Läufe gebraucht haben"
+  },
   "statsHelp": {
     "message": "Auf diesem Rechner an deinen Videos gemessen; Mediane über die Läufe, die den Schritt wirklich gerechnet haben."
   },
   "statsEmpty": {
     "message": "Noch kein Lauf; das erste Video füllt das hier."
   },
-  "statsConnect": { "message": "Verbinden, um die eigenen Zahlen zu sehen." },
-  "colStep": { "message": "Schritt" },
-  "colMedian": { "message": "Median" },
-  "colModel": { "message": "Sprachmodell" },
-  "colRuns": { "message": "Läufe" },
-  "colSummarise": { "message": "Zusammenfassen" },
-  "colTokensPerVideo": { "message": "Tokens je Video" },
-  "colUsd": { "message": "USD" },
-  "colTranscribe": { "message": "Transkribieren" },
-  "colTokensPerSecond": { "message": "Tokens/s" },
-
-  "benchHeading": { "message": "Benchmark" },
+  "statsConnect": {
+    "message": "Verbinden, um die eigenen Zahlen zu sehen."
+  },
+  "colStep": {
+    "message": "Schritt"
+  },
+  "colMedian": {
+    "message": "Median"
+  },
+  "colModel": {
+    "message": "Sprachmodell"
+  },
+  "colRuns": {
+    "message": "Läufe"
+  },
+  "colSummarise": {
+    "message": "Zusammenfassen"
+  },
+  "colTokensPerVideo": {
+    "message": "Tokens je Video"
+  },
+  "colUsd": {
+    "message": "USD"
+  },
+  "colTranscribe": {
+    "message": "Transkribieren"
+  },
+  "colTokensPerSecond": {
+    "message": "Tokens/s"
+  },
+  "benchHeading": {
+    "message": "Benchmark"
+  },
   "benchHelp": {
     "message": "Schickt dasselbe Video durch mehrere Modelle des aktuellen Backends und vergleicht, was jedes gebraucht hat."
   },
-  "benchUrl": { "message": "Video-URL" },
-  "benchModels": { "message": "Modelle im Vergleich" },
-  "benchRepeat": { "message": "Läufe je Modell" },
-  "benchStart": { "message": "Benchmark starten" },
-  "benchRunning": { "message": "Benchmark läuft…" },
-
-  "linksHeading": { "message": "Alle Links öffnen" },
+  "benchUrl": {
+    "message": "Video-URL"
+  },
+  "benchModels": {
+    "message": "Modelle im Vergleich"
+  },
+  "benchRepeat": {
+    "message": "Läufe je Modell"
+  },
+  "benchStart": {
+    "message": "Benchmark starten"
+  },
+  "benchRunning": {
+    "message": "Benchmark läuft…"
+  },
+  "linksHeading": {
+    "message": "Alle Links öffnen"
+  },
   "blocklist": {
     "message": "Gesperrte Hosts, einer je Zeile (Unterdomains eingeschlossen)"
   },
-  "seen": { "message": "Bereits geöffnete Links" },
+  "seen": {
+    "message": "Bereits geöffnete Links"
+  },
   "seenCount": {
     "message": "$1 Links",
-    "placeholders": { "1": { "content": "$1" } }
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
   },
-  "forgetAll": { "message": "Alle vergessen" },
-  "forgotten": { "message": "Vergessen." },
-
-  "stepFetch": { "message": "Titel, Beschreibung, Untertitel holen" },
-  "stepTranscribe": { "message": "Transkribieren" },
-  "stepAnalyze": { "message": "Mit dem Sprachmodell zusammenfassen" },
-  "stepNote": { "message": "Notiz schreiben" },
-  "stepEnrich": { "message": "Verlinkte Repositories lesen" },
-  "stepFrames": { "message": "Bilder wählen und beschriften" },
-  "stepRender": { "message": "Ausgaben rendern" }
+  "forgetAll": {
+    "message": "Alle vergessen"
+  },
+  "forgotten": {
+    "message": "Vergessen."
+  },
+  "stepFetch": {
+    "message": "Titel, Beschreibung, Untertitel holen"
+  },
+  "stepTranscribe": {
+    "message": "Transkribieren"
+  },
+  "stepAnalyze": {
+    "message": "Mit dem Sprachmodell zusammenfassen"
+  },
+  "stepNote": {
+    "message": "Notiz schreiben"
+  },
+  "stepEnrich": {
+    "message": "Verlinkte Repositories lesen"
+  },
+  "stepFrames": {
+    "message": "Bilder wählen und beschriften"
+  },
+  "stepRender": {
+    "message": "Ausgaben rendern"
+  },
+  "helpBackendClaude": {
+    "message": "Die Claude-Code-CLI über dein Abo: kein Schlüssel, keine zusätzliche Rechnung, liest Bilder, findet jeden Link. Die beste Wahl, außer du willst offline bleiben."
+  },
+  "helpBackendAnthropic": {
+    "message": "Die API von Anthropic, je Token bezahlt; braucht den Schlüssel unten. Dieselben Modelle wie claude, ohne Abo."
+  },
+  "helpBackendOpenai": {
+    "message": "Die API von OpenAI, je Token bezahlt; braucht den Schlüssel unten."
+  },
+  "helpBackendLmstudio": {
+    "message": "Dein eigenes Modell in LM Studio, kostenlos und offline. Lade es mit 32768 Kontext oder mehr und nimm ein Bildmodell, wenn die Bilder beschriftet werden sollen."
+  },
+  "helpBackendOllama": {
+    "message": "Dein eigenes Modell in Ollama, kostenlos und offline. Gib ihm 32768 Kontext oder mehr; für beschriftete Bilder ein Bildmodell mit `ollama pull` holen."
+  },
+  "modelAdvice": {
+    "message": "Gut: ein Bildmodell (LM Studio nennt es vlm) mit 32768 Token Kontext oder mehr. Schlecht: ein Whisper- oder Embedding-Modell, das gar nicht schreiben kann; ein Modell unter 32768 Token, dem mitten im Transkript der Platz ausgeht; ein stark quantisiertes, das hier achtmal langsamer läuft."
+  },
+  "modelDefault": {
+    "message": "Voreinstellung des Backends"
+  },
+  "modelCustom": {
+    "message": "anderer Name…"
+  },
+  "history": {
+    "message": "Verlauf"
+  },
+  "historyHelp": {
+    "message": "Was deine eigenen Läufe auf diesem Rechner gebraucht haben. Mediane über die Läufe, die den Schritt wirklich gerechnet haben."
+  },
+  "video": {
+    "message": "Video"
+  },
+  "openSettings": {
+    "message": "Einstellungen"
+  }
 }
