@@ -171,3 +171,48 @@ def test_profiles_change_the_transcriber_and_the_model_on_top_of_the_file():
     assert profile_overrides("thorough", {**DEFAULTS, "llm": "lmstudio"})["model"] == ""
     with pytest.raises(ConfigError):
         profile_overrides("quick", DEFAULTS)
+
+
+def test_two_saves_at_once_keep_both_values(tmp_path):
+    """The options page saves every field on its own, and the service
+    answers each request in its own thread. Without a lock around read
+    and write, the slower one wrote back the file it had read before the
+    faster one changed it, and the owner lost a setting on 2026-09-10."""
+    import threading
+
+    from corganshelper_service.config import store
+
+    store(tmp_path, {"llm": "claude"})
+    ready = threading.Barrier(4)
+    values = [
+        {"llm": "lmstudio"},
+        {"model": "qwen3-8b"},
+        {"language": "de"},
+    ]
+
+    failures: list[str] = []
+
+    def save(one: dict) -> None:
+        ready.wait(timeout=5)
+        for _ in range(20):
+            try:
+                store(tmp_path, one)
+            except OSError as error:  # two renames over one target
+                failures.append(str(error))
+
+    threads = [threading.Thread(target=save, args=(v,)) for v in values]
+    for thread in threads:
+        thread.start()
+    ready.wait(timeout=5)
+    for thread in threads:
+        thread.join(timeout=10)
+
+    # Without the lock this counted dozens of "the process cannot access
+    # the file", the 500 the options page showed.
+    assert failures == []
+    stored = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+    assert stored["llm"] == "lmstudio"
+    assert stored["model"] == "qwen3-8b"
+    assert stored["language"] == "de"
+    # Nothing left behind: the staging file is renamed, never kept.
+    assert not list(tmp_path.glob("*.tmp"))
