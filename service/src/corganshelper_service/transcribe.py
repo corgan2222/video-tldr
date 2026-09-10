@@ -91,13 +91,27 @@ def whisper_device() -> tuple[str, int, str]:
     return device, int(index or 0), "float16"
 
 
+# Once per process, and the answer is kept. `stt_status` calls this on
+# every GET /health, and the popup asks every two seconds: adding the
+# same directories again and again grew PATH without end and filled the
+# process's list of DLL directories, until Windows answered WinError 206
+# ("the filename or extension is too long"). numpy then failed to load in
+# the middle of a run, and ctranslate2 counted no CUDA device at all
+# (owner, 2026-09-10).
+_DLL_DIRS: list[Path] | None = None
+
+
 def add_nvidia_dll_dirs() -> list[Path]:
     """Windows finds cuBLAS and cuDNN only on the DLL search path. The pip
     wheels (`nvidia-cublas-cu12`, `nvidia-cudnn-cu12`, the `gpu` extra) put
     them under site-packages/nvidia/*/bin, so those go on the path here
     before ctranslate2 loads. A no-op elsewhere."""
+    global _DLL_DIRS
+    if _DLL_DIRS is not None:
+        return _DLL_DIRS
     if os.name != "nt" or not hasattr(os, "add_dll_directory"):
-        return []
+        _DLL_DIRS = []
+        return _DLL_DIRS
     import sysconfig
 
     added = []
@@ -111,7 +125,8 @@ def add_nvidia_dll_dirs() -> list[Path]:
         os.environ["PATH"] = os.pathsep.join(
             [str(p) for p in added] + [os.environ.get("PATH", "")]
         )
-    return added
+    _DLL_DIRS = added
+    return _DLL_DIRS
 
 
 def whisper_transcribe(

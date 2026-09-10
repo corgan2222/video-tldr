@@ -10,6 +10,7 @@ import {
   formatSeconds,
   NoServiceError,
   request,
+  ServiceError,
   STEP_KEY,
   STEPS,
   type BenchRow,
@@ -67,6 +68,10 @@ const FIELDS: Record<string, string> = {
   ollama_url: '#ollama-url',
   stt: '#stt',
 };
+
+// How long the page waits before it asks a restarted service again: the
+// old process needs a moment to let go of the port.
+const RESTART_WAIT_MS = 2500;
 
 // The two entries the model list carries besides the models themselves.
 const DEFAULT_MODEL = '';
@@ -468,6 +473,26 @@ modelChoice.addEventListener('change', () => {
 pick('#connect').addEventListener('click', async () => {
   await api.storage.local.set(connection());
   await loadService();
+});
+
+// The service answers, then hands its port to a fresh process, so the
+// page waits a moment before it asks again. A restart is what cures a
+// process that lost its graphics card or filled its DLL search path.
+pick('#restart').addEventListener('click', async () => {
+  say(t('restarting'));
+  try {
+    await request(connection(), 'POST', '/restart');
+  } catch (error) {
+    // A service that drops the connection while answering has restarted
+    // all the same; only a refusal is worth showing.
+    if (error instanceof ServiceError && error.status) {
+      say(message(error), true);
+      return;
+    }
+  }
+  await new Promise((done) => setTimeout(done, RESTART_WAIT_MS));
+  await loadService();
+  say(connected ? t('restarted') : t('restartSlow'), !connected);
 });
 pick('#copy-command').addEventListener('click', async () => {
   await navigator.clipboard.writeText(t('noServiceCommand'));

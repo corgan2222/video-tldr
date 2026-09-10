@@ -23,6 +23,8 @@ The contract, every answer JSON:
                                          "capabilities"}
     POST /pick {"kind", "start"}    200 {"path"}: a file or folder dialog on
                                     this desktop, empty when cancelled
+    POST /restart                   200 {"restarting": true}, then this
+                                    process hands the port to a fresh one
 
 A job carries `id` (the video id), `url`, `profile`, `options` (what the
 popup set for this run), `status` (queued, running, done, error,
@@ -53,6 +55,7 @@ import queue
 import subprocess
 import sys
 import threading
+import time
 from collections import deque
 from collections.abc import Callable
 from datetime import datetime
@@ -90,6 +93,8 @@ LOG_BYTES = 1_000_000
 LOG_FILES = 3
 LOG_LINES = 50
 LOG_LINES_MAX = 500
+# Long enough for the answer to reach the page before the socket closes.
+RESTART_DELAY_SECONDS = 0.4
 EXTENSION_ORIGINS = ("moz-extension://", "chrome-extension://")
 # What `open` starts, the first that the job wrote.
 OPEN_ORDER = ["obsidian", "pdf", "docx", "md", "summary"]
@@ -513,15 +518,57 @@ class Service:
         raise NotReady(f"job {vid} wrote no {what if what != 'auto' else 'output'}")
 
 
+def relaunch(home: Path | None, port: int, overrides: dict) -> None:
+    """Start a fresh service and leave. Called after this one has let go
+    of the port. The arguments are rebuilt rather than taken from
+    `sys.argv`, so the new process is the same service no matter how this
+    one was started."""
+    args = [sys.executable, "-m", __package__ or "corganshelper_service"]
+    if home:
+        args += ["--home", str(home)]
+    for name in ("llm", "model", "stt", "style"):
+        if overrides.get(name):
+            args += [f"--{name}", str(overrides[name])]
+    args += ["serve", "--port", str(port)]
+    subprocess.Popen(  # noqa: S603 - our own arguments, no shell
+        args,
+        close_fds=True,
+        creationflags=getattr(subprocess, "DETACHED_PROCESS", 0),
+    )
+
+
 class Server(ThreadingHTTPServer):
     # HTTPServer sets SO_REUSEADDR, and on Windows that lets a second
     # `serve` bind a port that is already listening: it prints a token
     # and answers nothing (2026-09-10). Without it the second start fails.
     allow_reuse_address = False
 
-    def __init__(self, service: Service, port: int = PORT) -> None:
+    def __init__(
+        self,
+        service: Service,
+        port: int = PORT,
+        relauncher: Callable[[Path | None, int, dict], None] = relaunch,
+    ) -> None:
         super().__init__(("127.0.0.1", port), Handler)
         self.service = service
+        self.relauncher = relauncher
+
+    def restart(self) -> None:
+        """Answer first, then hand the port to a fresh process. A whole
+        process is what it takes: a CUDA start that failed once stays
+        failed for the life of this one, and the DLL search path only
+        grows (2026-09-10)."""
+
+        def swap() -> None:
+            time.sleep(RESTART_DELAY_SECONDS)  # let the answer reach the page
+            self.shutdown()
+            self.server_close()
+            self.relauncher(
+                self.service.home, self.server_address[1], self.service.overrides
+            )
+            os._exit(0)
+
+        threading.Thread(target=swap, daemon=True, name="restart").start()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -647,6 +694,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(HTTPStatus.OK, stats(service.settings()))
             if method == "GET" and parts == ["health"]:
                 return self.reply(HTTPStatus.OK, service.health())
+            if method == "POST" and parts == ["restart"]:
+                # Answered first, swapped after: see Server.restart.
+                self.reply(HTTPStatus.OK, {"restarting": True})
+                service.log.info("restart asked for")
+                return self.server.restart()
             if method == "POST" and parts == ["pick"]:
                 body = self.body()
                 kind = body.get("kind")

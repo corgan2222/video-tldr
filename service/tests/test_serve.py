@@ -623,3 +623,27 @@ def test_stats_come_from_the_runs_in_the_work_folder(server, tmp_path):
     assert answer["runs"] == 1
     assert answer["steps"] == {"analyze": 70.0}
     assert answer["models"]["claude:sonnet"]["seconds"] == 70.0
+
+
+def test_restart_answers_first_and_then_hands_over_the_port(service, monkeypatch):
+    """The owner has no console for the service, so the options page needs
+    a button: a process that lost CUDA or filled its DLL search path is
+    only cured by a fresh one (2026-09-10)."""
+    handed: list[tuple] = []
+    # The thread ends the process right after handing over; in a test it
+    # must stop at the hand-over.
+    monkeypatch.setattr(module.os, "_exit", lambda code: None)
+    server = Server(service, 0, relauncher=lambda *args: handed.append(args))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    port = server.server_port
+    try:
+        code, answer = call(server, "POST", "/restart")
+        assert (code, answer) == (200, {"restarting": True})
+        for _ in range(100):
+            if handed:
+                break
+            time.sleep(0.05)
+        assert handed == [(service.home, port, service.overrides)]
+    finally:
+        server.server_close()

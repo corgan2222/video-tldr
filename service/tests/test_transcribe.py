@@ -1,4 +1,5 @@
 import json
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -328,3 +329,31 @@ def test_a_process_without_cuda_is_told_to_restart_the_service(tmp_path, monkeyp
     assert state["ok"] is False
     assert "cuda:3 not found (2 CUDA devices)" in state["detail"]
     assert "restart the service" not in state["detail"]
+
+
+def test_the_dll_directories_are_added_once_per_process(tmp_path, monkeypatch):
+    """Every GET /health asked for them, the popup asks every two seconds,
+    and each call grew PATH and the process's DLL directory list until
+    Windows answered WinError 206 and numpy stopped loading mid-run
+    (owner, 2026-09-10)."""
+    import sysconfig
+
+    from corganshelper_service import transcribe as module
+
+    root = tmp_path / "nvidia"
+    for name in ("cublas", "cudnn"):
+        (root / name / "bin").mkdir(parents=True)
+    added: list[str] = []
+    monkeypatch.setattr(module, "_DLL_DIRS", None)
+    monkeypatch.setattr(module.os, "name", "nt")
+    monkeypatch.setattr(module.os, "add_dll_directory", added.append, raising=False)
+    monkeypatch.setattr(sysconfig, "get_paths", lambda: {"purelib": str(tmp_path)})
+    monkeypatch.setenv("PATH", "C:/windows")
+
+    first = module.add_nvidia_dll_dirs()
+    for _ in range(50):
+        module.add_nvidia_dll_dirs()
+
+    assert len(first) == 2
+    assert len(added) == 2
+    assert os.environ["PATH"].count("cublas") == 1
