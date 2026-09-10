@@ -54,7 +54,9 @@ That picks the CUDA libraries when the machine has a card and the ONNX
 runtime alone when it has none, puts `video-tldr` on your PATH, and
 registers no autostart. You start the service yourself with
 `video-tldr serve`; whenever it is not answering, the extension shows
-that command with a button that copies it. `-Root D:\video-tldr` keeps
+that command with a button that copies it. Add `-Autostart` and a task
+starts it at every logon instead — `video-tldr autostart on|off|status`
+switches that later, without reinstalling. `-Root D:\video-tldr` keeps
 the program, its environment and its data under one directory instead of
 three standard places. The speech models download on first use, several
 gigabytes of them.
