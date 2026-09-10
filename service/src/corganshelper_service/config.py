@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -248,21 +249,34 @@ def resolve_home(home: Path | None) -> Path:
     return Path(home or os.environ.get("CORGANSHELPER_HOME", DEFAULT_HOME)).resolve()
 
 
+# Reading and writing config.json belong together. The options page saves
+# every field on its own, so three requests land within a second, and the
+# service answers each in its own thread: without this lock the last one
+# wrote back what it had read before the others changed it, and two
+# threads renaming their file over the same target answered 500. Both
+# happened to the owner on 2026-09-10.
+_WRITE_LOCK = threading.Lock()
+
+
 def store(home: Path | None, values: dict) -> Path:
     """Write `values` into config.json and keep the rest of the file. The
     environment is read here on purpose not at all: a key that lives in a
     variable stays there instead of being copied into the file."""
     path = resolve_home(home) / CONFIG_NAME
-    config = {**DEFAULTS, **read_config(path), **validate(values)}
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # Written beside and renamed over: the service's worker thread reads
-    # this file while the options page writes it, and a truncated file
-    # in between would fail that job with "not valid JSON".
-    staging = path.with_suffix(".json.tmp")
-    staging.write_text(
-        json.dumps({k: config[k] for k in KEYS}, indent=2) + "\n", encoding="utf-8"
-    )
-    os.replace(staging, path)
+    with _WRITE_LOCK:
+        config = {**DEFAULTS, **read_config(path), **validate(values)}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Written beside and renamed over: the service's worker thread
+        # reads this file while the options page writes it, and a
+        # truncated file in between would fail that job with "not valid
+        # JSON". The name carries the process id, so a command line
+        # running next to the service never shares the staging file.
+        staging = path.with_suffix(f".json.{os.getpid()}.tmp")
+        staging.write_text(
+            json.dumps({k: config[k] for k in KEYS}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(staging, path)
     return path
 
 
