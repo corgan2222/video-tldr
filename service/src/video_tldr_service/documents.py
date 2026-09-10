@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-from html import escape
+from html import escape, unescape
 from pathlib import Path
 
 from .analyze import stamp
@@ -47,6 +47,58 @@ pre code { font-size: 0.9em; background: none; border: none; }
 """
 
 
+# What a browser runs instead of opening, once it stands in an `href` or
+# a `src`.
+RUNNABLE_SCHEMES = ("javascript:", "data:", "vbscript:")
+# The one `data:` a note may carry: a picture is not code. A README's
+# base64 badge can reach the note inside the model's answer about that
+# README, and behind `unsafe:` it is a source no browser loads. SVG stays
+# blocked, because an SVG file is a document that can hold a `script`
+# element and outside references; a raster format has nowhere to put one.
+PICTURE_DATA = "data:image/"
+SCRIPTABLE_DATA = "data:image/svg"
+
+
+def runnable(target: str) -> bool:
+    """Whether a browser would run this link or picture target rather than
+    open it. Read close to the way a browser reads a URL: entities
+    decoded, then every ASCII space and control character dropped, then
+    the scheme compared without case. Dropping every space is wider than
+    a URL parser goes, which keeps one inside a word, and wider is the
+    side to err on here."""
+    plain = "".join(c for c in unescape(target) if c > " " and c != "\x7f").lower()
+    if plain.startswith(PICTURE_DATA) and not plain.startswith(SCRIPTABLE_DATA):
+        return False
+    return plain.startswith(RUNNABLE_SCHEMES)
+
+
+def safe_target(target: str) -> str:
+    """`target` as it may stand in an `href` or a `src`: a runnable one
+    behind a scheme no browser knows, so a reader still sees what stood
+    there and nothing happens with it."""
+    return f"unsafe:{target}" if runnable(target) else target
+
+
+class SafeTargets:
+    """Every `href` and `src` of the page through `safe_target`.
+
+    The check sits in the parsed tree rather than in the Markdown,
+    because the same scheme can be written in forms no pattern over the
+    text catches: a newline inside the word, a letter as an entity, the
+    colon as an entity. Measured 2026-09-10, all of those reach the tree
+    as the one attribute value they became, so one check covers them.
+    python-markdown asks a tree processor for `run` alone, so this needs
+    no subclass and `markdown` stays an import inside the function
+    below."""
+
+    def run(self, root) -> None:
+        for element in root.iter():
+            for name in ("href", "src"):
+                target = element.get(name)
+                if target:
+                    element.set(name, safe_target(target))
+
+
 def html(title: str, markdown_text: str, template: str = "") -> str:
     """A complete page from the note's Markdown. `template` is the file
     `pdf_template` names: an `.html` page with `{{content}}` and
@@ -54,16 +106,22 @@ def html(title: str, markdown_text: str, template: str = "") -> str:
     follows STYLE, so a few overriding rules are the short way in."""
     import markdown
 
-    # The Markdown carries a video title, a channel name and a description
-    # that a stranger uploaded, plus a model's answer built from those. So
-    # raw HTML in it is escaped rather than passed through: this page is
-    # rendered by Chrome from a file:// URL to make the PDF, and it stays
-    # on disk next to it. python-markdown lets HTML through by default and
-    # dropped its safe mode in 3.0; deregistering the two handlers is what
-    # replaced it. Tables, fenced code, emphasis and links are untouched.
+    # The Markdown carries a video title and a channel name a stranger
+    # uploaded, the URLs read out of that video's description, and a
+    # model's answer written from all of those. Chrome renders this page
+    # from a file:// URL to make the PDF and leaves it on disk next to it.
+    # So two ways in are closed here. Raw HTML is escaped rather than
+    # passed through: python-markdown lets it through by default and
+    # dropped its safe mode in 3.0, and deregistering the two handlers is
+    # what replaced it. A link is Markdown's own syntax, so its target is
+    # checked in the tree instead. Tables, fenced code, emphasis and
+    # ordinary links are untouched.
     md = markdown.Markdown(extensions=["tables", "fenced_code"])
     md.preprocessors.deregister("html_block")
     md.inlinePatterns.deregister("html")
+    # Below python-markdown's own `unescape` processor, which sits at 0, so
+    # every target arrives with its escaped characters already restored.
+    md.treeprocessors.register(SafeTargets(), "safe_targets", -1)
     body = md.convert(markdown_text)
     style = STYLE
     if template:
@@ -201,6 +259,13 @@ def content_box(
     margin; the whole frame when nothing is drawn."""
     import numpy as np
 
+    # A short buffer is a screenshot that came out smaller than the window
+    # asked for; reshape would answer that with a bare ValueError.
+    if len(raw) < width * height:
+        raise FetchError(
+            f"diagram: the screenshot holds {len(raw)} bytes, "
+            f"too few for {width}x{height} grey pixels"
+        )
     pixels = np.frombuffer(raw[: width * height], dtype=np.uint8)
     pixels = pixels.reshape(height, width)
     rows = np.flatnonzero((pixels < 250).any(axis=1))
