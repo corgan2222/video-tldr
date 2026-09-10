@@ -8,7 +8,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from . import __version__, llm
+from . import __version__, autostart, llm
 from .analyze import analyze
 from .config import (
     FORMATS,
@@ -171,6 +171,15 @@ def build_parser() -> argparse.ArgumentParser:
         "stop", help="ask a running service to end, so an update can replace it"
     )
     stop_cmd.add_argument("--port", type=int, default=PORT, help=f"default {PORT}")
+    autostart_cmd = commands.add_parser(
+        "autostart", help="start the service at logon, or stop doing that"
+    )
+    autostart_cmd.add_argument(
+        "state", choices=["on", "off", "status"], help="what autostart should do"
+    )
+    autostart_cmd.add_argument(
+        "--port", type=int, default=None, help=f"port for the task; default {PORT}"
+    )
     return parser
 
 
@@ -217,6 +226,19 @@ def main(argv: list[str] | None = None) -> int:
         # Zero either way: an installer runs this before every update, and
         # a machine without a running service is the ordinary case.
         print(stop(settings.config["token"], args.port))
+        return 0
+
+    if args.command == "autostart":
+        try:
+            if args.state == "on":
+                print(autostart.enable(args.port))
+            elif args.state == "off":
+                print(autostart.disable())
+            else:
+                print(autostart.status())
+        except autostart.AutostartError as error:
+            print(f"autostart failed: {error}", file=sys.stderr)
+            return 1
         return 0
 
     if args.command == "run":
