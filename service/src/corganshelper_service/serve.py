@@ -79,7 +79,7 @@ from .config import (
 from .documents import browser as find_browser
 from .fetch import FetchError, video_folder, video_id
 from .llm import LlmError
-from .run import bench, read_bench, run, stats
+from .run import bench, needs_model, read_bench, run, stats
 from .transcribe import stt_status
 
 PORT = 8765
@@ -173,11 +173,18 @@ class Service:
     """The jobs, and the one thread that works them off."""
 
     def __init__(
-        self, home: Path | None, overrides: dict | None = None, runner: Runner = run
+        self,
+        home: Path | None,
+        overrides: dict | None = None,
+        runner: Runner = run,
+        checker: Callable[[Settings], str | None] = llm.check,
     ) -> None:
         self.home = home
         self.overrides = overrides or {}
         self.runner = runner
+        # What asks the backend before a job is queued. Injected like the
+        # runner, so a test does not need the CLI or a server of its own.
+        self.checker = checker
         self.jobs: dict[str, dict] = {}
         self.lock = threading.Lock()
         self.queue: queue.Queue[str] = queue.Queue()
@@ -307,6 +314,15 @@ class Service:
         # the worker: a wrong one is a 400 the popup can show, not a job
         # that fails a minute later.
         options = validate(dict(options or {}))
+        # The backend is asked once before the job goes into the queue: a
+        # key the vendor refuses or a server that is not running is a 400
+        # the popup shows now. Asked for on 2026-09-10, after a 401 ended
+        # a run at `analyze`, with fetch and transcribe already paid for.
+        settings = self.settings(profile, options)
+        if needs_model(settings, vid, force=profile == "thorough"):
+            trouble = self.checker(settings)
+            if trouble:
+                raise LlmError(trouble)
         return self.enqueue(vid, {"url": url, "profile": profile, "options": options})
 
     def submit_bench(self, url: str, models: list[str], repeat: int = 1) -> dict:

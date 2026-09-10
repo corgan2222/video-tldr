@@ -7,10 +7,12 @@ from corganshelper_service import run as module
 from corganshelper_service.config import DEFAULTS, Settings
 from corganshelper_service.fetch import FetchError, work_folder
 from corganshelper_service.run import (
+    MODEL_RESULTS,
     STEPS,
     bench,
     bench_table,
     header,
+    needs_model,
     read_bench,
     row,
     run,
@@ -174,6 +176,21 @@ def test_a_url_that_is_no_video_fails_before_the_first_step(steps, tmp_path):
     assert steps == []
     assert row(result).startswith("| ? | error in fetch |")
     assert not list(tmp_path.glob("work/*/run.json"))
+
+
+def test_only_a_folder_with_every_model_answer_needs_no_model(tmp_path):
+    settings = Settings(home=tmp_path)
+    assert needs_model(settings, "x_x_x_x_x_x") is True
+
+    work = work_folder(settings, "x_x_x_x_x_x")
+    work.mkdir(parents=True)
+    for name in MODEL_RESULTS:
+        assert needs_model(settings, "x_x_x_x_x_x") is True
+        (work / name).write_text("{}", encoding="utf-8")
+
+    assert needs_model(settings, "x_x_x_x_x_x") is False
+    # Thorough computes every step again, model included.
+    assert needs_model(settings, "x_x_x_x_x_x", force=True) is True
 
 
 def test_the_table_has_one_cell_per_column(steps, tmp_path):

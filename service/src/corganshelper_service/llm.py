@@ -191,10 +191,28 @@ def is_chat_model(name: str) -> bool:
     return not any(part in name.lower() for part in NOT_CHAT)
 
 
+# How a server says that it does not accept the key: the HTTP status, the
+# word the vendors use, and the code OpenAI puts in the body.
+REFUSED = ("401", "nauthorized", "invalid_api_key", "invalid x-api-key")
+
+
+def refused_key(text: str) -> bool:
+    return any(part in text for part in REFUSED)
+
+
 def reachable_message(name: str, error: Exception) -> str:
     text = f"{name}: {error}"
     if name in START_HINT and "onnect" in text:
         text += f"; is the server running? {START_HINT[name]}"
+    elif refused_key(text):
+        # The message the vendor sends says "Unauthorized" and nothing
+        # about where the key lives (seen 2026-09-10 on a job that had
+        # already fetched and transcribed the video).
+        text += (
+            "; the server did not accept the key. Check it in the settings, "
+            f"together with the address, or run `video-tldr config --set "
+            f"{name}_api_key=<key>`"
+        )
     return text
 
 
@@ -419,6 +437,10 @@ def complete(
             # then answers again.
             wire = is_connection_error(error)
             limit = CONNECTION_ATTEMPTS if wire else ATTEMPTS
+            if refused_key(str(error)):
+                # A key the server refuses once is refused again; the
+                # second request only costs the owner time.
+                raise
             if attempt >= limit:
                 raise LlmError(f"{error} (after {attempt} attempts)") from error
             if wire:

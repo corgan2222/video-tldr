@@ -35,6 +35,10 @@ from .transcribe import transcribe
 # In the order they run. `note` is render with no format but summary.md.
 STEPS = ["fetch", "transcribe", "analyze", "note", "enrich", "frames", "render"]
 RESULT_NAME = "run.json"
+# What only the language model can write. A folder that holds all three
+# answers every step from the cache, so such a run needs no model and no
+# reachable server.
+MODEL_RESULTS = ("analysis.json", "enrich.json", "frames.json")
 # A step under this took its result from the cache and says nothing
 # about how long the step takes.
 CACHED_SECONDS = 0.05
@@ -45,6 +49,17 @@ Progress = Callable[..., None]
 
 class Cancelled(Exception):
     """`should_stop` said so between two steps."""
+
+
+def needs_model(settings: Settings, vid: str, force: bool = False) -> bool:
+    """Whether a run of this video would ask the language model at all.
+    The caller checks the backend before queueing a job, and a video whose
+    steps are all cached must not be turned away for a server it never
+    talks to."""
+    if force:
+        return True
+    folder = work_folder(settings, vid)
+    return any(not (folder / name).exists() for name in MODEL_RESULTS)
 
 
 def run(
