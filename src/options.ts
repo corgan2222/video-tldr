@@ -78,7 +78,7 @@ function fillSelect(
   select.value = value;
 }
 
-// The choice between fast and accurate, as `video-tltr models stt`
+// The choice between fast and accurate, as `video-tldr models stt`
 // prints it: speed class, leaderboard word error rate, languages.
 function sttLabel(config: Config | undefined, name: string): string {
   const spec = config?.stt_models[name];
@@ -216,7 +216,7 @@ async function loadService(): Promise<void> {
     const config = await request<Config>(connection(), 'GET', '/config');
     connected = true;
     show(config);
-    serviceStatus.textContent = `Connected to the video-tltr service ${config.version}, data under ${config.home}, log in ${config.log}.`;
+    serviceStatus.textContent = `Connected to the video-tldr service ${config.version}, data under ${config.home}, log in ${config.log}.`;
     showStats(await request<Stats>(connection(), 'GET', '/stats'));
   } catch (error) {
     connected = false;
@@ -263,7 +263,7 @@ async function load(): Promise<void> {
   } else {
     show();
     serviceStatus.textContent =
-      'Not connected: paste the token from `video-tltr serve` and press Connect.';
+      'Not connected: paste the token from `video-tldr serve` and press Connect.';
     statsNote.textContent = 'Connect to see what your runs took.';
     await loadModels();
   }

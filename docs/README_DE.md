@@ -1,4 +1,4 @@
-# video-tltr
+# video-tldr
 
 _[English version](../README.md)_
 
@@ -47,7 +47,7 @@ und Modellwahl.
 
 ## Benutzung
 
-1. Dienst starten: `cd service && uv run video-tltr serve`. Er druckt ein
+1. Dienst starten: `cd service && uv run video-tldr serve`. Er druckt ein
    Token.
 2. Auf das Symbol klicken; ohne Token öffnet es die Einstellungen. Token
    eintragen, „Connect" drücken, Sprache, Ausgaben und Modell wählen,
@@ -56,7 +56,7 @@ und Modellwahl.
    „Thorough" drücken. Das Fenster zeigt die Schritte, während sie
    laufen; eine Benachrichtigung meldet, wenn die Zusammenfassung fertig
    ist, und ein Klick darauf öffnet die Notiz.
-4. Ohne Browser: `uv run video-tltr run <url>` macht dasselbe von der
+4. Ohne Browser: `uv run video-tldr run <url>` macht dasselbe von der
    Kommandozeile.
 
 ---

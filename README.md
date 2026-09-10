@@ -1,4 +1,4 @@
-# video-tltr
+# video-tldr
 
 _[Deutsche Fassung](docs/README_DE.md)_
 
@@ -44,7 +44,7 @@ model choice.
 
 ## Usage
 
-1. Start the service: `cd service && uv run video-tltr serve`. It prints
+1. Start the service: `cd service && uv run video-tldr serve`. It prints
    a token.
 2. Click the toolbar icon; without a token it opens the settings. Enter
    the token, press Connect, choose the language, the outputs and the
@@ -52,7 +52,7 @@ model choice.
 3. Open a YouTube video, click the icon, press Fast or Thorough. The
    window shows the steps as they run; a notification says when the
    summary is ready, and a click on it opens the note.
-4. Without a browser: `uv run video-tltr run <url>` does the same from
+4. Without a browser: `uv run video-tldr run <url>` does the same from
    the command line.
 
 ## Contributing

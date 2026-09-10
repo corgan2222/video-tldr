@@ -438,7 +438,7 @@ def serve(home: Path | None, overrides: dict | None = None, port: int = PORT) ->
     # Flushed: started by the task scheduler with stdout in a file, the
     # lines would otherwise sit in the buffer until the service stops.
     print(
-        f"video-tltr service {__version__} listening on http://127.0.0.1:{port}, "
+        f"video-tldr service {__version__} listening on http://127.0.0.1:{port}, "
         f"data under {service.settings().home}, log in {service.log_path}",
         flush=True,
     )
@@ -446,7 +446,7 @@ def serve(home: Path | None, overrides: dict | None = None, port: int = PORT) ->
         f"token: {service.token}  (paste it into the extension's options)",
         flush=True,
     )
-    service.log.info("video-tltr service %s listening on port %s", __version__, port)
+    service.log.info("video-tldr service %s listening on port %s", __version__, port)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

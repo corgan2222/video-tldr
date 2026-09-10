@@ -74,7 +74,7 @@ describe('request', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('refused')));
 
     await expect(request(connection, 'GET', '/config')).rejects.toThrow(
-      'no service at http://127.0.0.1:8765; start it with "video-tltr serve"',
+      'no service at http://127.0.0.1:8765; start it with "video-tldr serve"',
     );
   });
 });
@@ -187,7 +187,7 @@ describe('badgeFor', () => {
     expect(badgeFor(job).text).toBe('…');
     expect(
       badgeFor({ ...job, status: 'running', step: 'frames' }),
-    ).toMatchObject({ text: 'img', title: 'video-tltr: frames x' });
+    ).toMatchObject({ text: 'img', title: 'video-tldr: frames x' });
     expect(badgeFor({ ...job, status: 'running', step: 'odd' }).text).toBe('…');
     expect(
       badgeFor({ ...job, status: 'done', title: 'A video' }).title,
@@ -202,6 +202,6 @@ describe('badgeFor', () => {
     });
     expect(badge).toEqual(failureBadge('frames failed: ffmpeg failed'));
     expect(badge.text).toBe('!');
-    expect(badge.title).toBe('video-tltr: frames failed: ffmpeg failed');
+    expect(badge.title).toBe('video-tldr: frames failed: ffmpeg failed');
   });
 });

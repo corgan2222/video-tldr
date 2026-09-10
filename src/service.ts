@@ -3,7 +3,7 @@
 // the job model, and the arithmetic behind the badge and the time
 // estimate. No browser API in here, so vitest runs it as it is.
 
-export const NAME = 'video-tltr';
+export const NAME = 'video-tldr';
 
 export interface Connection {
   serviceUrl: string;
@@ -183,7 +183,7 @@ export async function request<T>(
     });
   } catch {
     throw new ServiceError(
-      `no service at ${base}; start it with "video-tltr serve"`,
+      `no service at ${base}; start it with "video-tldr serve"`,
     );
   }
   const data = (await response.json().catch(() => ({}))) as {

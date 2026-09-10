@@ -13,7 +13,7 @@
 // where the manifest pins `strict_min_version`.
 //
 // What happens goes to the console of this worker: about:debugging, This
-// Firefox, Inspect next to video-tltr (chrome://extensions, service
+// Firefox, Inspect next to video-tldr (chrome://extensions, service
 // worker link, in Chrome).
 import { api } from './api.js';
 import { DEFAULT_BLOCKLIST, planOpen, type Selection } from './links.js';

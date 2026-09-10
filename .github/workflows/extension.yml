@@ -41,9 +41,9 @@ jobs:
         run: npx web-ext lint --source-dir dist
 
       - name: Zip the extension
-        run: cd dist && zip -r ../video-tltr.zip .
+        run: cd dist && zip -r ../video-tldr.zip .
 
       - uses: actions/upload-artifact@v4
         with:
-          name: video-tltr
-          path: video-tltr.zip
+          name: video-tldr
+          path: video-tldr.zip
