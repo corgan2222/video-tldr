@@ -3,17 +3,17 @@ import json
 import urllib.error
 import urllib.request
 
-from corganshelper_service import enrich as enrich_module
-from corganshelper_service import llm
-from corganshelper_service.config import Settings
-from corganshelper_service.enrich import (
+from video_tldr_service import enrich as enrich_module
+from video_tldr_service import llm
+from video_tldr_service.config import Settings
+from video_tldr_service.enrich import (
     INSTALL_SCHEMA,
     enrich,
     installations,
     readme,
     repositories,
 )
-from corganshelper_service.fetch import work_folder
+from video_tldr_service.fetch import work_folder
 
 VID = "jFHu6wx_TMQ"
 

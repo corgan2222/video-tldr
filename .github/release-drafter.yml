@@ -138,7 +138,7 @@ template: |
 
   $CHANGES
 
-  `corganshelper-$RESOLVED_VERSION.zip` is the packed extension, for a
+  `video-tldr-$RESOLVED_VERSION.zip` is the packed extension, for a
   manual install or a store upload. The store listings are the supported
   way to install it.
 

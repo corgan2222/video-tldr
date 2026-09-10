@@ -4,9 +4,9 @@ from typing import ClassVar
 
 import pytest
 
-from corganshelper_service import llm
-from corganshelper_service.config import Settings
-from corganshelper_service.llm import LlmError, parse_result
+from video_tldr_service import llm
+from video_tldr_service.config import Settings
+from video_tldr_service.llm import LlmError, parse_result
 
 
 def settings_for(tmp_path, **config):
@@ -166,7 +166,7 @@ def test_the_cli_gets_no_tools_without_pictures_and_only_read_with_them(
 
 
 def test_what_a_run_cost_is_read_from_the_envelope_and_added_up():
-    from corganshelper_service.llm import last_cost, totals
+    from video_tldr_service.llm import last_cost, totals
 
     parse_result(
         json.dumps(

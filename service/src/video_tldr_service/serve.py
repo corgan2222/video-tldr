@@ -219,7 +219,7 @@ class Service:
     def open_log(self) -> logging.Logger:
         # A fresh data directory: the token no longer creates it on the way.
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
-        log = logging.getLogger(f"corganshelper.serve.{id(self)}")
+        log = logging.getLogger(f"video-tldr.serve.{id(self)}")
         log.setLevel(logging.INFO)
         log.propagate = False
         log.handlers.clear()
@@ -244,7 +244,7 @@ class Service:
     def ensure_token(self) -> str:
         """The token from config.json, or empty: then the Host and Origin
         checks alone keep web pages out, and any extension in the browser
-        may use the service (owner's choice, 2026-09-10). `corganshelper
+        may use the service (owner's choice, 2026-09-10). `video-tldr
         config --set token=<secret>` turns the check on."""
         return self.settings().config["token"]
 
@@ -523,14 +523,14 @@ def relaunch(home: Path | None, port: int, overrides: dict) -> None:
     of the port. The arguments are rebuilt rather than taken from
     `sys.argv`, so the new process is the same service no matter how this
     one was started."""
-    args = [sys.executable, "-m", __package__ or "corganshelper_service"]
+    args = [sys.executable, "-m", __package__ or "video_tldr_service"]
     if home:
         args += ["--home", str(home)]
     for name in ("llm", "model", "stt", "style"):
         if overrides.get(name):
             args += [f"--{name}", str(overrides[name])]
     args += ["serve", "--port", str(port)]
-    subprocess.Popen(  # noqa: S603 - our own arguments, no shell
+    subprocess.Popen(  # our own arguments, no shell
         args,
         close_fds=True,
         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0),

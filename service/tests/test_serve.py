@@ -6,10 +6,10 @@ import urllib.request
 
 import pytest
 
-from corganshelper_service import serve as module
-from corganshelper_service.config import Settings, store
-from corganshelper_service.fetch import video_folder, work_folder
-from corganshelper_service.serve import Server, Service
+from video_tldr_service import serve as module
+from video_tldr_service.config import Settings, store
+from video_tldr_service.fetch import video_folder, work_folder
+from video_tldr_service.serve import Server, Service
 
 URL = "https://youtu.be/x_x_x_x_x_x"
 SECOND_URL = "https://youtu.be/aaaaaaaaaaa"

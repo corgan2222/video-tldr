@@ -10,7 +10,7 @@ const inter = Inter({
 
 // Without a base, Next resolves the relative og:image paths of the docs
 // pages against localhost and bakes that into the static export. The base
-// carries the /corganshelper path, and Next joins the page paths onto it.
+// carries the /video-tldr path, and Next joins the page paths onto it.
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
 };

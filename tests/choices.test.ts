@@ -6,10 +6,7 @@ import { DEFAULT_CHOICES, DEFAULT_SETTINGS, STEPS } from '../src/service.js';
 // is connected, from a copy in service.ts. This reads config.py, the
 // original, so a backend or a default added there fails here until the
 // copy follows.
-const source = readFileSync(
-  'service/src/corganshelper_service/config.py',
-  'utf8',
-);
+const source = readFileSync('service/src/video_tldr_service/config.py', 'utf8');
 
 function pythonList(name: string): string[] {
   const match = new RegExp(`^${name} = \\[([^\\]]*)\\]`, 'm').exec(source);
@@ -56,7 +53,7 @@ it('the choices shown before connecting are the ones config.py has', () => {
 
 it('the steps the popup lists are the ones run.py runs', () => {
   const runSource = readFileSync(
-    'service/src/corganshelper_service/run.py',
+    'service/src/video_tldr_service/run.py',
     'utf8',
   );
   const match = /^STEPS = \[([^\]]*)\]/m.exec(runSource);

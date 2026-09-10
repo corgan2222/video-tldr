@@ -2,8 +2,8 @@ version = 1
 revision = 3
 requires-python = ">=3.13"
 conflicts = [[
-    { package = "corganshelper-service", extra = "cpu" },
-    { package = "corganshelper-service", extra = "gpu" },
+    { package = "video-tldr-service", extra = "cpu" },
+    { package = "video-tldr-service", extra = "gpu" },
 ]]
 
 [manifest]
@@ -42,7 +42,7 @@ version = "4.15.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "idna" },
-    { name = "typing-extensions", marker = "python_full_version < '3.15' or (extra == 'extra-21-corganshelper-service-cpu' and extra == 'extra-21-corganshelper-service-gpu')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.15' or (extra == 'extra-18-video-tldr-service-cpu' and extra == 'extra-18-video-tldr-service-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a9/d2/f4d173e22df740bc37b1db102b386ba719b66e95b0f0d751f556b387e6d2/anyio-4.15.1.tar.gz", hash = "sha256:9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94", size = 276966, upload-time = "2026-09-05T10:42:39.44Z" }
 wheels = [
@@ -100,56 +100,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
-]
-
-[[package]]
-name = "corganshelper-service"
-source = { editable = "." }
-dependencies = [
-    { name = "anthropic" },
-    { name = "faster-whisper" },
-    { name = "markdown" },
-    { name = "numpy" },
-    { name = "onnx-asr", extra = ["hub"] },
-    { name = "openai" },
-    { name = "python-docx" },
-    { name = "yt-dlp" },
-]
-
-[package.optional-dependencies]
-gpu = [
-    { name = "nvidia-cublas-cu12" },
-    { name = "nvidia-cudnn-cu12" },
-    { name = "onnxruntime-gpu", extra = ["cuda", "cudnn"], marker = "extra == 'extra-21-corganshelper-service-gpu'" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anthropic", specifier = ">=1.4.0" },
-    { name = "faster-whisper", specifier = ">=1.2.1" },
-    { name = "markdown", specifier = ">=3.10.3" },
-    { name = "numpy", specifier = ">=2.5.3" },
-    { name = "nvidia-cublas-cu12", marker = "extra == 'gpu'", specifier = ">=12.9.2.10" },
-    { name = "nvidia-cudnn-cu12", marker = "extra == 'gpu'", specifier = ">=9" },
-    { name = "onnx-asr", extras = ["hub"], specifier = ">=0.12.0" },
-    { name = "onnxruntime", marker = "extra == 'cpu'", specifier = ">=1.20" },
-    { name = "onnxruntime-gpu", extras = ["cuda", "cudnn"], marker = "extra == 'gpu'", specifier = "<1.27" },
-    { name = "openai", specifier = ">=3.11.0" },
-    { name = "python-docx", specifier = ">=1.2.0" },
-    { name = "yt-dlp", specifier = ">=2026.8.19" },
-]
-provides-extras = ["cpu", "gpu"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8" },
-    { name = "ruff", specifier = ">=0.12" },
 ]
 
 [[package]]
@@ -307,11 +257,11 @@ name = "httpx2"
 version = "2.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio", marker = "sys_platform != 'emscripten' or (extra == 'extra-21-corganshelper-service-cpu' and extra == 'extra-21-corganshelper-service-gpu')" },
-    { name = "httpcore2", marker = "sys_platform != 'emscripten' or (extra == 'extra-21-corganshelper-service-cpu' and extra == 'extra-21-corganshelper-service-gpu')" },
-    { name = "httpx2-jsfetch", marker = "sys_platform == 'emscripten' or (extra == 'extra-21-corganshelper-service-cpu' and extra == 'extra-21-corganshelper-service-gpu')" },
+    { name = "anyio", marker = "sys_platform != 'emscripten' or (extra == 'extra-18-video-tldr-service-cpu' and extra == 'extra-18-video-tldr-service-gpu')" },
+    { name = "httpcore2", marker = "sys_platform != 'emscripten' or (extra == 'extra-18-video-tldr-service-cpu' and extra == 'extra-18-video-tldr-service-gpu')" },
+    { name = "httpx2-jsfetch", marker = "sys_platform == 'emscripten' or (extra == 'extra-18-video-tldr-service-cpu' and extra == 'extra-18-video-tldr-service-gpu')" },
     { name = "idna" },
-    { name = "truststore", marker = "sys_platform != 'emscripten' or (extra == 'extra-21-corganshelper-service-cpu' and extra == 'extra-21-corganshelper-service-gpu')" },
+    { name = "truststore", marker = "sys_platform != 'emscripten' or (extra == 'extra-18-video-tldr-service-cpu' and extra == 'extra-18-video-tldr-service-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7f/f8/579a8b51e42e38ee32647df9f08aa25643ae788e275cc625b199829c4671/httpx2-2.12.0.tar.gz", hash = "sha256:7631fe9887a8a2275f4a2540e053aa670fcc50742864a9ae7c66e609fdcf12cf", size = 100040, upload-time = "2026-08-18T13:22:09.086Z" }
 wheels = [
@@ -335,7 +285,7 @@ dependencies = [
     { name = "click" },
     { name = "filelock" },
     { name = "fsspec" },
-    { name = "hf-xet", marker = "platform_machine == 'AMD64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' or (extra == 'extra-21-corganshelper-service-cpu' and extra == 'extra-21-corganshelper-service-gpu')" },
+    { name = "hf-xet", marker = "platform_machine == 'AMD64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' or (extra == 'extra-18-video-tldr-service-cpu' and extra == 'extra-18-video-tldr-service-gpu')" },
     { name = "httpx" },
     { name = "packaging" },
     { name = "pyyaml" },
@@ -839,7 +789,7 @@ name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-21-corganshelper-service-cpu' and extra == 'extra-21-corganshelper-service-gpu')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-video-tldr-service-cpu' and extra == 'extra-18-video-tldr-service-gpu')" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
@@ -965,7 +915,7 @@ name = "tqdm"
 version = "4.70.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-21-corganshelper-service-cpu' and extra == 'extra-21-corganshelper-service-gpu')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-video-tldr-service-cpu' and extra == 'extra-18-video-tldr-service-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/21/3b/6c24bec5be5e743ffd99576daa5cc077722fc7d5bbc00bd133fa0c698dc6/tqdm-4.70.0.tar.gz", hash = "sha256:55b0b0dbd97462d06ebee91e4dac24ed4d4702be82b24f07e6c1d27e08cea220", size = 795438, upload-time = "2026-07-27T11:33:15.271Z" }
 wheels = [
@@ -1000,6 +950,56 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a3/26/b09b8010994eccc3c09092e6b34058f36a460eea2d4c3e8b910c695975a0/typing_inspection-0.4.4.tar.gz", hash = "sha256:547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47", size = 76928, upload-time = "2026-08-12T12:37:25.997Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/67/81/4add07e5172b7ac40d8ed5ff580409a7801a4fe26d529bdd915401dabfbe/typing_inspection-0.4.4-py3-none-any.whl", hash = "sha256:65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147", size = 14750, upload-time = "2026-08-12T12:37:24.648Z" },
+]
+
+[[package]]
+name = "video-tldr-service"
+source = { editable = "." }
+dependencies = [
+    { name = "anthropic" },
+    { name = "faster-whisper" },
+    { name = "markdown" },
+    { name = "numpy" },
+    { name = "onnx-asr", extra = ["hub"] },
+    { name = "openai" },
+    { name = "python-docx" },
+    { name = "yt-dlp" },
+]
+
+[package.optional-dependencies]
+gpu = [
+    { name = "nvidia-cublas-cu12" },
+    { name = "nvidia-cudnn-cu12" },
+    { name = "onnxruntime-gpu", extra = ["cuda", "cudnn"], marker = "extra == 'extra-18-video-tldr-service-gpu'" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anthropic", specifier = ">=1.4.0" },
+    { name = "faster-whisper", specifier = ">=1.2.1" },
+    { name = "markdown", specifier = ">=3.10.3" },
+    { name = "numpy", specifier = ">=2.5.3" },
+    { name = "nvidia-cublas-cu12", marker = "extra == 'gpu'", specifier = ">=12.9.2.10" },
+    { name = "nvidia-cudnn-cu12", marker = "extra == 'gpu'", specifier = ">=9" },
+    { name = "onnx-asr", extras = ["hub"], specifier = ">=0.12.0" },
+    { name = "onnxruntime", marker = "extra == 'cpu'", specifier = ">=1.20" },
+    { name = "onnxruntime-gpu", extras = ["cuda", "cudnn"], marker = "extra == 'gpu'", specifier = "<1.27" },
+    { name = "openai", specifier = ">=3.11.0" },
+    { name = "python-docx", specifier = ">=1.2.0" },
+    { name = "yt-dlp", specifier = ">=2026.8.19" },
+]
+provides-extras = ["cpu", "gpu"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8" },
+    { name = "ruff", specifier = ">=0.12" },
 ]
 
 [[package]]

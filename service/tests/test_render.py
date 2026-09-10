@@ -3,11 +3,11 @@ from datetime import date
 
 import pytest
 
-from corganshelper_service import llm
-from corganshelper_service import render as render_module
-from corganshelper_service.config import Settings
-from corganshelper_service.fetch import FetchError, video_folder, work_folder
-from corganshelper_service.render import (
+from video_tldr_service import llm
+from video_tldr_service import render as render_module
+from video_tldr_service.config import Settings
+from video_tldr_service.fetch import FetchError, video_folder, work_folder
+from video_tldr_service.render import (
     by_section,
     frontmatter,
     note_name,

@@ -1,9 +1,9 @@
 import copy
 import json
 
-from corganshelper_service import analyze as analyze_module
-from corganshelper_service import llm
-from corganshelper_service.analyze import (
+from video_tldr_service import analyze as analyze_module
+from video_tldr_service import llm
+from video_tldr_service.analyze import (
     ANALYSIS_SCHEMA,
     PART_LIMIT,
     STYLE_INSTRUCTIONS,
@@ -13,8 +13,8 @@ from corganshelper_service.analyze import (
     stamp,
     transcript_lines,
 )
-from corganshelper_service.config import Settings
-from corganshelper_service.fetch import work_folder
+from video_tldr_service.config import Settings
+from video_tldr_service.fetch import work_folder
 
 FAKE_ANALYSIS = {
     "kind": "explainer",

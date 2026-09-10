@@ -1,6 +1,6 @@
 # Security Policy
 
-corganshelper is a browser extension. It runs with the permissions its
+video-tldr is a browser extension. It runs with the permissions its
 manifest declares and nothing more: what it may read on a page, what it
 stores, and where it may send anything is bounded by `src/manifest.json`,
 and that file is the authoritative list. Today it declares no permission
@@ -28,7 +28,7 @@ Two private channels, either is fine:
 
 - **GitHub private vulnerability reporting.** In this repository's
   _Security_ tab, _Report a vulnerability_:
-  `https://github.com/corgan2222/corganshelper/security/advisories/new`. Preferred: report, discussion,
+  `https://github.com/corgan2222/video-tldr/security/advisories/new`. Preferred: report, discussion,
   and fix stay in one place, and you see the patch before it goes public.
 - **Email `stefan@knaak.org`** with the project name and "security" in the
   subject line. Nothing is encrypted at rest on the receiving end; if the

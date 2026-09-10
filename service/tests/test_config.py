@@ -2,19 +2,19 @@ import json
 
 import pytest
 
-from corganshelper_service.__main__ import main
-from corganshelper_service.config import ConfigError, Settings, parse_assignments
+from video_tldr_service.__main__ import main
+from video_tldr_service.config import ConfigError, Settings, parse_assignments
 
 
 def clean_env(monkeypatch):
     for variable in (
-        "CORGANSHELPER_LLM",
-        "CORGANSHELPER_MODEL",
-        "CORGANSHELPER_STT",
-        "CORGANSHELPER_FORMATS",
-        "CORGANSHELPER_OBSIDIAN_VAULT",
-        "CORGANSHELPER_OBSIDIAN_FOLDER",
-        "CORGANSHELPER_BROWSER",
+        "VIDEO_TLDR_LLM",
+        "VIDEO_TLDR_MODEL",
+        "VIDEO_TLDR_STT",
+        "VIDEO_TLDR_FORMATS",
+        "VIDEO_TLDR_OBSIDIAN_VAULT",
+        "VIDEO_TLDR_OBSIDIAN_FOLDER",
+        "VIDEO_TLDR_BROWSER",
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
     ):
@@ -90,7 +90,7 @@ def test_config_set_writes_the_file_and_the_key_is_never_printed(
 
 
 def test_formats_are_a_comma_list_of_known_names(tmp_path, monkeypatch, capsys):
-    from corganshelper_service.config import split_formats
+    from video_tldr_service.config import split_formats
 
     clean_env(monkeypatch)
     home = str(tmp_path)
@@ -131,7 +131,7 @@ def test_language_is_a_choice_and_the_file_is_replaced_not_truncated(
 def test_outputs_go_to_downloads_unless_a_folder_is_set(tmp_path, monkeypatch):
     from pathlib import Path
 
-    from corganshelper_service.config import default_download_dir
+    from video_tldr_service.config import default_download_dir
 
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     monkeypatch.setenv("HOME", str(tmp_path))
@@ -160,7 +160,7 @@ def test_the_run_switches_are_on_or_off_and_style_is_a_choice(
 
 
 def test_profiles_change_the_transcriber_and_the_model_on_top_of_the_file():
-    from corganshelper_service.config import DEFAULTS, ConfigError, profile_overrides
+    from video_tldr_service.config import DEFAULTS, ConfigError, profile_overrides
 
     assert profile_overrides("fast", DEFAULTS) == {"stt": "auto", "model": ""}
     assert profile_overrides("thorough", DEFAULTS) == {
@@ -180,7 +180,7 @@ def test_two_saves_at_once_keep_both_values(tmp_path):
     faster one changed it, and the owner lost a setting on 2026-09-10."""
     import threading
 
-    from corganshelper_service.config import store
+    from video_tldr_service.config import store
 
     store(tmp_path, {"llm": "claude"})
     ready = threading.Barrier(4)

@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from corganshelper_service import __main__ as cli
+from video_tldr_service import __main__ as cli
 
 
 def test_a_caption_outside_the_console_codepage_is_printed_anyway(

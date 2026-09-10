@@ -8,7 +8,6 @@ _[Deutsche Fassung](docs/README_DE.md)_
 
 Too long to read? A Firefox and Chrome extension with a local service that
 turns the YouTube video in the active tab into a summary with pictures.
-The repository keeps its old name, corganshelper.
 
 ## What It Can Do
 
@@ -80,4 +79,4 @@ How AI tools are handled is in [AI_POLICY.md](AI_POLICY.md).
 ## Documentation
 
 The full documentation is at
-[https://corgan2222.github.io/corganshelper/](https://corgan2222.github.io/corganshelper/).
+[https://corgan2222.github.io/video-tldr/](https://corgan2222.github.io/video-tldr/).

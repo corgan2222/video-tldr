@@ -31,9 +31,7 @@ from .run import bench, bench_table, header, row, run, urls_in
 from .serve import PORT, serve
 from .transcribe import transcribe
 
-# What `--help` and every error message call the command. The package and
-# the repository keep the name corganshelper, which is why `pyproject.toml`
-# installs both names for the same entry point.
+# What `--help` and every error message call the command.
 PROG = "video-tldr"
 
 
@@ -67,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--home",
         type=Path,
-        help="data directory; default CORGANSHELPER_HOME or D:/corganshelper",
+        help="data directory; default VIDEO_TLDR_HOME or ~/.video-tldr",
     )
     parser.add_argument(
         "--llm", choices=LLM_BACKENDS, help="language model backend for this run"

@@ -14,7 +14,7 @@ it('package.json and src/manifest.json carry the same version', () => {
 
 it('the service package carries the same version as package.json', () => {
   const init = readFileSync(
-    'service/src/corganshelper_service/__init__.py',
+    'service/src/video_tldr_service/__init__.py',
     'utf8',
   );
   const match = /^__version__ = "([^"]+)"$/m.exec(init);

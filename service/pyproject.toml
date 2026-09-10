@@ -3,12 +3,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "corganshelper-service"
-# The number lives in src/corganshelper_service/__init__.py, mirrored from
+name = "video-tldr-service"
+# The number lives in src/video_tldr_service/__init__.py, mirrored from
 # package.json by scripts/bump_version.py. Not here: uv.lock records the
 # project's own version, and a bump in this file would date the lock.
 dynamic = ["version"]
-description = "The local service behind the corganshelper extension: fetches, transcribes and summarises YouTube videos."
+description = "The local service behind the video-tldr extension: fetches, transcribes and summarises YouTube videos."
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
@@ -24,11 +24,8 @@ dependencies = [
     "yt-dlp>=2026.8.19",
 ]
 
-# Two names for one command: the extension is called video-tldr, the
-# repository and the package keep their old name.
 [project.scripts]
-corganshelper = "corganshelper_service.__main__:main"
-video-tldr = "corganshelper_service.__main__:main"
+video-tldr = "video_tldr_service.__main__:main"
 
 # One of the two extras is needed to transcribe: they carry the ONNX
 # runtime for parakeet and, in gpu, the CUDA libraries whisper needs too.
@@ -51,10 +48,10 @@ override-dependencies = ["onnxruntime ; python_version < '3'"]
 conflicts = [[{ extra = "cpu" }, { extra = "gpu" }]]
 
 [tool.hatch.version]
-path = "src/corganshelper_service/__init__.py"
+path = "src/video_tldr_service/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/corganshelper_service"]
+packages = ["src/video_tldr_service"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
