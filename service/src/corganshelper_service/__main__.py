@@ -26,6 +26,8 @@ from .fetch import FetchError, fetch
 from .frames import frames
 from .llm import LlmError
 from .render import render
+from .run import header, row, run, urls_in
+from .serve import PORT, serve
 from .transcribe import transcribe
 
 PROG = "corganshelper"
@@ -126,6 +128,30 @@ def build_parser() -> argparse.ArgumentParser:
                 choices=FORMATS,
                 help="an output besides summary.md; repeatable; default from config",
             )
+    run_cmd = commands.add_parser(
+        "run", help="every step in a row, for one URL or for --batch FILE"
+    )
+    run_cmd.add_argument("url", nargs="?")
+    run_cmd.add_argument(
+        "--batch",
+        type=Path,
+        metavar="FILE",
+        help="one URL per line; prints a Markdown table, one row per video",
+    )
+    run_cmd.add_argument("--language", help="language of the note; default from config")
+    run_cmd.add_argument(
+        "--force", action="store_true", help="redo every step although results exist"
+    )
+    run_cmd.add_argument(
+        "--format",
+        action="append",
+        choices=FORMATS,
+        help="an output besides summary.md; repeatable; default from config",
+    )
+    serve_cmd = commands.add_parser(
+        "serve", help="listen on 127.0.0.1 for the extension until Ctrl+C"
+    )
+    serve_cmd.add_argument("--port", type=int, default=PORT, help=f"default {PORT}")
     return parser
 
 
@@ -137,17 +163,53 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "run" and not (args.url or args.batch):
+        parser.error("run needs a URL or --batch FILE")
+    overrides = {"llm": args.llm, "model": args.model, "stt": args.stt}
     try:
         if args.command == "config" and args.set:
             # Written first, then loaded like any other run reads it.
             store(args.home, parse_assignments(args.set))
-        settings = Settings.load(
-            home=args.home,
-            overrides={"llm": args.llm, "model": args.model, "stt": args.stt},
-        )
+        settings = Settings.load(home=args.home, overrides=overrides)
     except ConfigError as error:
         print(f"config error: {error}", file=sys.stderr)
         return 1
+
+    if args.command == "serve":
+        try:
+            return serve(args.home, overrides, args.port)
+        except OSError as error:
+            print(f"serve failed: {error}", file=sys.stderr)
+            return 1
+
+    if args.command == "run":
+        urls = urls_in(args.batch) if args.batch else [args.url]
+        if args.batch:
+            print(header(), flush=True)
+        failed = 0
+        for url in urls:
+            result = run(
+                url,
+                settings,
+                force=args.force,
+                language=args.language,
+                formats=args.format,
+                progress=lambda step, url=url: print(
+                    f"  {url} {step}", file=sys.stderr
+                ),
+            )
+            if result["error"]:
+                failed += 1
+                print(
+                    f"{url}: {result['error']['step']} failed: "
+                    f"{result['error']['message']}",
+                    file=sys.stderr,
+                )
+            if args.batch:
+                print(row(result), flush=True)
+            else:
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 1 if failed else 0
 
     if args.command == "probe":
         problems = probe(settings)

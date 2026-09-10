@@ -113,3 +113,16 @@ def test_models_stt_lists_speed_error_rate_and_languages(tmp_path, monkeypatch, 
     assert "parakeet" in out and "fast" in out
     assert main(["--home", str(tmp_path), "--stt", "canary", "config"]) == 0
     assert '"stt": "canary"' in capsys.readouterr().out
+
+
+def test_language_is_a_choice_and_the_file_is_replaced_not_truncated(
+    tmp_path, monkeypatch, capsys
+):
+    clean_env(monkeypatch)
+    home = str(tmp_path)
+    assert main(["--home", home, "config", "--set", "language=fr"]) == 1
+    assert "language must be one of de, en" in capsys.readouterr().err
+
+    assert main(["--home", home, "config", "--set", "language=en"]) == 0
+    # Written beside and renamed over, so a reader never sees a half file.
+    assert [p.name for p in tmp_path.iterdir()] == ["config.json"]

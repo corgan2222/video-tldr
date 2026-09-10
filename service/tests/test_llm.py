@@ -146,8 +146,15 @@ class FakeOpenAI:
                 )
 
         self.chat = SimpleNamespace(completions=Completions())
+        # What LM Studio lists on this machine: two chat models, a Whisper
+        # and an embedding model. Only the first two can answer a prompt.
         self.models = SimpleNamespace(
-            list=lambda: [SimpleNamespace(id="qwen3-8b"), SimpleNamespace(id="gemma")]
+            list=lambda: [
+                SimpleNamespace(id="qwen3-8b"),
+                SimpleNamespace(id="whisper-large-v3-turbo"),
+                SimpleNamespace(id="gemma"),
+                SimpleNamespace(id="text-embedding-nomic-embed-text-v1.5"),
+            ]
         )
 
 
