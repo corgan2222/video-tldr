@@ -15,7 +15,7 @@ import { t, translate } from './i18n.js';
 const COMMANDS: Record<string, string> = {
   'cmd-script':
     'irm https://raw.githubusercontent.com/corgan2222/video-tldr/main/install.ps1 | iex',
-  'cmd-uv': 'uv tool install video-tldr',
+  'cmd-uv': 'uv tool install video-tldr-service',
   'cmd-source': 'git clone https://github.com/corgan2222/video-tldr.git',
 };
 

@@ -48,7 +48,7 @@ which carries the Python with it. Three ways, whichever suits you:
 
 ```
 irm https://raw.githubusercontent.com/corgan2222/video-tldr/main/install.ps1 | iex
-uv tool install video-tldr
+uv tool install video-tldr-service
 git clone https://github.com/corgan2222/video-tldr.git
 ```
 
