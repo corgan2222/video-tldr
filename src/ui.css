@@ -12,7 +12,20 @@
   --muted: color-mix(in srgb, CanvasText 65%, transparent);
   --accent: #1a73e8;
   --good: #188038;
+  /* Amber for what still works but not fully: a model that answers and
+     cannot read pictures is not the same as a server that is silent. */
+  --warn: #b25f00;
   --bad: #d93025;
+}
+
+/* The signal colours carry text as well as dots, and a dark window
+   swallows them: each gets a lighter shade there. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --good: #6dd58c;
+    --warn: #fcad70;
+    --bad: #f28b82;
+  }
 }
 
 * {
@@ -233,6 +246,10 @@ code {
   color: var(--good);
 }
 
+.light.warn::before {
+  color: var(--warn);
+}
+
 .light.bad::before {
   color: var(--bad);
 }
@@ -339,4 +356,12 @@ pre {
 
 .status.bad {
   color: var(--bad);
+}
+
+.status.ok {
+  color: var(--good);
+}
+
+.status.warn {
+  color: var(--warn);
 }

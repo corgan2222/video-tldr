@@ -293,9 +293,12 @@ async function loadModels(): Promise<void> {
   }
 }
 
-function light(id: string, name: string, state?: Light): void {
+// `soft` turns a failed light amber instead of red: a model that answers
+// and cannot read pictures still gets the run done, only without labels.
+function light(id: string, name: string, state?: Light, soft = false): void {
   const item = pick<HTMLElement>(`#light-${id}`);
-  item.className = `light ${state ? (state.ok ? 'ok' : 'bad') : 'unknown'}`;
+  const trouble = soft ? 'warn' : 'bad';
+  item.className = `light ${state ? (state.ok ? 'ok' : trouble) : 'unknown'}`;
   const what = document.createElement('span');
   what.className = 'what';
   what.textContent = `${name}:`;
@@ -311,7 +314,7 @@ async function loadHealth(): Promise<Health | undefined> {
     light('service', t('lightService'), health.service);
     light('llm', t('lightLlm'), health.llm);
     light('stt', t('lightStt'), health.stt);
-    light('capabilities', t('lightCapabilities'), health.capabilities);
+    light('capabilities', t('lightCapabilities'), health.capabilities, true);
     return health;
   } catch (error) {
     light('service', t('lightService'), { ok: false, detail: message(error) });
@@ -336,9 +339,17 @@ async function checkBackend(): Promise<void> {
   }
   const [, health] = await Promise.all([loadModels(), loadHealth()]);
   if (!health) return;
+  // Three answers, three colours: green when everything works, amber when
+  // the model answers but cannot do all of it, red when nothing gets
+  // through at all.
   const able = health.capabilities;
-  checkResult.textContent = able && !able.ok ? able.detail : health.llm.detail;
-  checkResult.className = health.llm.ok ? 'status' : 'status bad';
+  const limited = Boolean(able && !able.ok);
+  checkResult.textContent = limited ? able!.detail : health.llm.detail;
+  checkResult.className = !health.llm.ok
+    ? 'status bad'
+    : limited
+      ? 'status warn'
+      : 'status ok';
 }
 
 async function loadService(): Promise<void> {
@@ -348,7 +359,7 @@ async function loadService(): Promise<void> {
     noService.hidden = true;
     show();
     serviceStatus.textContent = `${config.version} · ${config.home}`;
-    serviceStatus.className = 'status';
+    serviceStatus.className = 'status ok';
     showStats(await request<Stats>(connection(), 'GET', '/stats'));
   } catch (error) {
     connected = false;
@@ -388,9 +399,10 @@ async function saveOne(key: string): Promise<void> {
   }
 }
 
+// Saved, copied, forgotten: what worked is green, what did not is red.
 function say(text: string, bad = false): void {
   status.textContent = text;
-  status.className = bad ? 'status bad' : 'status';
+  status.className = bad ? 'status bad' : 'status ok';
   setTimeout(() => {
     status.textContent = '';
   }, 6000);
