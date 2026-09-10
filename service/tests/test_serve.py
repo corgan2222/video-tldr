@@ -7,7 +7,7 @@ import urllib.request
 import pytest
 
 from corganshelper_service import serve as module
-from corganshelper_service.config import Settings
+from corganshelper_service.config import Settings, store
 from corganshelper_service.serve import Server, Service
 
 URL = "https://youtu.be/x_x_x_x_x_x"
@@ -57,6 +57,9 @@ def runner():
 
 @pytest.fixture
 def service(tmp_path, runner):
+    # With a token set, so the tests below see the check; without one the
+    # service answers everyone on 127.0.0.1 (test below).
+    store(tmp_path, {"token": "secret"})
     return Service(tmp_path, runner=runner)
 
 
@@ -97,12 +100,21 @@ def wait_for(server, vid, status):
     raise AssertionError(f"job never became {status}: {job}")
 
 
-def test_serve_makes_a_token_and_keeps_it_in_config_json(tmp_path, runner):
-    first = Service(tmp_path, runner=runner)
-
-    assert first.token
-    assert Settings.load(tmp_path).config["token"] == first.token
-    assert Service(tmp_path, runner=runner).token == first.token
+def test_without_a_token_in_config_json_nobody_needs_one(tmp_path, runner):
+    open_service = Service(tmp_path / "open", runner=runner)
+    server = Server(open_service, 0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        assert open_service.token == ""
+        assert call(server, "GET", "/config", token=False)[0] == 200
+        assert call(server, "GET", "/config", token="anything")[0] == 200
+        # Host and Origin still keep web pages out.
+        page = {"Origin": "https://evil.example"}
+        assert call(server, "GET", "/config", headers=page, token=False)[0] == 403
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 def test_without_the_token_nothing_answers(server):

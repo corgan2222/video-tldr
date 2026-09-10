@@ -46,15 +46,18 @@ describe('request', () => {
     expect(init.body).toBe('{"url":"https://youtu.be/x"}');
   });
 
-  it('sends no content type without a body', async () => {
+  it('sends no content type without a body, no token header without a token', async () => {
     const fetchMock = vi.fn().mockResolvedValue(answer(200, {}));
     vi.stubGlobal('fetch', fetchMock);
 
     await request(connection, 'GET', '/jobs/x');
+    await request({ ...connection, token: '' }, 'GET', '/jobs/x');
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.body).toBeUndefined();
     expect(init.headers).toEqual({ Authorization: 'Bearer secret' });
+    const [, open] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(open.headers).toEqual({});
   });
 
   it("throws the service's own reason on an error status", async () => {

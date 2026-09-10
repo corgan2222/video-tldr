@@ -170,9 +170,10 @@ export async function request<T>(
       `the service URL must be http://127.0.0.1 with a port, not ${base}`,
     );
   }
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${connection.token}`,
-  };
+  // The token is optional: a service without one ignores the header, a
+  // service with one answers 401 without it.
+  const headers: Record<string, string> = {};
+  if (connection.token) headers.Authorization = `Bearer ${connection.token}`;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   let response: Response;
   try {

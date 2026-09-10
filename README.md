@@ -44,11 +44,10 @@ model choice.
 
 ## Usage
 
-1. Start the service: `cd service && uv run video-tldr serve`. It prints
-   a token.
-2. Click the toolbar icon; without a token it opens the settings. Enter
-   the token, press Connect, choose the language, the outputs and the
-   model, Save.
+1. Start the service: `cd service && uv run video-tldr serve`.
+2. Click the toolbar icon, open Settings, press Connect, choose the
+   language, the outputs and the model, Save. A token is needed only
+   when the service was given one.
 3. Open a YouTube video, click the icon, press Fast or Thorough. The
    window shows the steps as they run; a notification says when the
    summary is ready, and a click on it opens the note.

@@ -222,6 +222,7 @@ async function loadService(): Promise<void> {
     connected = false;
     show();
     serviceStatus.textContent = `Not connected: ${message(error)}`;
+    statsNote.textContent = 'Connect to see what your runs took.';
   }
   await loadModels();
 }
@@ -258,15 +259,7 @@ async function load(): Promise<void> {
   seenCount.textContent = `${seen.length} links`;
   serviceUrlBox.value = stored.serviceUrl as string;
   tokenBox.value = stored.token as string;
-  if (tokenBox.value) {
-    await loadService();
-  } else {
-    show();
-    serviceStatus.textContent =
-      'Not connected: paste the token from `video-tldr serve` and press Connect.';
-    statsNote.textContent = 'Connect to see what your runs took.';
-    await loadModels();
-  }
+  await loadService();
 }
 
 pick('#connect').addEventListener('click', async () => {

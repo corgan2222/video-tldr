@@ -38,7 +38,6 @@ import json
 import logging
 import os
 import queue
-import secrets
 import subprocess
 import sys
 import threading
@@ -127,6 +126,8 @@ class Service:
         return Settings.load(self.home, overrides)
 
     def open_log(self) -> logging.Logger:
+        # A fresh data directory: the token no longer creates it on the way.
+        self.log_path.parent.mkdir(parents=True, exist_ok=True)
         log = logging.getLogger(f"corganshelper.serve.{id(self)}")
         log.setLevel(logging.INFO)
         log.propagate = False
@@ -150,11 +151,11 @@ class Service:
             return [line.rstrip("\n") for line in deque(handle, maxlen=lines)]
 
     def ensure_token(self) -> str:
-        token = self.settings().config["token"]
-        if not token:
-            token = secrets.token_urlsafe(24)
-            store(self.home, {"token": token})
-        return token
+        """The token from config.json, or empty: then the Host and Origin
+        checks alone keep web pages out, and any extension in the browser
+        may use the service (owner's choice, 2026-09-10). `corganshelper
+        config --set token=<secret>` turns the check on."""
+        return self.settings().config["token"]
 
     def config(self) -> dict:
         settings = self.settings()
@@ -351,6 +352,8 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def authorised(self) -> bool:
+        if not self.server.service.token:
+            return True
         # Compared as bytes: http.server decodes headers as latin-1, and
         # compare_digest refuses a str with a non-ASCII character in it,
         # which killed the handler thread instead of answering 401.
@@ -442,10 +445,17 @@ def serve(home: Path | None, overrides: dict | None = None, port: int = PORT) ->
         f"data under {service.settings().home}, log in {service.log_path}",
         flush=True,
     )
-    print(
-        f"token: {service.token}  (paste it into the extension's options)",
-        flush=True,
-    )
+    if service.token:
+        print(
+            f"token: {service.token}  (paste it into the extension's options)",
+            flush=True,
+        )
+    else:
+        print(
+            "no token set: any extension in the browser may use the service; "
+            "`corganshelper config --set token=<secret>` turns the check on",
+            flush=True,
+        )
     service.log.info("video-tldr service %s listening on port %s", __version__, port)
     try:
         server.serve_forever()

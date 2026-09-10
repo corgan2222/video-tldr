@@ -1,6 +1,6 @@
 {
   "name": "video-tldr",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "description": "Too long to read? One click turns the YouTube video in the active tab into a summary with pictures, as a note, PDF or Word file.",
   "type": "module",
   "license": "MIT",

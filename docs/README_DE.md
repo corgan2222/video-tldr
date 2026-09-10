@@ -47,11 +47,10 @@ und Modellwahl.
 
 ## Benutzung
 
-1. Dienst starten: `cd service && uv run video-tldr serve`. Er druckt ein
-   Token.
-2. Auf das Symbol klicken; ohne Token öffnet es die Einstellungen. Token
-   eintragen, „Connect" drücken, Sprache, Ausgaben und Modell wählen,
-   „Save".
+1. Dienst starten: `cd service && uv run video-tldr serve`.
+2. Auf das Symbol klicken, „Settings" öffnen, „Connect" drücken, Sprache,
+   Ausgaben und Modell wählen, „Save". Ein Token braucht es nur, wenn der
+   Dienst eines bekommen hat.
 3. Ein YouTube-Video öffnen, auf das Symbol klicken, „Fast" oder
    „Thorough" drücken. Das Fenster zeigt die Schritte, während sie
    laufen; eine Benachrichtigung meldet, wenn die Zusammenfassung fertig

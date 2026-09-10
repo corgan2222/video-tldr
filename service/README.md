@@ -50,8 +50,7 @@ line and prints a Markdown table, one row per video, as each finishes.
 ## Serving the extension
 
 `corganshelper serve` listens on `http://127.0.0.1:8765` (`--port`
-changes that) and prints a token; paste both into the extension's
-options. The extension hands over the URL of the active tab, the service
+changes that). The extension hands over the URL of the active tab, the service
 runs `run` on it, one job at a time, and the extension polls the job
 until it is done. A click on the notification asks the service to open
 the result: the note in Obsidian when that format was written, else the
@@ -66,11 +65,14 @@ first document among PDF, Word and Markdown.
 | `PUT /config {key: value}`  | writes the keys given to `config.json`, answers like `GET`        |
 | `GET /models?llm=<backend>` | the names that backend accepts as `model`; `400` with the reason  |
 
-Every request must carry `Authorization: Bearer <token>` and a `Host`
-header of `127.0.0.1:<port>`; an `Origin` header is accepted only from
-`moz-extension://` and `chrome-extension://`. The service sends no CORS
-headers, so a web page cannot reach it. The token lives in `config.json`
-as `token`; delete it there to have `serve` make a new one.
+Every request must carry a `Host` header of `127.0.0.1:<port>`; an
+`Origin` header is accepted only from `moz-extension://` and
+`chrome-extension://`. The service sends no CORS headers, so a web page
+cannot reach it. A token is optional: with `token` set in `config.json`
+(`corganshelper config --set token=<secret>`), every request must also
+carry `Authorization: Bearer <token>`, which keeps other extensions in
+the browser out; without one, any extension that may reach 127.0.0.1 can
+use the service.
 
 What the service did is in `serve.log` next to the data (three files of
 a megabyte, the newest without a number): every request with its status,

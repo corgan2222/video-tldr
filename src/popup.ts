@@ -204,9 +204,7 @@ async function load(): Promise<void> {
     : 'No YouTube video in this tab.';
   videoBox.title = tabUrl;
 
-  if (!connection.token) {
-    hint.textContent = 'Not set up yet: open Settings, paste the token.';
-  } else if (!currentId) {
+  if (!currentId) {
     hint.textContent = 'Open a YouTube video first.';
   } else {
     buttons.fast.disabled = false;
@@ -215,7 +213,7 @@ async function load(): Promise<void> {
   try {
     stats = await request<Stats>(connection, 'GET', '/stats');
   } catch (error) {
-    if (connection.token) status.textContent = message(error);
+    status.textContent = `${message(error)} Check Settings.`;
   }
   await refresh();
   setInterval(() => void refresh(), REFRESH_MS);

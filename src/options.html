@@ -80,18 +80,17 @@
     <p class="note">
       The toolbar icon opens a window with two buttons, Fast and Thorough, that
       hand the YouTube video in the active tab to the local service,
-      <code>video-tldr serve</code>. The service prints its token when it
-      starts. The settings below live in the service's <code>config.json</code>;
-      grey text shows the default.
+      <code>video-tldr serve</code>. The settings below live in the service's
+      <code>config.json</code>; grey text shows the default.
     </p>
     <label for="service-url">Service URL</label>
     <input id="service-url" type="url" placeholder="http://127.0.0.1:8765" />
-    <label for="token">Token</label>
+    <label for="token">Token (only if the service has one)</label>
     <input
       id="token"
       type="password"
       autocomplete="off"
-      placeholder="printed by video-tldr serve"
+      placeholder="empty unless config.json sets a token"
     />
     <div class="row">
       <button id="connect">Connect</button>
