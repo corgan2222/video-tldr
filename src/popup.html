@@ -50,6 +50,23 @@
         font-size: 12px;
         margin: 4px 0;
       }
+      #lights span {
+        margin-right: 10px;
+        cursor: help;
+      }
+      .light::before {
+        content: '●';
+        margin-right: 4px;
+      }
+      .light.ok::before {
+        color: #188038;
+      }
+      .light.bad::before {
+        color: #d93025;
+      }
+      .light.unknown::before {
+        color: #9aa0a6;
+      }
       .job {
         margin-top: 10px;
         padding-top: 8px;
@@ -113,6 +130,11 @@
       <h1>video-tldr</h1>
       <a id="settings">Settings</a>
     </header>
+    <div id="lights" class="note">
+      <span id="light-service" class="light unknown" title="">service</span>
+      <span id="light-llm" class="light unknown" title="">model</span>
+      <span id="light-stt" class="light unknown" title="">transcriber</span>
+    </div>
     <div id="video">…</div>
     <div class="row">
       <button id="fast" disabled>Fast</button>

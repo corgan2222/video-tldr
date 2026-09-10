@@ -1,6 +1,8 @@
 import { api } from './api.js';
 import { DEFAULT_BLOCKLIST } from './links.js';
 import {
+  BACKEND_FIELDS,
+  BACKEND_INFO,
   DEFAULT_CHOICES,
   DEFAULT_CONNECTION,
   DEFAULT_SETTINGS,
@@ -10,6 +12,8 @@ import {
   STEPS,
   type Config,
   type Connection,
+  type Health,
+  type Light,
   type Measure,
   type Stats,
 } from './service.js';
@@ -29,6 +33,8 @@ const serviceStatus = pick<HTMLElement>('#service-status');
 const formatsBox = pick<HTMLElement>('#formats');
 const modelList = pick<HTMLDataListElement>('#models');
 const modelHint = pick<HTMLElement>('#model-hint');
+const backendInfo = pick<HTMLElement>('#backend-info');
+const keyNote = pick<HTMLElement>('#key-note');
 const statsBox = pick<HTMLElement>('#stats');
 const statsNote = pick<HTMLElement>('#stats-note');
 
@@ -52,6 +58,7 @@ const FIELDS: Record<string, string> = {
 
 // True once GET /config answered; only then does Save reach the service.
 let connected = false;
+let config: Config | undefined;
 
 function field(key: string): HTMLInputElement | HTMLSelectElement {
   return pick<HTMLInputElement | HTMLSelectElement>(FIELDS[key]);
@@ -80,7 +87,7 @@ function fillSelect(
 
 // The choice between fast and accurate, as `video-tldr models stt`
 // prints it: speed class, leaderboard word error rate, languages.
-function sttLabel(config: Config | undefined, name: string): string {
+function sttLabel(name: string): string {
   const spec = config?.stt_models[name];
   if (!spec) {
     if (name === 'auto') return 'auto (caption track when there is one)';
@@ -101,9 +108,35 @@ function checkbox(name: string, checked: boolean): HTMLLabelElement {
   return label;
 }
 
+function light(id: string, name: string, state?: Light): void {
+  const item = pick<HTMLElement>(`#light-${id}`);
+  item.className = `light ${state ? (state.ok ? 'ok' : 'bad') : 'unknown'}`;
+  item.textContent = `${name}: ${state?.detail ?? 'not checked yet'}`;
+}
+
+// The backend decides which extra fields make sense; the OpenAI key also
+// serves the openai transcriber.
+function showBackendFields(): void {
+  const backend = field('llm').value;
+  const needed = new Set(BACKEND_FIELDS[backend] ?? []);
+  if (field('stt').value === 'openai') needed.add('openai_api_key');
+  document.querySelectorAll<HTMLElement>('[data-field]').forEach((box) => {
+    box.hidden = !needed.has(box.dataset.field ?? '');
+  });
+  keyNote.hidden =
+    !needed.has('openai_api_key') && !needed.has('anthropic_api_key');
+  const recommended = config?.default_models[backend] ?? '';
+  backendInfo.textContent =
+    (BACKEND_INFO[backend] ?? '') +
+    (recommended ? ` Default model: ${recommended}.` : '');
+  (field('model') as HTMLInputElement).placeholder = recommended
+    ? `empty means ${recommended}`
+    : 'pick one of the models the server has loaded';
+}
+
 // Fill the fields from the service's answer, or from the copy of its
 // defaults when there is none yet.
-function show(config?: Config): void {
+function show(): void {
   const settings = config?.settings ?? DEFAULT_SETTINGS;
   const choices = config?.choices ?? DEFAULT_CHOICES;
   for (const key of Object.keys(FIELDS)) {
@@ -114,7 +147,7 @@ function show(config?: Config): void {
         element,
         choices[key] ?? [],
         value,
-        key === 'stt' ? (c) => sttLabel(config, c) : undefined,
+        key === 'stt' ? sttLabel : undefined,
       );
     } else {
       // Without a connection the placeholder shows the default; a value
@@ -122,21 +155,27 @@ function show(config?: Config): void {
       element.value = config ? value : '';
     }
   }
+  const browserBox = field('browser') as HTMLInputElement;
+  browserBox.placeholder = config?.browser_found
+    ? `found: ${config.browser_found}`
+    : 'no Chrome or Edge found; choose one with Browse…';
   const chosen = new Set(
     (settings.formats ?? '').split(',').map((f) => f.trim()),
   );
   formatsBox.replaceChildren(
     ...(choices.formats ?? []).map((f) => checkbox(f, chosen.has(f))),
   );
+  showBackendFields();
 }
 
 function table(head: string[], rows: string[][]): HTMLTableElement {
   const node = document.createElement('table');
   const header = node.insertRow();
-  for (const text of head)
+  for (const text of head) {
     header.append(
       Object.assign(document.createElement('th'), { textContent: text }),
     );
+  }
   for (const cells of rows) {
     const row = node.insertRow();
     cells.forEach((text, index) => {
@@ -211,20 +250,36 @@ async function loadModels(): Promise<void> {
   }
 }
 
+// The three lights: asked once per connect, the service asks its
+// backend and looks for the transcriber's model.
+async function loadHealth(): Promise<void> {
+  try {
+    const health = await request<Health>(connection(), 'GET', '/health');
+    light('service', 'Service', health.service);
+    light('llm', 'Language model', health.llm);
+    light('stt', 'Transcriber', health.stt);
+  } catch (error) {
+    light('service', 'Service', { ok: false, detail: message(error) });
+    light('llm', 'Language model');
+    light('stt', 'Transcriber');
+  }
+}
+
 async function loadService(): Promise<void> {
   try {
-    const config = await request<Config>(connection(), 'GET', '/config');
+    config = await request<Config>(connection(), 'GET', '/config');
     connected = true;
-    show(config);
+    show();
     serviceStatus.textContent = `Connected to the video-tldr service ${config.version}, data under ${config.home}, log in ${config.log}.`;
     showStats(await request<Stats>(connection(), 'GET', '/stats'));
   } catch (error) {
     connected = false;
+    config = undefined;
     show();
     serviceStatus.textContent = `Not connected: ${message(error)}`;
     statsNote.textContent = 'Connect to see what your runs took.';
   }
-  await loadModels();
+  await Promise.all([loadModels(), loadHealth()]);
 }
 
 // Every field goes back as it stands. A key the service showed as stars
@@ -238,6 +293,26 @@ async function saveService(): Promise<void> {
     (box) => box.value,
   ).join(',');
   await request(connection(), 'PUT', '/config', values);
+}
+
+// A file or folder dialog on the desktop, opened by the service: the
+// browser's own dialog never tells an extension the full path.
+async function browse(key: string, kind: 'file' | 'folder'): Promise<void> {
+  const box = field(key) as HTMLInputElement;
+  try {
+    const { path } = await request<{ path: string }>(
+      connection(),
+      'POST',
+      '/pick',
+      {
+        kind,
+        start: box.value.trim(),
+      },
+    );
+    if (path) box.value = path;
+  } catch (error) {
+    say(message(error));
+  }
 }
 
 function say(text: string): void {
@@ -268,7 +343,15 @@ pick('#connect').addEventListener('click', async () => {
 });
 
 field('llm').addEventListener('change', () => {
+  showBackendFields();
   void loadModels();
+});
+field('stt').addEventListener('change', showBackendFields);
+pick('#pick-vault').addEventListener('click', () => {
+  void browse('obsidian_vault', 'folder');
+});
+pick('#pick-browser').addEventListener('click', () => {
+  void browse('browser', 'file');
 });
 
 pick('#save').addEventListener('click', async () => {
@@ -285,6 +368,7 @@ pick('#save').addEventListener('click', async () => {
   }
   try {
     await saveService();
+    await loadHealth();
   } catch (error) {
     say(message(error));
     return;

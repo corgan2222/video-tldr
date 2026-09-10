@@ -255,3 +255,39 @@ def test_canary_is_told_the_language_and_parakeet_is_not(tmp_path, monkeypatch):
     module.onnx_transcribe(audio, tmp_path, "nemo-parakeet-tdt-0.6b-v3", "de")
 
     assert calls == [{"language": "de"}, {}, {}]
+
+
+def test_stt_status_says_what_would_run_and_whether_it_can(tmp_path, monkeypatch):
+    from corganshelper_service import transcribe as module
+    from corganshelper_service.config import Settings
+
+    monkeypatch.setenv("CORGANSHELPER_WHISPER", "cpu")
+    settings = Settings(home=tmp_path)
+
+    state = module.stt_status(settings)
+    assert state["ok"] is True
+    assert state["detail"].startswith("captions first, else whisper (large-v3-turbo)")
+    assert "downloads on first use" in state["detail"]
+    assert "cpu" in state["detail"]
+
+    (tmp_path / "models" / "faster-whisper-large-v3-turbo").mkdir(parents=True)
+    assert "downloaded" in module.stt_status(settings)["detail"]
+
+    settings.config["stt"] = "subtitles"
+    assert module.stt_status(settings) == {
+        "ok": True,
+        "detail": "captions only, no model needed",
+    }
+
+    settings.config["stt"] = "openai"
+    assert module.stt_status(settings)["ok"] is False
+    settings.config["openai_api_key"] = "k"
+    assert module.stt_status(settings) == {
+        "ok": True,
+        "detail": "openai whisper-1, key set",
+    }
+
+    settings.config["stt"] = "parakeet"
+    state = module.stt_status(settings)
+    assert state["ok"] is True
+    assert state["detail"].startswith("parakeet (nemo-parakeet-tdt-0.6b-v3)")

@@ -319,6 +319,43 @@ def test_the_log_names_every_request_and_what_a_job_did(server, runner, tmp_path
     assert any("RuntimeError: boom" in line for line in answer["lines"])
 
 
+def test_health_shows_three_lights_and_config_the_defaults(server, monkeypatch):
+    monkeypatch.setattr(
+        module.llm, "status", lambda settings: {"ok": True, "detail": "claude CLI"}
+    )
+    monkeypatch.setattr(
+        module, "stt_status", lambda settings: {"ok": False, "detail": "no GPU"}
+    )
+
+    code, answer = call(server, "GET", "/health")
+
+    assert code == 200
+    assert answer["service"]["ok"] is True
+    assert "video-tldr service" in answer["service"]["detail"]
+    assert answer["llm"] == {"ok": True, "detail": "claude CLI"}
+    assert answer["stt"] == {"ok": False, "detail": "no GPU"}
+    _, config = call(server, "GET", "/config")
+    assert config["default_models"]["claude"] == "sonnet"
+    assert isinstance(config["browser_found"], str)
+
+
+def test_pick_opens_a_dialog_on_this_desktop_and_returns_the_path(server, monkeypatch):
+    asked = []
+
+    def fake_pick(kind, start=""):
+        asked.append((kind, start))
+        return "D:/Vaults/Notes" if kind == "folder" else ""
+
+    monkeypatch.setattr(module, "pick", fake_pick)
+
+    code, answer = call(server, "POST", "/pick", {"kind": "folder", "start": "D:/"})
+    assert (code, answer) == (200, {"path": "D:/Vaults/Notes"})
+    code, answer = call(server, "POST", "/pick", {"kind": "file"})
+    assert (code, answer) == (200, {"path": ""})
+    assert asked == [("folder", "D:/"), ("file", "")]
+    assert call(server, "POST", "/pick", {"kind": "anything"})[0] == 400
+
+
 def test_stats_come_from_the_runs_in_the_work_folder(server, tmp_path):
     code, answer = call(server, "GET", "/stats")
     assert (code, answer["runs"]) == (200, 0)

@@ -13,7 +13,9 @@ import {
   stepViews,
   videoId,
   type Connection,
+  type Health,
   type Job,
+  type Light,
   type Profile,
   type Stats,
 } from './service.js';
@@ -215,8 +217,32 @@ async function load(): Promise<void> {
   } catch (error) {
     status.textContent = `${message(error)} Check Settings.`;
   }
+  void showLights();
   await refresh();
   setInterval(() => void refresh(), REFRESH_MS);
+}
+
+// Three dots under the title: service, language model, transcriber. The
+// detail sits in the tooltip, and a red one gets its reason in the
+// status line.
+function light(id: string, state?: Light): void {
+  const dot = pick<HTMLElement>(`#light-${id}`);
+  dot.className = `light ${state ? (state.ok ? 'ok' : 'bad') : 'unknown'}`;
+  dot.title = state?.detail ?? 'not checked';
+  if (state && !state.ok) status.textContent = state.detail;
+}
+
+async function showLights(): Promise<void> {
+  try {
+    const health = await request<Health>(connection, 'GET', '/health');
+    light('service', health.service);
+    light('llm', health.llm);
+    light('stt', health.stt);
+  } catch (error) {
+    light('service', { ok: false, detail: message(error) });
+    light('llm');
+    light('stt');
+  }
 }
 
 pick('#settings').addEventListener('click', () => {

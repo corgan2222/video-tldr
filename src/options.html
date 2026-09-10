@@ -52,6 +52,9 @@
         gap: 8px;
         align-items: center;
       }
+      .row input {
+        flex: 1;
+      }
       #formats label {
         display: inline;
         font-weight: normal;
@@ -59,6 +62,27 @@
       }
       .note {
         opacity: 0.75;
+      }
+      .lights {
+        list-style: none;
+        margin: 8px 0;
+        padding: 0;
+      }
+      .lights li {
+        margin: 3px 0;
+      }
+      .light::before {
+        content: '●';
+        margin-right: 6px;
+      }
+      .light.ok::before {
+        color: #188038;
+      }
+      .light.bad::before {
+        color: #d93025;
+      }
+      .light.unknown::before {
+        color: #9aa0a6;
       }
       table {
         border-collapse: collapse;
@@ -96,82 +120,93 @@
       <button id="connect">Connect</button>
       <span id="service-status" class="note">Not connected.</span>
     </div>
+    <ul class="lights">
+      <li id="light-service" class="light unknown">Service: not checked yet</li>
+      <li id="light-llm" class="light unknown">
+        Language model: not checked yet
+      </li>
+      <li id="light-stt" class="light unknown">Transcriber: not checked yet</li>
+    </ul>
 
     <fieldset id="service-settings">
-      <h3>Note</h3>
-      <label for="language">Language of the note</label>
+      <h3>Summary</h3>
+      <label for="language">Language the summary is written in</label>
       <select id="language"></select>
+      <p class="note">
+        The note, its sections and captions come out in this language. Quotes
+        and technical terms stay as spoken in the video.
+      </p>
       <label>Outputs besides the summary (none chosen falls back to md)</label>
       <div id="formats"></div>
-      <label for="obsidian-vault">Obsidian vault (path)</label>
-      <input
-        id="obsidian-vault"
-        type="text"
-        placeholder="D:\Vaults\Notes; empty means no Obsidian note"
-      />
+      <label for="obsidian-vault">Obsidian vault</label>
+      <div class="row">
+        <input
+          id="obsidian-vault"
+          type="text"
+          placeholder="folder of the vault; empty means no Obsidian note"
+        />
+        <button id="pick-vault" type="button">Browse…</button>
+      </div>
       <label for="obsidian-folder">Folder in the vault for the notes</label>
       <input id="obsidian-folder" type="text" placeholder="Videos" />
       <label for="browser">Chrome or Edge for the PDF</label>
-      <input
-        id="browser"
-        type="text"
-        placeholder="path to chrome.exe; empty searches the usual places"
-      />
-
-      <h3>Summary: the language model</h3>
+      <div class="row">
+        <input id="browser" type="text" placeholder="searching…" />
+        <button id="pick-browser" type="button">Browse…</button>
+      </div>
       <p class="note">
-        Reads the transcript and writes the note. Two things to choose: where it
-        runs (the backend) and which model there. Thorough asks for the
-        strongest model of the backend instead.
+        Empty means the one the service found on this machine, shown in grey.
+      </p>
+
+      <h3>Language model</h3>
+      <p class="note">
+        Reads the transcript and writes the note. Choose where it runs (the
+        backend) and which model there; Thorough asks for the strongest model of
+        the backend instead.
       </p>
       <label for="llm">Backend</label>
       <select id="llm"></select>
-      <label for="model">Model</label>
-      <input
-        id="model"
-        type="text"
-        list="models"
-        autocomplete="off"
-        placeholder="empty means the backend's default"
-      />
-      <datalist id="models"></datalist>
-      <span id="model-hint" class="note"></span>
-      <label for="anthropic-api-key">Anthropic API key</label>
-      <input
-        id="anthropic-api-key"
-        type="password"
-        autocomplete="off"
-        placeholder="only for the anthropic backend"
-      />
-      <label for="openai-api-key">OpenAI API key</label>
-      <input
-        id="openai-api-key"
-        type="password"
-        autocomplete="off"
-        placeholder="only for the openai backend, or openai speech to text"
-      />
-      <p class="note">
+      <p class="note" id="backend-info"></p>
+      <div data-field="anthropic_api_key">
+        <label for="anthropic-api-key">Anthropic API key</label>
+        <input id="anthropic-api-key" type="password" autocomplete="off" />
+      </div>
+      <div data-field="openai_api_key">
+        <label for="openai-api-key">OpenAI API key</label>
+        <input id="openai-api-key" type="password" autocomplete="off" />
+      </div>
+      <div data-field="openai_base_url">
+        <label for="openai-base-url">OpenAI base URL</label>
+        <input
+          id="openai-base-url"
+          type="text"
+          placeholder="empty for api.openai.com"
+        />
+      </div>
+      <div data-field="lmstudio_url">
+        <label for="lmstudio-url">LM Studio URL</label>
+        <input
+          id="lmstudio-url"
+          type="text"
+          placeholder="http://localhost:1234/v1"
+        />
+      </div>
+      <div data-field="ollama_url">
+        <label for="ollama-url">Ollama URL</label>
+        <input
+          id="ollama-url"
+          type="text"
+          placeholder="http://localhost:11434/v1"
+        />
+      </div>
+      <p class="note" id="key-note">
         Stars stand for a stored key; leave them to keep it, clear the field to
         remove it.
       </p>
-      <label for="openai-base-url">OpenAI base URL</label>
-      <input
-        id="openai-base-url"
-        type="text"
-        placeholder="empty for api.openai.com"
-      />
-      <label for="lmstudio-url">LM Studio URL</label>
-      <input
-        id="lmstudio-url"
-        type="text"
-        placeholder="http://localhost:1234/v1"
-      />
-      <label for="ollama-url">Ollama URL</label>
-      <input
-        id="ollama-url"
-        type="text"
-        placeholder="http://localhost:11434/v1"
-      />
+      <label for="model">Model</label>
+      <input id="model" type="text" list="models" autocomplete="off" />
+      <datalist id="models"></datalist>
+      <span id="model-hint" class="note"></span>
 
       <h3>Transcription: speech to text</h3>
       <p class="note">

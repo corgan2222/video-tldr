@@ -103,6 +103,21 @@ def check(settings: Settings) -> str | None:
     return None
 
 
+def status(settings: Settings) -> dict:
+    """`ok` and one line for the popup: where the model runs and which
+    one answers. A local server is asked, so this takes a request."""
+    trouble = check(settings)
+    if trouble:
+        return {"ok": False, "detail": trouble}
+    name = backend(settings)
+    model = model_name(settings)
+    if name == "claude":
+        return {"ok": True, "detail": f"claude CLI at {claude_binary()}, model {model}"}
+    if name in ("anthropic", "openai"):
+        return {"ok": True, "detail": f"{name} API, key set, model {model}"}
+    return {"ok": True, "detail": f"{name} at {endpoint(settings)[1]}, model {model}"}
+
+
 def models(settings: Settings) -> list[str]:
     """The names the chosen backend accepts as `model`."""
     name = backend(settings)

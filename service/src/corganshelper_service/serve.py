@@ -13,6 +13,9 @@ The contract, every answer JSON:
     GET  /models?llm=<backend>      200 {"models": [...]}; 400 with the reason
     GET  /log?lines=<n>             200 {"lines": [...]}, the tail of serve.log
     GET  /stats                     200 what earlier runs took, see run.stats
+    GET  /health                    200 {"service", "llm", "stt"}: {"ok", "detail"}
+    POST /pick {"kind", "start"}    200 {"path"}: a file or folder dialog on
+                                    this desktop, empty when cancelled
 
 A job carries `id` (the video id), `url`, `profile`, `status` (queued,
 running, done, error), `step` and `step_started` (the running or last
@@ -65,9 +68,11 @@ from .config import (
     profile_overrides,
     store,
 )
+from .documents import browser as find_browser
 from .fetch import FetchError, video_id
 from .llm import LlmError
 from .run import run, stats
+from .transcribe import stt_status
 
 PORT = 8765
 # Every request, every job step and every traceback, next to the data:
@@ -97,6 +102,41 @@ def start(target: str) -> None:
         os.startfile(target)
     else:
         subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", target])
+
+
+def pick(kind: str, start: str = "") -> str:
+    """A file or folder dialog on this desktop, for the options page: the
+    browser's own dialog never tells an extension the full path. Empty
+    when the dialog is cancelled."""
+    import tkinter as tk
+    from tkinter import filedialog
+
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    try:
+        if kind == "folder":
+            chosen = filedialog.askdirectory(
+                parent=root, initialdir=start or None, title="Choose the folder"
+            )
+        else:
+            chosen = filedialog.askopenfilename(
+                parent=root,
+                initialdir=start or None,
+                title="Choose the program",
+                filetypes=[("Programs", "*.exe"), ("All files", "*.*")],
+            )
+    finally:
+        root.destroy()
+    return chosen or ""
+
+
+def browser_found() -> str:
+    """The Chrome or Edge the PDF step would use when none is configured."""
+    try:
+        return find_browser("")
+    except FetchError:
+        return ""
 
 
 class Service:
@@ -171,9 +211,24 @@ class Service:
             # the options page to label the choice with.
             "stt_models": STT_MODELS,
             "profiles": list(PROFILES),
+            "default_models": llm.DEFAULT_MODELS,
+            "browser_found": browser_found(),
             "home": str(settings.home),
             "log": str(self.log_path),
             "version": __version__,
+        }
+
+    def health(self) -> dict:
+        """Three lights for the popup and the options page: the service
+        itself, the language model, the transcriber."""
+        settings = self.settings()
+        return {
+            "service": {
+                "ok": True,
+                "detail": f"video-tldr service {__version__}, data under {settings.home}",
+            },
+            "llm": llm.status(settings),
+            "stt": stt_status(settings),
         }
 
     def models(self, backend: str | None = None) -> list[str]:
@@ -412,6 +467,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(HTTPStatus.OK, {"lines": service.log_tail(lines)})
             if method == "GET" and parts == ["stats"]:
                 return self.reply(HTTPStatus.OK, stats(service.settings()))
+            if method == "GET" and parts == ["health"]:
+                return self.reply(HTTPStatus.OK, service.health())
+            if method == "POST" and parts == ["pick"]:
+                body = self.body()
+                kind = body.get("kind")
+                if kind not in ("file", "folder"):
+                    raise ValueError("kind must be file or folder")
+                chosen = pick(kind, str(body.get("start") or ""))
+                return self.reply(HTTPStatus.OK, {"path": chosen})
             raise KeyError(self.path)
         except (FetchError, ConfigError, LlmError, ValueError, TypeError) as error:
             self.reply(HTTPStatus.BAD_REQUEST, {"error": str(error)})

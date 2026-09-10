@@ -242,6 +242,27 @@ def test_openai_without_a_key_and_a_local_server_without_a_model_are_named(
     assert llm.models(settings_for(tmp_path)) == ["sonnet", "opus", "haiku"]
 
 
+def test_status_is_one_line_for_the_popup(tmp_path, fake_openai, monkeypatch):
+    monkeypatch.setattr(llm, "claude_binary", lambda: "C:/bin/claude.exe")
+    assert llm.status(settings_for(tmp_path)) == {
+        "ok": True,
+        "detail": "claude CLI at C:/bin/claude.exe, model sonnet",
+    }
+
+    state = llm.status(settings_for(tmp_path, llm="lmstudio", model="qwen3-8b"))
+    assert state["ok"] is True
+    assert state["detail"] == "lmstudio at http://localhost:1234/v1, model qwen3-8b"
+
+    state = llm.status(settings_for(tmp_path, llm="lmstudio"))
+    assert state["ok"] is False
+    assert "no model set" in state["detail"]
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert llm.status(settings_for(tmp_path, llm="openai"))["ok"] is False
+    state = llm.status(settings_for(tmp_path, llm="openai", openai_api_key="k"))
+    assert state == {"ok": True, "detail": "openai API, key set, model gpt-5-mini"}
+
+
 def test_the_anthropic_api_gets_the_schema_as_output_config(tmp_path, monkeypatch):
     import anthropic
 

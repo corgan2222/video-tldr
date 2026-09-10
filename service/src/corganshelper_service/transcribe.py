@@ -245,6 +245,46 @@ def openai_transcribe(
     return result.language, segments
 
 
+def stt_status(settings: Settings) -> dict:
+    """Whether the chosen transcriber can run here, in one line for the
+    popup: the model on disk or still to download, the device it would
+    use; for OpenAI, whether the key is there. A missing model is no
+    error, the first use downloads it."""
+    name = settings.config["stt"]
+    if name == "subtitles":
+        return {"ok": True, "detail": "captions only, no model needed"}
+    chosen = STT_DEFAULT if name == "auto" else name
+    spec = STT_MODELS[chosen]
+    prefix = "captions first, else " if name == "auto" else ""
+    if spec["engine"] == "openai":
+        ok = bool(settings.config["openai_api_key"])
+        key = "key set" if ok else "needs openai_api_key"
+        return {"ok": ok, "detail": f"{prefix}openai {spec['model']}, {key}"}
+    models_dir = settings.home / "models"
+    if spec["engine"] == "whisper":
+        present = any(models_dir.glob(f"*{spec['model']}*"))
+    else:
+        present = (models_dir / spec["model"]).is_dir()
+    disk = "downloaded" if present else "downloads on first use, gigabytes"
+    device, index, compute = whisper_device()
+    ok = True
+    where = f"{device} {compute}"
+    if device == "cuda":
+        try:
+            add_nvidia_dll_dirs()
+            import ctranslate2
+
+            count = ctranslate2.get_cuda_device_count()
+        except Exception as error:  # noqa: BLE001 - any failure means no GPU here
+            count, where = 0, f"no CUDA ({error})"
+        else:
+            where = f"GPU cuda:{index} of {count}, {compute}"
+        if count <= index:
+            ok = False
+            where = f"GPU cuda:{index} not found ({count} CUDA devices); set CORGANSHELPER_WHISPER=cpu"
+    return {"ok": ok, "detail": f"{prefix}{chosen} ({spec['model']}), {disk}, {where}"}
+
+
 def transcribe(
     url: str, settings: Settings, force: bool = False, engine: str | None = None
 ) -> dict:

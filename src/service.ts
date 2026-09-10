@@ -113,10 +113,52 @@ export interface Config {
   choices: Record<string, string[]>;
   stt_models: Record<string, SttModel>;
   profiles: string[];
+  default_models: Record<string, string>;
+  browser_found: string;
   home: string;
   log: string;
   version: string;
 }
+
+export interface Light {
+  ok: boolean;
+  detail: string;
+}
+
+// The three lights from GET /health: the service, the language model,
+// the transcriber.
+export interface Health {
+  service: Light;
+  llm: Light;
+  stt: Light;
+}
+
+// What each backend is, for the options page; the recommended model
+// comes from the service (config.default_models).
+export const BACKEND_INFO: Record<string, string> = {
+  claude:
+    'The Claude Code CLI on your subscription: no key, no extra bill. ' +
+    'Best at pictures and links. Recommended.',
+  anthropic:
+    'The Anthropic API, paid per token, needs the key below. Same models ' +
+    'as claude, without the subscription.',
+  openai: 'The OpenAI API, paid per token, needs the key below.',
+  lmstudio:
+    'Your own model in LM Studio, free and offline. Load it with a context ' +
+    'of 32768 or more; local models find fewer links than the cloud ones.',
+  ollama:
+    'Your own model in Ollama, free and offline. Pick a chat model below ' +
+    'and give it a context of 32768 or more.',
+};
+
+// Which extra fields a backend needs; the options page shows only those.
+export const BACKEND_FIELDS: Record<string, string[]> = {
+  claude: [],
+  anthropic: ['anthropic_api_key'],
+  openai: ['openai_api_key', 'openai_base_url'],
+  lmstudio: ['lmstudio_url'],
+  ollama: ['ollama_url'],
+};
 
 export interface Measure {
   runs: number;
