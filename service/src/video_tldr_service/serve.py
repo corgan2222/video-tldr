@@ -79,9 +79,9 @@ from .config import (
     STT_MODELS,
     ConfigError,
     Settings,
+    job_options,
     profile_overrides,
     store,
-    validate,
 )
 from .documents import browser as find_browser
 from .fetch import FetchError, video_folder, video_id
@@ -329,7 +329,7 @@ class Service:
         # The switches of the popup travel per job. Checked here and not in
         # the worker: a wrong one is a 400 the popup can show, not a job
         # that fails a minute later.
-        options = validate(dict(options or {}))
+        options = job_options(dict(options or {}))
         # The backend is asked once before the job goes into the queue: a
         # key the vendor refuses or a server that is not running is a 400
         # the popup shows now. Asked for on 2026-09-10, after a 401 ended
