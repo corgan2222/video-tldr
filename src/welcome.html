@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>video-tldr</title>
+    <link rel="stylesheet" href="ui.css" />
+    <style>
+      body {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      .tagline {
+        color: var(--muted);
+        margin: 2px 0 20px;
+      }
+      .way {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+      }
+      .way h2 {
+        font-size: 14px;
+        margin: 0 0 4px;
+      }
+      .way p {
+        margin: 0 0 8px;
+        color: var(--muted);
+      }
+      .cmd {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .cmd code {
+        flex: 1;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>video-tldr</h1>
+    <p class="tagline">Watch it. Vault it.</p>
+
+    <p data-i18n="welcomeIntro"></p>
+
+    <div class="way">
+      <h2 data-i18n="welcomeScriptTitle"></h2>
+      <p data-i18n="welcomeScriptHelp"></p>
+      <div class="cmd">
+        <code id="cmd-script"></code>
+        <button data-copy="cmd-script" data-i18n="copyCommand"></button>
+      </div>
+    </div>
+
+    <div class="way">
+      <h2 data-i18n="welcomeUvTitle"></h2>
+      <p data-i18n="welcomeUvHelp"></p>
+      <div class="cmd">
+        <code id="cmd-uv"></code>
+        <button data-copy="cmd-uv" data-i18n="copyCommand"></button>
+      </div>
+    </div>
+
+    <div class="way">
+      <h2 data-i18n="welcomeWingetTitle"></h2>
+      <p data-i18n="welcomeWingetHelp"></p>
+      <div class="cmd">
+        <code id="cmd-winget"></code>
+        <button data-copy="cmd-winget" data-i18n="copyCommand"></button>
+      </div>
+    </div>
+
+    <p data-i18n="welcomeThen"></p>
+
+    <p><a id="to-settings" href="#" data-i18n="welcomeSettings"></a></p>
+
+    <p id="status" class="status"></p>
+
+    <script type="module" src="welcome.js"></script>
+  </body>
+</html>
