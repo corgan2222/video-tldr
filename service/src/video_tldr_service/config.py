@@ -305,6 +305,39 @@ def read_config(path: Path) -> dict:
     return validate({k: v for k, v in data.items() if v not in (None, "")})
 
 
+# What a job may carry in its `options`. The rest of KEYS names a program
+# to start, a place to write, a vendor URL or a secret, and those belong
+# to whoever owns the machine — through `video-tldr config` or the
+# settings page, not through the body of a job. Without this list a
+# `POST /jobs` with {"options": {"browser": "..."}} decides which program
+# the PDF step runs, and one with an `openai_base_url` decides where the
+# API key travels.
+JOB_OPTIONS = frozenset(
+    {
+        "llm",
+        "model",
+        "stt",
+        "language",
+        "formats",
+        "style",
+        "timestamps",
+        "condensed",
+        "cleanup",
+    }
+)
+
+
+def job_options(values: dict) -> dict:
+    """The options a job may set, validated; a ConfigError for the rest."""
+    barred = sorted(set(values) & (set(KEYS) - JOB_OPTIONS))
+    if barred:
+        raise ConfigError(
+            f"a job may not set {', '.join(barred)}; "
+            "use `video-tldr config --set` or the settings page"
+        )
+    return validate(values)
+
+
 def validate(values: dict) -> dict:
     """The same values back, or a ConfigError naming the wrong one."""
     unknown = sorted(set(values) - set(KEYS))

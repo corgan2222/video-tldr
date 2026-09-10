@@ -54,7 +54,17 @@ def html(title: str, markdown_text: str, template: str = "") -> str:
     follows STYLE, so a few overriding rules are the short way in."""
     import markdown
 
-    body = markdown.markdown(markdown_text, extensions=["tables", "fenced_code"])
+    # The Markdown carries a video title, a channel name and a description
+    # that a stranger uploaded, plus a model's answer built from those. So
+    # raw HTML in it is escaped rather than passed through: this page is
+    # rendered by Chrome from a file:// URL to make the PDF, and it stays
+    # on disk next to it. python-markdown lets HTML through by default and
+    # dropped its safe mode in 3.0; deregistering the two handlers is what
+    # replaced it. Tables, fenced code, emphasis and links are untouched.
+    md = markdown.Markdown(extensions=["tables", "fenced_code"])
+    md.preprocessors.deregister("html_block")
+    md.inlinePatterns.deregister("html")
+    body = md.convert(markdown_text)
     style = STYLE
     if template:
         path = Path(template).expanduser()

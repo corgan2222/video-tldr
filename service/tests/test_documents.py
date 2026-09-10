@@ -46,6 +46,32 @@ def test_the_page_carries_the_title_and_the_pictures_as_file_urls():
     assert "<h1>Head</h1>" in page and "<li>one</li>" in page
 
 
+# The title, the channel and the description come from whoever uploaded
+# the video, and the model's answer is built from those. Chrome renders
+# this page from a file:// URL to print the PDF, and it stays on disk, so
+# a script tag in a title would run on the reader's machine.
+def test_html_in_the_note_is_shown_not_run():
+    page = html("t", "# <script>alert(1)</script>\n\nand <iframe src=x></iframe>\n")
+    assert "<script>alert(1)</script>" not in page
+    assert "<iframe" not in page
+    assert "&lt;script&gt;" in page
+
+
+def test_an_event_attribute_stays_text():
+    page = html("t", '<img src=x onerror="alert(1)">\n')
+    # The whole tag is escaped, so no img element exists to fire the
+    # handler; what is left reads as the text it was.
+    assert "<img" not in page
+    assert "&lt;img src=x onerror=" in page
+
+
+def test_markdown_that_should_work_still_does():
+    page = html("t", "| a | b |\n|---|---|\n| 1 | 2 |\n\n**bold** [l](https://e.com)\n")
+    assert "<table>" in page and "<td>1</td>" in page
+    assert "<strong>bold</strong>" in page
+    assert '<a href="https://e.com">l</a>' in page
+
+
 def test_a_command_block_becomes_a_pre_the_style_sets_apart():
     page = html("t", "```bash\npip install b\n```\n")
     assert "<pre><code" in page and "pip install b" in page
