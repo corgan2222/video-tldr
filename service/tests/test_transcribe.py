@@ -331,6 +331,44 @@ def test_a_process_without_cuda_is_told_to_restart_the_service(tmp_path, monkeyp
     assert "restart the service" not in state["detail"]
 
 
+def test_the_audio_conversions_go_through_the_helper_with_the_longer_limit(
+    tmp_path, monkeypatch
+):
+    """Transcoding a talk takes longer than converting a thumbnail, so it
+    gets the longer limit; a failure has to arrive as a FetchError with
+    what ffmpeg said, not as a bare CalledProcessError."""
+    import subprocess
+
+    from video_tldr_service import fetch as fetch_module
+    from video_tldr_service import transcribe as module
+
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr(fetch_module.subprocess, "run", fake_run)
+    audio = tmp_path / "BT4ywlPr6Pk.m4a"
+    audio.write_bytes(b"m4a")
+
+    assert module.to_wav16k(audio).name == "BT4ywlPr6Pk.16k.wav"
+    assert module.shrink_for_upload(audio).name == "BT4ywlPr6Pk.upload.mp3"
+
+    for command, kwargs in calls:
+        assert command[:2] == ["ffmpeg", "-hide_banner"]
+        assert kwargs["timeout"] == module.FFMPEG_AUDIO_TIMEOUT_SECONDS
+    assert "16000" in calls[0][0] and "48k" in calls[1][0]
+
+    def failing_run(command, **kwargs):
+        raise subprocess.CalledProcessError(1, command, b"", b"no such encoder")
+
+    monkeypatch.setattr(fetch_module.subprocess, "run", failing_run)
+    with pytest.raises(FetchError) as caught:
+        module.to_wav16k(audio)
+    assert "no such encoder" in str(caught.value)
+
+
 def test_the_dll_directories_are_added_once_per_process(tmp_path, monkeypatch):
     """Every GET /health asked for them, the popup asks every two seconds,
     and each call grew PATH and the process's DLL directory list until
