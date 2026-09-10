@@ -44,11 +44,18 @@ turns the YouTube video in the active tab into a summary with pictures.
 Two parts: the service, and the extension that talks to it.
 
 The service comes from a release. It needs [uv](https://docs.astral.sh/uv/),
-which carries the Python with it:
+which carries the Python with it. Three ways, whichever suits you:
 
 ```
 irm https://raw.githubusercontent.com/corgan2222/video-tldr/main/install.ps1 | iex
+uv tool install video-tldr
+git clone https://github.com/corgan2222/video-tldr.git
 ```
+
+The script picks the right extra for the machine and puts the command on
+your PATH. `uv tool install` is shorter if you already have uv. The clone
+is what works before any release exists, and what a contributor wants
+anyway.
 
 That picks the CUDA libraries when the machine has a card and the ONNX
 runtime alone when it has none, puts `video-tldr` on your PATH, and

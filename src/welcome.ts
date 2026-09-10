@@ -8,11 +8,15 @@ import { t, translate } from './i18n.js';
 
 // Kept next to each other on purpose: these three lines also stand in
 // README.md, and a reader who compares them should find the same text.
+//
+// No winget: it installs artefacts (msi, exe, msix, a portable zip), and
+// this is a wheel that uv unpacks into an environment with gigabytes of
+// CUDA in it. uv itself is in winget because it is one binary.
 const COMMANDS: Record<string, string> = {
-  'cmd-winget': 'winget install corgan2222.video-tldr',
   'cmd-script':
     'irm https://raw.githubusercontent.com/corgan2222/video-tldr/main/install.ps1 | iex',
   'cmd-uv': 'uv tool install video-tldr',
+  'cmd-source': 'git clone https://github.com/corgan2222/video-tldr.git',
 };
 
 function say(text: string): void {

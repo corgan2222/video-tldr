@@ -49,11 +49,18 @@ Zusammenfassung mit Bildern macht.
 Zwei Teile: der Dienst und die Erweiterung, die mit ihm spricht.
 
 Der Dienst kommt aus einem Release. Er braucht
-[uv](https://docs.astral.sh/uv/), das sein Python selbst mitbringt:
+[uv](https://docs.astral.sh/uv/), das sein Python selbst mitbringt. Drei
+Wege, nimm den, der dir passt:
 
 ```
 irm https://raw.githubusercontent.com/corgan2222/video-tldr/main/install.ps1 | iex
+uv tool install video-tldr
+git clone https://github.com/corgan2222/video-tldr.git
 ```
+
+Das Skript wählt das passende Extra für den Rechner und legt den Befehl
+auf den PATH. `uv tool install` ist kürzer, wenn du uv schon hast. Der
+Klon geht ohne jedes Release und ist ohnehin das, was Beitragende wollen.
 
 Das wählt die CUDA-Bibliotheken, wenn eine Karte da ist, und sonst allein
 die ONNX-Laufzeit, legt `video-tldr` auf den PATH und trägt keinen
