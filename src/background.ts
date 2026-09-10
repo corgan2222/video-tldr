@@ -54,6 +54,8 @@ function message(error: unknown): string {
 // The toolbar icon hands the active tab's URL to the service. Firefox
 // grants a host permission only when asked, Chrome at install time; asked
 // first thing in the click handler, both answer at once when it is granted.
+// First thing on purpose: Firefox counts the request as user input only
+// until the first await, so nothing may run before it.
 api.action.onClicked.addListener(async (tab) => {
   const granted = await api.permissions.request({ origins: [HOST_PATTERN] });
   if (!granted) {
