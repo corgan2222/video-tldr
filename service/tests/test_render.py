@@ -6,6 +6,7 @@ import pytest
 from video_tldr_service import llm
 from video_tldr_service import render as render_module
 from video_tldr_service.config import Settings
+from video_tldr_service.documents import html as to_html
 from video_tldr_service.fetch import FetchError, video_folder, work_folder
 from video_tldr_service.render import (
     by_section,
@@ -155,6 +156,159 @@ def test_without_timestamps_the_note_carries_the_text_alone():
     assert "?t=" not in note
     # The video itself keeps its link, it is no timestamp.
     assert "[Video](https://youtu.be/Zvc5QkrWgAU)" in note
+
+
+# The title, the channel and the upload date come from whoever uploaded
+# the video, and the model's answer is written from those. Chrome renders
+# the page from a file:// URL to print the PDF, and the page stays next to
+# it, so anything executable in the note runs on the reader's machine.
+def test_nothing_from_outside_or_from_the_model_can_run_in_the_page():
+    fetched = {
+        **FETCHED,
+        "title": "<script>alert(1)</script>",
+        "channel": '<img src=x onerror="alert(2)">',
+        "upload_date": "<svg onload=alert(3)>",
+    }
+    analysis = {
+        **ANALYSIS,
+        "summary": "Read [this](javascript:alert(4)) and ![x](javascript:alert(5)).",
+        "links": [{"url": "javascript:alert(6)", "role": "repository"}],
+    }
+
+    note = render_markdown(fetched, analysis, player=True)
+    page = to_html("t", note)
+
+    # No tag from outside survives as a tag in the page, and no link or
+    # picture target in it runs.
+    assert "<script" not in page and "<svg" not in page
+    assert "<img src=x" not in page
+    assert 'href="javascript:' not in page and 'src="javascript:' not in page
+    assert '<a href="unsafe:javascript:alert(4)">this</a>' in page
+    assert 'src="unsafe:javascript:alert(5)"' in page
+    # The escaped forms are still readable; the thumbnail stays a picture,
+    # and the player the Obsidian note ends with stays whole.
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
+    assert "&lt;img src=x onerror=" in page
+    assert (
+        '<img alt="&lt;script&gt;alert(1)&lt;/script&gt;" src="Zvc5QkrWgAU.jpg"' in page
+    )
+    assert '<iframe width="560"' in note
+    # What a reader of the .md file and Obsidian sees: the fields from
+    # outside carry no tag either, which is what `outside` is for.
+    assert "<script" not in note and "<svg" not in note and "<img" not in note
+    assert "# &lt;script&gt;alert(1)&lt;/script&gt;" in note
+
+
+def test_the_short_fields_beside_the_title_are_masked_too():
+    """The kind with no label of its own, a section's heading and a key
+    point go the way the title goes. The repository's URL is a link target
+    and takes the scheme check instead of the masking."""
+    analysis = {
+        **ANALYSIS,
+        "kind": '<img src=x onerror="alert(1)">',
+        "sections": [
+            {
+                "title": "<script>alert(2)</script>",
+                "start": 0,
+                "end": 60,
+                "summary": "x",
+            }
+        ],
+        "key_points": [{"time": 12, "text": "<svg onload=alert(3)>"}],
+    }
+    repositories = [{"repo": "r", "url": "javascript:alert(9)", "install": []}]
+
+    note = render_markdown(FETCHED, analysis, repositories=repositories)
+    page = to_html("t", note)
+
+    assert "<img" not in note and "<script" not in note and "<svg" not in note
+    assert 'Art: &lt;img src=x onerror="alert(1)"&gt;' in note
+    assert (
+        "### [0:00](https://youtu.be/Zvc5QkrWgAU?t=0) "
+        "&lt;script&gt;alert(2)&lt;/script&gt;" in note
+    )
+    assert "&lt;svg onload=alert(3)&gt;" in note
+    assert "### [r](unsafe:javascript:alert(9))" in note
+    # A kind this project has a label for keeps its label.
+    assert "Art: Erklärvideo" in render_markdown(FETCHED, ANALYSIS)
+    # The masking happens once: the page shows the tag as text, not the
+    # entity of an entity.
+    assert "&lt;script&gt;alert(2)&lt;/script&gt;" in page and "&amp;lt;" not in page
+
+
+# A guard against the defence overshooting, not evidence that it works:
+# this one passes without it as well. What proves the gap is closed is the
+# test above and the ones in test_documents.py.
+def test_markdown_from_the_model_is_still_rendered():
+    analysis = {
+        **ANALYSIS,
+        "summary": "## Head\n\n- one\n- two\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n"
+        "```bash\npip install b\n```",
+    }
+
+    page = to_html("t", render_markdown(FETCHED, analysis))
+
+    assert "<h2>Head</h2>" in page and "<li>one</li>" in page
+    assert "<table>" in page and "<td>1</td>" in page
+    assert '<code class="language-bash">pip install b' in page
+    assert '<a href="https://github.com/a/b">' in page
+
+
+# What the defence may not cost. An earlier round masked the schemes and
+# the angle brackets in the model's prose, and `Abschnitt Open Data: 5 > 3`
+# reached the .md file as `Abschnitt Open Data%3A 5 &gt; 3`.
+def test_a_prose_line_reaches_the_md_file_as_the_model_wrote_it():
+    analysis = {**ANALYSIS, "summary": "Abschnitt Open Data: 5 > 3 und a < b."}
+
+    note = render_markdown(FETCHED, analysis)
+    page = to_html("t", note)
+
+    assert "Abschnitt Open Data: 5 > 3 und a < b." in note
+    assert "%3A" not in note and "&gt;" not in note and "&lt;" not in note
+    # In the page the brackets are text, python-markdown sees to that.
+    assert "Abschnitt Open Data: 5 &gt; 3 und a &lt; b." in page
+
+
+def test_a_code_block_shows_the_tag_it_carries():
+    """This one holds the limit `outside` names, it does not describe a
+    leak: a tag the model carries back into its prose stays raw in the .md
+    file and in the Obsidian note, because that prose is Markdown meant to
+    be rendered. The page for the PDF escapes it, which the last two
+    asserts are about."""
+    analysis = {
+        **ANALYSIS,
+        "summary": "Never run <script src=x></script>. Paste this:\n\n"
+        "```html\n<script src=x></script>\n```",
+    }
+
+    note = render_markdown(FETCHED, analysis)
+    page = to_html("t", note)
+
+    # Inside the block the tag stands as it was written; markdown escapes
+    # it on the way into the page, once, so no entity reaches the reader.
+    assert "```html\n<script src=x></script>\n```" in note
+    assert "<code" in page and "&lt;script src=x&gt;&lt;/script&gt;" in page
+    assert "&amp;lt;" not in page
+    # The same tag in prose reaches the .md file as the model wrote it, and
+    # the page shows it as text rather than running it.
+    assert "Never run <script src=x></script>." in note
+    assert "Never run &lt;script src=x&gt;&lt;/script&gt;." in page
+
+
+def test_an_ampersand_in_a_field_reaches_both_notes_whole():
+    fetched = {**FETCHED, "title": "Docker & Podman", "channel": "Tom & Jerry"}
+
+    note = render_markdown(fetched, ANALYSIS)
+    # What the Obsidian note is made of: the frontmatter, wikilinks for the
+    # pictures, the player at the end.
+    obsidian = frontmatter(fetched, ANALYSIS) + render_markdown(
+        fetched, ANALYSIS, embed=lambda file, alt: f"![[{file}]]", player=True
+    )
+
+    for text in (note, obsidian):
+        assert "# Docker & Podman" in text
+        assert "Tom & Jerry · 2026-09-01" in text
+        assert "&amp;" not in text
 
 
 def test_english_labels_follow_the_language():

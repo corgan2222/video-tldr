@@ -1,3 +1,4 @@
+import http.client
 import json
 import threading
 import time
@@ -272,7 +273,10 @@ def test_the_options_of_one_job_beat_the_profile_and_a_wrong_one_is_a_400(
 
     # A job says how to summarise, not which program to run, where to
     # write, or where the API key travels. Those are the machine owner's,
-    # through the settings page or the command line.
+    # through the settings page or the command line. This service has a
+    # token set, and these stay 400 anyway: a job is the road a foreign
+    # extension in the browser takes, so the bar there is not the token's
+    # to lift.
     for key, value in (
         ("browser", r"C:\Windows\System32\calc.exe"),
         ("download_dir", r"C:\Users\someone\Startup"),
@@ -284,7 +288,8 @@ def test_the_options_of_one_job_beat_the_profile_and_a_wrong_one_is_a_400(
             server, "POST", "/jobs", {"url": URL, "options": {key: value}}
         )
         assert code == 400, key
-        assert f"a job may not set {key}" in answer["error"]
+        assert f"{key} may not be set over HTTP" in answer["error"]
+        assert "video-tldr config --set" in answer["error"]
 
 
 def test_a_waiting_job_says_how_many_are_ahead_of_it(server, runner):
@@ -427,6 +432,54 @@ def test_a_bad_url_and_an_unknown_job_are_errors_with_a_reason(server):
     assert call(server, "GET", "/nothing")[0] == 404
 
 
+def test_a_body_far_bigger_than_a_job_is_refused_before_it_is_read(server, runner):
+    """Content-Length is what the read would allocate, so the limit is
+    checked on the header, not on what arrives. These requests send no body
+    at all and only claim one: an answer instead of a request that hangs
+    until its timeout is the proof that the header alone decided. A body
+    that really arrived and stayed unread would also make the answer racy,
+    because the close after it sends a RST."""
+    for claimed in (module.MAX_BODY_BYTES + 1, 99_999_999, -1):
+        code, answer = call(
+            server, "POST", "/jobs", headers={"Content-Length": str(claimed)}
+        )
+
+        # A negative length is not greater than the limit, and `read(-1)`
+        # reads to the end of the connection: unbounded, in memory.
+        assert code == 413, claimed
+        assert str(module.MAX_BODY_BYTES) in answer["error"]
+    assert runner.calls == 0
+    # The limit leaves room for every body the extension really sends.
+    assert call(server, "POST", "/jobs", {"url": URL})[0] == 202
+
+
+def test_serve_says_a_token_is_set_without_saying_which(tmp_path, monkeypatch, capsys):
+    """The task scheduler starts the service with stdout in a file; the
+    token must not end up in it."""
+    store(tmp_path, {"token": "s3cret-token-value"})
+
+    class Quiet:
+        """A server that ends the moment it would listen."""
+
+        def __init__(self, service, port):
+            self.service = service
+
+        def serve_forever(self):
+            raise KeyboardInterrupt
+
+        def server_close(self):
+            pass
+
+    monkeypatch.setattr(module, "Server", Quiet)
+
+    assert module.serve(tmp_path, port=0) == 0
+
+    printed = capsys.readouterr().out
+    assert "s3cret-token-value" not in printed
+    assert "a token is set" in printed
+    assert "config.json" in printed
+
+
 def test_a_crash_inside_run_ends_the_job_as_an_error(server, runner):
     runner.fail = RuntimeError("boom")
     _, job = call(server, "POST", "/jobs", {"url": URL})
@@ -456,9 +509,90 @@ def test_config_is_read_and_written_through_the_service(server, tmp_path):
     code, answer = call(server, "PUT", "/config", {"colour": "blue"})
     assert code == 400
     assert "unknown setting colour" in answer["error"]
-    code, answer = call(server, "PUT", "/config", {"obsidian_folder": 5})
+    code, answer = call(server, "PUT", "/config", {"model": 5})
     assert code == 400
     assert "every setting is a string" in answer["error"]
+
+
+def test_with_a_token_the_options_page_saves_every_field_it_shows(server, tmp_path):
+    """A caller that got past the Authorization check is authenticated and
+    may set what the command line may, so the program, the paths and the
+    vendor URLs are stored. The page sends one key per request; this body
+    holds them together to show that the token lifts the bar for every one
+    of them (2026-09-10)."""
+    whole_page = {
+        "language": "en",
+        "browser": r"C:\Program Files\Chrome\chrome.exe",
+        "download_dir": str(tmp_path / "out"),
+        "pdf_template": str(tmp_path / "look.html"),
+        "obsidian_vault": str(tmp_path / "vault"),
+        "obsidian_folder": "Clips",
+        "openai_base_url": "https://api.openai.com/v1",
+        "anthropic_api_key": "sk-fake",
+        "openai_api_key": "********",
+        "token": "********",
+    }
+
+    code, answer = call(server, "PUT", "/config", whole_page)
+
+    assert code == 200
+    assert answer["settings"]["browser"].endswith("chrome.exe")
+    stored = Settings.load(tmp_path).config
+    assert stored["download_dir"] == str(tmp_path / "out")
+    assert stored["obsidian_vault"] == str(tmp_path / "vault")
+    assert stored["anthropic_api_key"] == "sk-fake"
+    # A masked secret counts as "keep it", and so does the token.
+    assert stored["openai_api_key"] == ""
+    assert stored["token"] == server.service.token
+    # A wrong value is still a 400, token or no token.
+    assert call(server, "PUT", "/config", {"stt": "loud"})[0] == 400
+
+
+def test_without_a_token_config_keeps_the_program_and_the_key_off_the_wire(
+    tmp_path, runner
+):
+    """Without a token any extension in the browser may call this service,
+    so then the fields that name a program to start, a place to write or
+    where the API key travels are refused, and the answer names both ways
+    in: the command line on this machine, or a token."""
+    open_service = Service(tmp_path, runner=runner)
+    server = Server(open_service, 0)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        assert open_service.token == ""
+        for key, value in (
+            ("browser", r"C:\Windows\System32\calc.exe"),
+            ("download_dir", r"C:\Users\someone\Startup"),
+            ("pdf_template", r"C:\x\evil.html"),
+            ("obsidian_vault", r"C:\x\vault"),
+            ("openai_base_url", "https://elsewhere.example/v1"),
+            ("lmstudio_url", "https://elsewhere.example/v1"),
+            ("ollama_url", "https://elsewhere.example/v1"),
+            ("openai_api_key", "sk-whatever"),
+            ("anthropic_api_key", "sk-whatever"),
+        ):
+            code, answer = call(server, "PUT", "/config", {key: value}, token=False)
+            assert code == 400, key
+            assert f"{key} may not be set over HTTP" in answer["error"]
+            assert "video-tldr config --set" in answer["error"]
+            assert "or a token set there" in answer["error"]
+            assert Settings.load(tmp_path).config[key] != value
+
+        # The page sends one key per request, so a refusal costs it that
+        # key alone. A caller that does join several still gets the whole
+        # body refused, barred key and switches together.
+        body = {"style": "noslop", "browser": "x.exe"}
+        assert call(server, "PUT", "/config", body, token=False)[0] == 400
+        assert Settings.load(tmp_path).config["style"] == "normal"
+        # The fields that only say how to summarise still save, and so does
+        # the subfolder inside the vault.
+        body = {"style": "noslop", "obsidian_folder": "Clips"}
+        assert call(server, "PUT", "/config", body, token=False)[0] == 200
+        stored = Settings.load(tmp_path).config
+        assert (stored["style"], stored["obsidian_folder"]) == ("noslop", "Clips")
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 def test_a_token_sent_to_config_is_not_written(server, tmp_path):
@@ -691,5 +825,277 @@ def test_stop_ends_the_process_without_handing_over_the_port(service, monkeypatc
 def test_stop_says_so_when_no_service_listens():
     """The ordinary case for an installer on a fresh machine, and for a
     second stop. It must not look like a failure."""
-    # Port 0 is never listening; the message names the port it tried.
+    # Port 1 is never listening here; the message names the port it tried.
     assert "no service on port 1" in module.stop("", port=1)
+
+
+def throwing(error):
+    """A stand-in for urlopen that fails the way the real one does."""
+
+    def urlopen(request, timeout=None):
+        raise error
+
+    return urlopen
+
+
+def test_stop_tells_a_service_that_refused_the_request_from_none(monkeypatch):
+    """HTTPError is a subclass of URLError, so a wrong token used to read
+    "no service on port 8765 (Unauthorized)" while the service was running
+    and holding its script. The installer reads this line: it went on to
+    replace a file Windows keeps open, and the uv step then failed with
+    nothing said about why (2026-09-10)."""
+    refused = urllib.error.HTTPError(
+        "http://127.0.0.1:8765/shutdown", 401, "Unauthorized", {}, None
+    )
+    monkeypatch.setattr(module, "urlopen", throwing(refused))
+    said = module.stop("wrong", port=8765)
+    assert "401 Unauthorized" in said
+    assert "may still be running" in said
+    # Neither of the two other cases: the port is not free, and nothing is
+    # on its way out.
+    assert "no service" not in said
+    assert "is stopping" not in said
+
+
+def test_stop_tells_a_refused_connection_from_one_that_never_got_through(monkeypatch):
+    """Both arrive as URLError, and the reason behind it is the difference:
+    refused means nothing holds the port, anything else means the installer
+    cannot tell. A dropped packet and a hung service look the same from
+    here, so only the refusal may read as the free port."""
+    monkeypatch.setattr(
+        module,
+        "urlopen",
+        throwing(urllib.error.URLError(ConnectionRefusedError(10061, "refused"))),
+    )
+    assert "no service on port 8765" in module.stop("", port=8765)
+    monkeypatch.setattr(
+        module, "urlopen", throwing(urllib.error.URLError(TimeoutError("timed out")))
+    )
+    said = module.stop("", port=8765)
+    assert "may still be running" in said
+    assert "no service" not in said
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        TimeoutError("timed out"),
+        ConnectionResetError(10054, "the other end closed the connection"),
+        http.client.RemoteDisconnected("Remote end closed connection"),
+        # Whatever else is on the port, answering something that is no HTTP
+        # answer: an HTTPException and no OSError, so it needs its own name
+        # in the catch.
+        http.client.BadStatusLine("not http at all"),
+    ],
+    ids=["timeout", "reset", "disconnected", "no-http"],
+)
+def test_stop_says_a_service_may_be_there_when_the_answer_breaks_off(
+    error, monkeypatch
+):
+    """These three come out of urlopen as they are, past URLError, and used
+    to fly out of stop instead of becoming a line. /shutdown answers before
+    it ends its process, so a line that breaks may have been taken: this
+    must not read like the free port it is not."""
+    monkeypatch.setattr(module, "urlopen", throwing(error))
+    said = module.stop("secret", port=8765)
+    assert "may still be running" in said
+    assert type(error).__name__ in said
+    assert "no service" not in said
+    assert "is stopping" not in said
+
+
+def test_a_result_the_worker_cannot_read_ends_that_job_and_no_other(server, runner):
+    """The lines after the run read `result["seconds"]` and
+    `result["written"]`. A result without them used to end the only worker
+    thread, and every job after it stayed queued for good (2026-09-10)."""
+
+    def half_a_result(url, settings, **kwargs):
+        if url == URL:
+            return {"error": None}
+        return runner(url, settings, **kwargs)
+
+    server.service.runner = half_a_result
+
+    first = call(server, "POST", "/jobs", {"url": URL})[1]["id"]
+    job = wait_for(server, first, "error")
+    assert "KeyError" in job["error"]["message"]
+
+    # The worker is still there: the next job runs.
+    second = call(server, "POST", "/jobs", {"url": SECOND_URL})[1]["id"]
+    assert wait_for(server, second, "done")["title"] == "A video"
+
+
+def test_a_cancel_the_worker_overtook_is_not_turned_back_into_running(service, runner):
+    """cancel and the worker both touch the same job. cancel used to read
+    the status outside the lock, and the worker's "running" overwrote the
+    "cancelled" a moment later: the job ran although it was cancelled."""
+    vid = "q_q_q_q_q_q"
+    # A job the worker has pulled out of the queue but not marked yet:
+    # exactly the gap cancel used to lose in.
+    service.jobs[vid] = {
+        "id": vid,
+        "url": URL,
+        "profile": "fast",
+        "status": "queued",
+        "step": None,
+        "step_started": None,
+        "queued": module.now(),
+    }
+
+    assert service.cancel(vid)["status"] == "cancelled"
+
+    # What the worker does with what it pulled, and what it must not do.
+    service.work_one(vid)
+    assert service.job(vid)["status"] == "cancelled"
+    assert runner.calls == 0
+
+
+def test_the_worker_waits_while_cancel_is_between_its_two_steps(
+    service, runner, monkeypatch
+):
+    """The other half: taking the job out of the queue and marking it
+    cancelled happen under one lock, and the test above only calls the two
+    sides one after the other. `cancel` calls `now` between its two steps,
+    so a hook on it starts the worker's `begin` exactly where the gap used
+    to be. The event says that thread really got as far as `begin`, and
+    `began` says the job it then found was cancelled, so "running" never
+    overwrote it. The 0.2 seconds are the weaker half of the proof: a
+    thread that is still alive by then did not walk through the lock, which
+    is what it does once the lock is gone.
+    (The queue is empty here, so the removal itself is a no-op; the test
+    above it covers a job that really waits in the queue.)"""
+    vid = "s_s_s_s_s_s"
+    service.jobs[vid] = {
+        "id": vid,
+        "url": URL,
+        "profile": "fast",
+        "status": "queued",
+        "step": None,
+        "step_started": None,
+        "queued": module.now(),
+    }
+    clock = module.now
+    began: list[dict | None] = []
+    still_waiting: list[bool] = []
+    worker: list[threading.Thread] = []
+    at_begin = threading.Event()
+
+    def take_the_job() -> None:
+        at_begin.set()
+        began.append(service.begin(vid))
+
+    def let_the_worker_in() -> str:
+        if not worker:
+            worker.append(threading.Thread(target=take_the_job, daemon=True))
+            worker[0].start()
+            # Waited for, not assumed: a thread the machine had not run yet
+            # would look exactly like one the lock holds.
+            assert at_begin.wait(timeout=5)
+            worker[0].join(0.2)
+            still_waiting.append(worker[0].is_alive())
+        return clock()
+
+    monkeypatch.setattr(module, "now", let_the_worker_in)
+
+    assert service.cancel(vid)["status"] == "cancelled"
+
+    worker[0].join(timeout=5)
+    assert still_waiting == [True]  # the lock held while cancel was inside
+    assert began == [None]  # and "running" never overwrote "cancelled"
+    assert runner.calls == 0
+
+
+def test_restart_and_shutdown_refuse_while_a_job_is_on_unless_forced(
+    service, runner, monkeypatch
+):
+    """An end mid-run leaves half-written outputs and takes the job list
+    with it. The way past it stays open for the installer: it frees the
+    port before uv can replace the exe (install.ps1)."""
+    ended: list[int] = []
+    monkeypatch.setattr(module.os, "_exit", lambda code: ended.append(code))
+    server = Server(service, 0, relauncher=lambda *args: None)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        runner.gate.clear()
+        _, job = call(server, "POST", "/jobs", {"url": URL})
+        wait_for(server, job["id"], "running")
+
+        for path in ("/restart", "/shutdown"):
+            code, answer = call(server, "POST", path)
+            assert code == 409, path
+            assert job["id"] in answer["error"]
+            # This text stands in the options page word for word, and the
+            # page has no force button, so it must not ask for JSON.
+            assert "force" not in answer["error"], path
+        assert ended == []
+
+        # `video-tldr stop`, the call install.ps1 makes, must still get
+        # through: it forces.
+        assert "is stopping" in module.stop(service.token, server.server_port)
+        for _ in range(100):
+            if ended:
+                break
+            time.sleep(0.05)
+        assert ended == [0]
+    finally:
+        runner.gate.set()
+        server.server_close()
+
+
+def test_a_hand_over_that_throws_still_ends_this_process(service, monkeypatch):
+    """`shutdown()` and `server_close()` run before the new process starts.
+    A start that throws used to leave this one alive without its socket:
+    listening to nothing, and holding the port's name in the task list."""
+    ended: list[int] = []
+    monkeypatch.setattr(module.os, "_exit", lambda code: ended.append(code))
+
+    def no_python_here(*args):
+        raise OSError("no interpreter to start")
+
+    server = Server(service, 0, relauncher=no_python_here)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        assert call(server, "POST", "/restart")[0] == 200
+        for _ in range(100):
+            if ended:
+                break
+            time.sleep(0.05)
+        assert ended == [0]
+    finally:
+        server.server_close()
+
+
+def test_one_dialog_at_a_time_and_none_that_holds_a_request_for_good(
+    server, monkeypatch
+):
+    """tkinter is not thread safe: a second Tk in a second request thread
+    took the process with it, and a dialog nobody answers held its request
+    thread without a limit."""
+    opened = threading.Event()
+    answered = threading.Event()
+
+    def waiting_dialog(kind, start=""):
+        opened.set()
+        answered.wait(timeout=5)
+        return "D:/Vaults/Notes"
+
+    monkeypatch.setattr(module, "dialog", waiting_dialog)
+    monkeypatch.setattr(module, "PICK_TIMEOUT_SECONDS", 0.2)
+
+    code, answer = call(server, "POST", "/pick", {"kind": "folder"})
+    assert code == 409
+    assert "no answer" in answer["error"]
+    assert opened.is_set()
+
+    # The first dialog still stands, so the second request is turned away
+    # instead of opening a Tk of its own.
+    code, answer = call(server, "POST", "/pick", {"kind": "folder"})
+    assert (code, "already open" in answer["error"]) == (409, True)
+
+    answered.set()
+    for _ in range(100):
+        code, answer = call(server, "POST", "/pick", {"kind": "folder"})
+        if code == 200:
+            break
+        time.sleep(0.02)
+    assert (code, answer) == (200, {"path": "D:/Vaults/Notes"})

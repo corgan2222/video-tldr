@@ -641,6 +641,92 @@ def test_a_model_without_eyes_stays_ok_but_says_the_pictures_go_unlabelled(
     assert state["detail"].endswith("no image input: pictures stay unlabelled")
 
 
+def test_only_an_http_address_with_a_host_reaches_a_provider():
+    for good in ("http://localhost:1234/v1", "https://api.example/v1"):
+        assert llm.checked_url(good) == good
+    for bad in ("file:///C:/Windows", "ftp://host/v1", "http:///v1", ""):
+        with pytest.raises(LlmError):
+            llm.checked_url(bad)
+
+
+def test_an_address_with_credentials_is_refused_without_repeating_them():
+    with pytest.raises(LlmError) as caught:
+        llm.checked_url("http://someone:hunter2@elsewhere.example/v1")
+    said = str(caught.value)
+    assert "hunter2" not in said
+    assert "someone" not in said
+    assert "api_key" in said
+
+
+def test_a_wrong_provider_address_stops_before_the_client_is_built(
+    tmp_path, fake_openai
+):
+    """The key travels to whatever host the address names, and the
+    transcript with it, so neither the chat request nor the model list may
+    get as far as building the client."""
+    for config in (
+        {"llm": "lmstudio", "model": "m", "lmstudio_url": "file:///etc/passwd"},
+        {"llm": "ollama", "model": "m", "ollama_url": ""},
+        {
+            "llm": "openai",
+            "model": "gpt-5-mini",
+            "openai_api_key": "sk-real",
+            "openai_base_url": "http://thief:hunter2@elsewhere.example/v1",
+        },
+    ):
+        with pytest.raises(LlmError) as caught:
+            llm.complete("i", "d", {}, settings_for(tmp_path, **config))
+        assert "hunter2" not in str(caught.value)
+        with pytest.raises(LlmError):
+            llm.models(settings_for(tmp_path, **config))
+    assert fake_openai.made == []
+
+
+def test_the_rest_call_to_a_local_server_looks_at_the_address_as_well(tmp_path):
+    """`capabilities` asks the server's own API, at a URL built from the same
+    setting. No stand-in for `fetch_json` here: the point is that the request
+    never leaves."""
+    able = llm.capabilities(
+        settings_for(
+            tmp_path, llm="lmstudio", model="m", lmstudio_url="http://u:pw@host/v1"
+        )
+    )
+    assert able["vision"] is None
+    assert "pw@" not in able["detail"]
+    assert "api_key" in able["detail"]
+
+
+def test_an_answer_without_a_single_choice_is_an_llm_error(tmp_path, monkeypatch):
+    """An IndexError here dies uncaught: run, serve and the CLI all wait for
+    an LlmError."""
+    import openai
+
+    class Empty:
+        def __init__(self, api_key=None, base_url=None, timeout=None):
+            class Completions:
+                def create(self, **request):
+                    return SimpleNamespace(choices=[], usage=None)
+
+            self.chat = SimpleNamespace(completions=Completions())
+
+    monkeypatch.setattr(openai, "OpenAI", Empty)
+    with pytest.raises(LlmError) as caught:
+        llm.complete("i", "d", {}, settings_for(tmp_path, llm="lmstudio", model="m"))
+    assert "without a single choice" in str(caught.value)
+
+
+def test_the_missing_model_is_only_asked_about_where_it_can_be_missing(
+    tmp_path, fake_openai
+):
+    """Only a local server serves whatever is loaded; every other backend
+    falls back to DEFAULT_MODELS, so `check` has nothing to ask it."""
+    for name, default in llm.DEFAULT_MODELS.items():
+        assert bool(default) is (name not in llm.LOCAL)
+
+    assert llm.check(settings_for(tmp_path, llm="openai", openai_api_key="k")) is None
+    assert "no model set" in (llm.check(settings_for(tmp_path, llm="lmstudio")) or "")
+
+
 def test_the_speed_of_the_last_request_travels_with_the_status(
     tmp_path, fake_openai, monkeypatch
 ):

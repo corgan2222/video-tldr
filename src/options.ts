@@ -388,6 +388,22 @@ function values(): Record<string, string> {
   return out;
 }
 
+// One key per request, never several at once: the service judges per key
+// and refuses some of them while no token is set. A refused key in a
+// joint request would make the whole request a 400 that stores nothing,
+// not even the keys the service does allow. The failure comes back whole
+// rather than as its text: only a 400 belongs to the key that was sent
+// (serve.py turns every ConfigError into one), and the caller has to tell
+// that from a service that no longer answers at all.
+async function put(key: string): Promise<unknown> {
+  try {
+    await request(connection(), 'PUT', '/config', { [key]: values()[key] });
+    return undefined;
+  } catch (error) {
+    return error;
+  }
+}
+
 // Saved when a field is left, not only on the button: a lost setting is
 // worse than a request too many. A key the service showed as stars goes
 // back as stars, which the service reads as "keep it".
@@ -396,19 +412,27 @@ async function saveOne(key: string): Promise<void> {
     say(t('notConnected'), true);
     return;
   }
-  try {
-    await request(connection(), 'PUT', '/config', { [key]: values()[key] });
-    say(t('saved'));
-  } catch (error) {
-    say(message(error), true);
-  }
+  const trouble = await put(key);
+  say(
+    trouble === undefined ? t('saved') : message(trouble),
+    trouble !== undefined,
+  );
 }
 
 // Saved, copied, forgotten: what worked is green, what did not is red.
+// Only the success goes away again. Without a token the service refuses
+// nine of the sixteen keys the save button sends, and those nine reasons
+// are 1600 characters (measured against config.py, 2026-09-10), which
+// nobody reads in six seconds; the reason would leave before it arrived.
+// The handle is kept because this function also hangs on every field's
+// blur, so an older wipe would otherwise clear a newer message.
+let wipe: ReturnType<typeof setTimeout> | undefined;
 function say(text: string, bad = false): void {
   status.textContent = text;
   status.className = bad ? 'status bad' : 'status ok';
-  setTimeout(() => {
+  clearTimeout(wipe);
+  if (bad) return;
+  wipe = setTimeout(() => {
     status.textContent = '';
   }, 6000);
 }
@@ -584,15 +608,22 @@ pick('#bench-start').addEventListener('click', async () => {
       },
     );
     const timer = setInterval(async () => {
-      const now = await request<Job & { bench?: BenchRow[] }>(
-        connection(),
-        'GET',
-        `/jobs/${job.id}`,
-      );
-      if (now.bench) showBench(now.bench);
-      if (now.status !== 'queued' && now.status !== 'running') {
+      try {
+        const now = await request<Job & { bench?: BenchRow[] }>(
+          connection(),
+          'GET',
+          `/jobs/${job.id}`,
+        );
+        if (now.bench) showBench(now.bench);
+        if (now.status !== 'queued' && now.status !== 'running') {
+          clearInterval(timer);
+          benchStatus.textContent = t(now.status);
+        }
+      } catch (error) {
+        // A service that goes away mid-benchmark makes every tick throw;
+        // without this the timer polls on until the page is closed.
         clearInterval(timer);
-        benchStatus.textContent = t(now.status);
+        benchStatus.textContent = message(error);
       }
     }, 3000);
   } catch (error) {
@@ -610,13 +641,29 @@ pick('#save').addEventListener('click', async () => {
     say(t('notConnected'), true);
     return;
   }
-  try {
-    await request(connection(), 'PUT', '/config', values());
-    await loadHealth();
-    say(t('saved'));
-  } catch (error) {
-    say(message(error), true);
+  // One request per key, one after the other: the service stores what it
+  // takes and names what it refuses, so a refused key no longer drops the
+  // allowed ones with it. One after the other because each request
+  // rewrites config.json, and the service answers each in its own thread.
+  // The reasons stand as the service worded them, with no key in front:
+  // every text names the key itself (config.py writes "<key> may not be
+  // set over HTTP" and "<key> must be one of ..."), so a prefix would say
+  // it twice. A set, because two keys can fail for the same reason.
+  const refused = new Set<string>();
+  for (const key of [...Object.keys(FIELDS), 'formats']) {
+    const trouble = await put(key);
+    if (trouble === undefined) continue;
+    refused.add(message(trouble));
+    // Only a 400 judged this key. A service that is gone and a token it
+    // does not accept answer every key alike, so asking for the rest
+    // would buy nothing but the same sentence again.
+    if (!(trouble instanceof ServiceError) || trouble.status !== 400) break;
   }
+  await loadHealth();
+  say(
+    refused.size === 0 ? t('saved') : Array.from(refused).join(' · '),
+    refused.size > 0,
+  );
 });
 
 pick('#clear').addEventListener('click', async () => {

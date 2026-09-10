@@ -1,12 +1,17 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from video_tldr_service import fetch as module
 from video_tldr_service.config import Settings
 from video_tldr_service.fetch import (
+    FFMPEG_TIMEOUT_SECONDS,
     JFIF,
     FetchError,
+    clean_title,
+    convert_thumbnail,
     ensure_jfif,
     fetch,
     subtitle_languages,
@@ -108,6 +113,42 @@ def test_a_jpeg_without_a_jfif_segment_gets_one_and_one_with_it_stays(tmp_path):
         bytes.fromhex("ffd8ffe10010") + b"Exif" + bytes.fromhex("0000ffd9")
     )
     assert ensure_jfif(exif).read_bytes()[6:10] == b"Exif"
+
+
+@pytest.mark.parametrize(
+    "title", ["CON", "nul", "COM1", "lpt9.txt", "AUX.part.one", "PRN "]
+)
+def test_a_title_that_is_a_windows_device_name_falls_back_to_the_id(title):
+    """Windows keeps CON, NUL, COM1 and their kin whatever the extension,
+    and the date prefix both callers add is their property, not this
+    function's."""
+    assert clean_title(title, "BT4ywlPr6Pk") == "BT4ywlPr6Pk"
+
+
+def test_a_title_that_only_begins_like_a_device_name_is_kept():
+    assert clean_title("CONcert", "BT4ywlPr6Pk") == "CONcert"
+
+
+def test_the_thumbnail_conversion_goes_through_the_helper_with_a_time_limit(
+    tmp_path, monkeypatch
+):
+    """A hanging ffmpeg would hold up every following job, and a failing
+    one has to name its complaint instead of a CalledProcessError."""
+    calls = []
+    (tmp_path / "BT4ywlPr6Pk.webp").write_bytes(b"webp")
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        (tmp_path / "BT4ywlPr6Pk.jpg").write_bytes(bytes.fromhex("ffd8ffd9"))
+        return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    assert convert_thumbnail(tmp_path, "BT4ywlPr6Pk").name == "BT4ywlPr6Pk.jpg"
+
+    command, kwargs = calls[0]
+    assert command[:2] == ["ffmpeg", "-hide_banner"]
+    assert kwargs["timeout"] == FFMPEG_TIMEOUT_SECONDS
+    assert command.count("-loglevel") == 1
 
 
 def test_settings_default_to_the_place_windows_keeps_machine_data(monkeypatch):

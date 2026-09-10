@@ -8,7 +8,6 @@ final request stitches the parts together.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from . import llm
 from .config import LANGUAGES, Settings
@@ -216,6 +215,9 @@ CONDENSED_INSTRUCTION = (
     "key points, the summary under 120 words, the whole note under 300 "
     "words. Keep the frame candidates as they are."
 )
+# The "five" of that instruction, for the split video where the code has to
+# hold the count itself.
+CONDENSED_LIMIT = 5
 
 
 def instruction(
@@ -289,6 +291,31 @@ def links_from(info: dict) -> list[dict]:
     ]
 
 
+def checked_links(result: dict, info: dict) -> list[dict]:
+    """The description's own URLs, each with the role the model gave it.
+    A URL the answer adds has no line in the description to come from, so
+    it goes (2026-09-10): the description is ours, the answer is not, and
+    enrich turns a link with role `repository` into a README request."""
+    roles = {
+        str(link.get("url")): link.get("role")
+        for link in result.get("links") or []
+        if link.get("role") in LINK_ROLES
+    }
+    return [
+        {"url": link["url"], "role": roles.get(link["url"]) or "other"}
+        for link in links_from(info)
+    ]
+
+
+def thin(items: list, limit: int) -> list:
+    """At most `limit` entries, evenly spread, in their own order. Slicing
+    would cut the end of a long video off instead."""
+    if len(items) <= limit:
+        return items
+    step = len(items) / limit
+    return [items[int(i * step)] for i in range(limit)]
+
+
 def one_analysis(
     head: str,
     segments: list[dict],
@@ -333,10 +360,18 @@ def one_analysis(
         settings,
     )
     spend.append(dict(llm.last_cost))
+    sections = [s for p in partial for s in p["sections"]]
+    key_points = [k for p in partial for k in p["key_points"]]
+    if condensed:
+        # Every part read the condensed limits on its own, so joining them
+        # gave parts times five sections (2026-09-10). The frame candidates
+        # stay whole, the instruction asks for that on purpose.
+        sections = thin(sections, CONDENSED_LIMIT)
+        key_points = thin(key_points, CONDENSED_LIMIT)
     return {
         **stitched,
-        "sections": [s for p in partial for s in p["sections"]],
-        "key_points": [k for p in partial for k in p["key_points"]],
+        "sections": sections,
+        "key_points": key_points,
         "frame_candidates": [f for p in partial for f in p["frame_candidates"]],
     }, len(parts)
 
@@ -385,8 +420,7 @@ def analyze(
         )
     for style, result in zip(styles, written):
         result["cost"] = llm.totals(spend)
-        if not result.get("links"):
-            result["links"] = links_from(info)
+        result["links"] = checked_links(result, info)
         # The first wording keeps analysis.json, the name every other step
         # reads; the rest of a `style=all` run sit next to it.
         path = result_path if style == styles[0] else folder / f"analysis-{style}.json"
@@ -394,7 +428,3 @@ def analyze(
             json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
         )
     return written[0]
-
-
-def analysis_path(settings: Settings, vid: str) -> Path:
-    return work_folder(settings, vid) / RESULT_NAME

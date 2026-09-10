@@ -25,6 +25,7 @@ import {
   iconSet,
   NAME,
   request,
+  ServiceError,
   videoId,
   type Badge,
   type Connection,
@@ -37,12 +38,19 @@ const MENU_ID = 'open-all-links';
 const SETTINGS_MENU_ID = 'settings';
 const SEND_MENU_ID = 'send-to-video-tldr';
 const POLL_ALARM = 'poll-job';
-const BLINK_ALARM = 'blink';
 // Chrome's floor for a repeating alarm; a job takes minutes anyway.
 const POLL_MINUTES = 0.5;
-// How often the icon flips while it blinks, and how long it does.
+// Pictures the icon shows while it blinks, BLINK_MS apart, so six seconds
+// in all. The last of them is the coloured one it settles on, which leaves
+// eleven flips before it.
 const BLINK_MS = 500;
 const BLINK_TIMES = 12;
+// Rounds in a row without one answer from the service before the poll
+// gives up: at POLL_MINUTES that is twenty minutes, longer than any
+// restart of the service takes. Without a limit the ids stay tracked and
+// the alarm wakes the worker every half minute for the rest of the
+// profile's life.
+const MAX_MISSES = 40;
 
 // What the popup may ask of this worker.
 export type Ask =
@@ -103,10 +111,12 @@ async function showBadge(badge: Badge): Promise<void> {
   await api.action.setTitle({ title: badge.title });
 }
 
-// Grey while the service does not answer, coloured while it does.
+// Grey while the service does not answer, coloured while it does. It used
+// to mirror the state into storage as `connected` as well; nothing read it
+// (the options page keeps a variable of that name of its own), so the write
+// went (2026-09-11).
 async function showIcon(connected: boolean): Promise<void> {
   await api.action.setIcon({ path: iconSet(connected) });
-  await api.storage.local.set({ connected });
 }
 
 function message(error: unknown): string {
@@ -127,6 +137,9 @@ async function startJob(
   const jobs = await trackedJobs();
   await api.storage.local.set({
     jobs: [...jobs.filter((id) => id !== job.id), job.id],
+    // A fresh job deserves the full MAX_MISSES, whatever an earlier
+    // round counted.
+    misses: 0,
   });
   await showIcon(true);
   await showBadge(badgeFor(job));
@@ -153,6 +166,14 @@ async function answer(ask: Ask): Promise<unknown> {
 
 // The popup's messages. `sendResponse` plus `return true` is the form
 // both browsers accept; a returned promise would satisfy Firefox only.
+//
+// The sender goes unchecked because manifest.json declares neither
+// `externally_connectable` nor a content script, so nothing but this
+// extension's own pages can reach this listener. Add either key and a
+// web page can send here: then this must start with
+// `if (sender.id !== api.runtime.id) return;`, and a content script
+// needs its own check of what the page is allowed to ask for.
+// tests/service.test.ts holds the manifest to those two keys.
 api.runtime.onMessage.addListener((ask: Ask, _sender, sendResponse) => {
   answer(ask).then(sendResponse, (error: unknown) => {
     console.warn(`${NAME}: ${ask.type} failed:`, message(error));
@@ -182,22 +203,29 @@ api.contextMenus.onClicked.addListener(async (info, tab) => {
 
 // A finished job should catch the eye without stealing focus: the icon
 // flips between the coloured and the grey one for a few seconds.
-async function blink(): Promise<void> {
-  await api.storage.local.set({ blinks: BLINK_TIMES });
-  await api.alarms.create(BLINK_ALARM, { periodInMinutes: BLINK_MS / 60000 });
-}
-
-async function blinkStep(): Promise<void> {
-  const { blinks } = (await api.storage.local.get({ blinks: 0 })) as {
-    blinks: number;
-  };
-  if (blinks <= 0) {
-    await api.alarms.clear(BLINK_ALARM);
-    await showIcon(true);
-    return;
-  }
-  await api.action.setIcon({ path: iconSet(blinks % 2 === 0) });
-  await api.storage.local.set({ blinks: blinks - 1 });
+//
+// On a timer, not on an alarm. Chrome honours no repeating alarm under
+// half a minute in a packed extension and warns about the attempt, and an
+// unpacked one has no floor at all (MDN alarms/create and the Chrome alarms
+// reference, read 2026-09-10). No floor is documented for Firefox, so what
+// `web-ext run` shows proves nothing either way: it loads unpacked, which
+// is the case with no floor in the browser that does document one. A
+// service worker ends when it goes
+// idle, so the timer is no promise either: these six seconds follow the
+// poll that raised the notification, well inside the idle timeout, and a
+// worker that does end mid-blink leaves the icon in one of its two
+// states, which the checkService of the next start paints over.
+export function blink(): void {
+  let left = BLINK_TIMES;
+  const timer = setInterval(() => {
+    left -= 1;
+    if (left <= 0) {
+      clearInterval(timer);
+      void showIcon(true);
+      return;
+    }
+    void api.action.setIcon({ path: iconSet(left % 2 === 0) });
+  }, BLINK_MS);
 }
 
 async function notify(job: Job): Promise<void> {
@@ -214,13 +242,14 @@ async function notify(job: Job): Promise<void> {
         ? `${what}. ${t('openNote')}`
         : `${what}: ${job.error?.message ?? 'unknown error'}`,
   });
-  if (job.status === 'done') await blink();
+  if (job.status === 'done') blink();
 }
 
 // One round over every tracked job. A finished one gets its notification
-// and leaves the list; one the service no longer knows leaves it too. The
-// badge shows a job still running, else the last one that finished.
-async function poll(): Promise<void> {
+// and leaves the list; one the service answers 404 for (serve.py: GET
+// /jobs/<id> is 200 or 404) leaves it too. The badge shows a job still
+// running, else the last one that finished.
+export async function poll(): Promise<void> {
   const jobs = await trackedJobs();
   if (jobs.length === 0) {
     await api.alarms.clear(POLL_ALARM);
@@ -229,19 +258,47 @@ async function poll(): Promise<void> {
   const to = await connection();
   const remaining: string[] = [];
   let badge: Badge | undefined;
+  let answered = false;
   for (const id of jobs) {
     let job: Job;
     try {
       job = await request<Job>(to, 'GET', `/jobs/${id}`);
+      answered = true;
     } catch (error) {
       console.warn(`${NAME}: GET /jobs failed:`, id, message(error));
       badge = failureBadge(message(error));
-      await showIcon(false);
+      const status = error instanceof ServiceError ? error.status : undefined;
+      // Only a 404 is the service saying it does not know this job. A
+      // service that is restarting, a 500 or a refused token say nothing
+      // about the job, so the id stays and the next round asks again:
+      // dropping it here loses the notification of a job that runs on,
+      // and dropping the last one stops the poll altogether.
+      //
+      // And not every 404 is about the job. The service answers one for any
+      // path it does not know (serve.py, `raise KeyError(self.path)`), so an
+      // older service without GET /jobs/<id> would drop every id in the
+      // first round and bring the whole symptom back. The two read apart by
+      // what the message quotes: the job itself as `'<id>'`, a path as
+      // `'/jobs/<id>'`, where the quote sits before the slash. A 404 that
+      // quotes neither counts as no answer at all, so the id stays and
+      // MAX_MISSES ends it eventually instead of it waiting for ever.
+      const knows = status === 404 && message(error).includes(`'${id}'`);
+      if (status !== undefined && (status !== 404 || knows)) answered = true;
+      if (!knows) remaining.push(id);
       continue;
     }
     console.info(`${NAME}: job`, job.id, job.status, job.step);
     if (job.status === 'done' || job.status === 'error') {
-      await notify(job);
+      // Caught, because the rest of this round depends on reaching the end
+      // of the loop: the icon, the shortened job list and the alarm that
+      // stops the poll all happen below. A notification the browser turns
+      // away (no notification service on this desktop, an icon it will not
+      // load) would otherwise leave the finished id in the list for good,
+      // and the alarm would wake the worker every half minute for the life
+      // of the profile to fail at the same notification again.
+      await notify(job).catch((error) => {
+        console.warn(`${NAME}: notify failed:`, job.id, message(error));
+      });
       badge ??= badgeFor(job);
       continue;
     }
@@ -252,14 +309,25 @@ async function poll(): Promise<void> {
     remaining.push(id);
     badge = badgeFor(job);
   }
-  await api.storage.local.set({ jobs: remaining });
+  // Once per round, and in both directions: the icon used to go grey on
+  // the first failed GET and stay grey, because no success painted it
+  // back.
+  await showIcon(answered);
+  const { misses } = (await api.storage.local.get({ misses: 0 })) as {
+    misses: number;
+  };
+  const missed = answered ? 0 : misses + 1;
+  const gaveUp = missed >= MAX_MISSES;
+  await api.storage.local.set({
+    jobs: gaveUp ? [] : remaining,
+    misses: missed,
+  });
   if (badge) await showBadge(badge);
-  if (remaining.length === 0) await api.alarms.clear(POLL_ALARM);
+  if (gaveUp || remaining.length === 0) await api.alarms.clear(POLL_ALARM);
 }
 
 api.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === POLL_ALARM) void poll();
-  if (alarm.name === BLINK_ALARM) void blinkStep();
 });
 
 // The notification's id carries the outcome: only a finished summary has

@@ -47,13 +47,23 @@ def video_id(url: str) -> str:
 # What Windows refuses in a file name, plus control characters.
 FORBIDDEN = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 TITLE_LENGTH = 80
+# Device names Windows keeps whatever the extension: `CON.txt` is the
+# console, not a file. Today no such name reaches Windows because both
+# callers put the date in front, which is a property of the callers.
+RESERVED = {"CON", "PRN", "AUX", "NUL"} | {
+    f"{port}{number}" for port in ("COM", "LPT") for number in range(1, 10)
+}
 
 
 def clean_title(title: str | None, fallback: str) -> str:
-    """A title Windows takes as a name: without what it refuses, cut to
-    TITLE_LENGTH, and the video id when nothing is left."""
+    """A title Windows takes as a name: without what it refuses and without
+    a device name, cut to TITLE_LENGTH, and the video id when nothing
+    usable is left."""
     name = FORBIDDEN.sub("", title or "").strip(" .")
-    return name[:TITLE_LENGTH].rstrip(" .") or fallback
+    name = name[:TITLE_LENGTH].rstrip(" .")
+    if name.split(".")[0].strip().upper() in RESERVED:
+        return fallback
+    return name or fallback
 
 
 def folder_name(vid: str, title: str | None, today: date) -> str:
@@ -198,7 +208,16 @@ class _Log:
         self.errors.append(message)
 
 
-def ffmpeg(*args: str) -> bytes:
+# A limit against a hang, not a budget for the work. One frame, one crop
+# or one thumbnail is a second of work; audio is decoded far faster than
+# realtime, so three hours of it stay inside the longer limit. The service
+# works one job at a time, so an ffmpeg that never returns stops every
+# following job as well, not only its own.
+FFMPEG_TIMEOUT_SECONDS = 120
+FFMPEG_AUDIO_TIMEOUT_SECONDS = 900
+
+
+def ffmpeg(*args: str, timeout: float = FFMPEG_TIMEOUT_SECONDS) -> bytes:
     """Run ffmpeg quietly; what it wrote to stdout, or a FetchError with
     its complaint. Shared by every step that cuts, converts or measures."""
     try:
@@ -206,7 +225,10 @@ def ffmpeg(*args: str) -> bytes:
             ["ffmpeg", "-hide_banner", "-loglevel", "error", *args],
             capture_output=True,
             check=True,
+            timeout=timeout,
         )
+    except subprocess.TimeoutExpired as error:
+        raise FetchError(f"ffmpeg gave no answer within {timeout}s") from error
     except subprocess.CalledProcessError as error:
         complaint = error.stderr.decode("utf-8", "replace").strip()[:300]
         raise FetchError(f"ffmpeg failed: {complaint}") from error
@@ -241,10 +263,7 @@ def convert_thumbnail(folder: Path, vid: str) -> Path | None:
     )
     if source is None:
         return None
-    subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(source), str(target)],
-        check=True,
-    )
+    ffmpeg("-y", "-i", str(source), str(target))
     source.unlink()
     return ensure_jfif(target)
 
