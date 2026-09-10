@@ -46,16 +46,35 @@ Zusammenfassung mit Bildern macht.
 
 ## Installation
 
-Bis zum ersten Release aus dem Quelltext bauen:
+Zwei Teile: der Dienst und die Erweiterung, die mit ihm spricht.
+
+Der Dienst kommt aus einem Release. Er braucht
+[uv](https://docs.astral.sh/uv/), das sein Python selbst mitbringt:
+
+```
+irm https://raw.githubusercontent.com/corgan2222/video-tldr/main/install.ps1 | iex
+```
+
+Das wählt die CUDA-Bibliotheken, wenn eine Karte da ist, und sonst allein
+die ONNX-Laufzeit, legt `video-tldr` auf den PATH und trägt keinen
+Autostart ein: die Erweiterung startet den Dienst, wenn sie ihn braucht.
+`-Root D:\video-tldr` legt Programm, Umgebung und Daten unter ein
+Verzeichnis statt an drei übliche Orte. Die Sprachmodelle kommen beim
+ersten Lauf dazu, mehrere Gigabyte.
+
+Die Erweiterung ist die `.zip` desselben Releases: in Firefox als
+temporäres Add-on laden (`about:debugging`, „Dieser Firefox") oder
+entpacken und den Ordner in Chrome laden (`chrome://extensions`,
+Entwicklermodus).
+
+Bis zum ersten Release beides aus dem Quelltext bauen. Die Erweiterung:
 
 ```
 npm ci
 npm run build
 ```
 
-`dist/` in Firefox als temporäres Add-on laden (`about:debugging`, „Dieser
-Firefox") oder in Chrome als entpackte Erweiterung (`chrome://extensions`,
-Entwicklermodus). Die Video-Zusammenfassung braucht den lokalen Dienst aus
+Dann `dist/` laden. Der Dienst liegt in
 [`service/`](../service/README.md); dessen README beschreibt Einrichtung
 und Modellwahl.
 

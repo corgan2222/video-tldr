@@ -49,7 +49,34 @@ jobs:
       - name: Pack
         run: cd dist && zip -r "../video-tldr-${GITHUB_REF_NAME#v}.zip" .
 
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Build the service wheel
+        run: uv build --project service --wheel --out-dir .
+
+      # What install.ps1 needs besides the wheel. The overrides keep
+      # faster-whisper from pulling the CPU onnxruntime in next to the GPU
+      # one; they live in pyproject.toml, which uv reads only inside the
+      # project, so the release carries them as a file. The constraints
+      # pin the combination uv.lock was resolved with, so an install a
+      # month from now is the one that was tested. Both exports keep their
+      # platform markers, which is why Linux may write them.
+      - name: Write the overrides and the constraints
+        run: |
+          python - <<'PY' > overrides.txt
+          import tomllib, pathlib
+          data = tomllib.loads(pathlib.Path("service/pyproject.toml").read_text(encoding="utf-8"))
+          print("\n".join(data["tool"]["uv"]["override-dependencies"]))
+          PY
+          for extra in gpu cpu; do
+            uv export --project service --extra "$extra" \
+              --no-hashes --no-dev --no-emit-project \
+              -o "constraints-$extra.txt"
+          done
+
       - name: Attach to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$GITHUB_REF_NAME" video-tldr-*.zip
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            video-tldr-*.zip *.whl overrides.txt constraints-gpu.txt constraints-cpu.txt
