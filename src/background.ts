@@ -50,7 +50,13 @@ export type Ask =
   | { type: 'cancel'; id: string }
   | { type: 'open'; id: string; what?: 'obsidian' | 'folder' | 'auto' };
 
-api.runtime.onInstalled.addListener(() => {
+api.runtime.onInstalled.addListener((details) => {
+  // Only on a fresh install, not on an update: the store hands over the
+  // extension alone, and without the service the first click ends at a
+  // command the machine does not have yet.
+  if (details.reason === 'install') {
+    void api.tabs.create({ url: api.runtime.getURL('welcome.html') });
+  }
   api.contextMenus.create({
     id: MENU_ID,
     title: t('openAllLinks'),

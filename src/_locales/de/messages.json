@@ -146,6 +146,33 @@
   "grantAccess": {
     "message": "Zugriff erlauben"
   },
+  "welcomeIntro": {
+    "message": "Die eine Hälfte ist installiert. Die andere ist ein kleiner Dienst, der auf diesem Rechner läuft und die Arbeit macht: das Video holen, es transkribieren, ein Sprachmodell fragen. Nimm den Weg, der dir passt; alle drei führen zum selben Programm."
+  },
+  "welcomeWingetTitle": {
+    "message": "Mit winget"
+  },
+  "welcomeWingetHelp": {
+    "message": "Den Paketmanager bringt Windows mit, mehr braucht es nicht — ab dem ersten Release, sobald das Paket im winget-Repository liegt."
+  },
+  "welcomeScriptTitle": {
+    "message": "Mit dem Installationsskript"
+  },
+  "welcomeScriptHelp": {
+    "message": "Wählt die CUDA-Bibliotheken, wenn eine NVIDIA-Karte da ist, und sonst die kleinere ONNX-Laufzeit. Lies es vorher, wenn du sehen willst, was ein Skript tut, bevor du es ausführst."
+  },
+  "welcomeUvTitle": {
+    "message": "Mit uv, falls du es schon hast"
+  },
+  "welcomeUvHelp": {
+    "message": "Der kürzeste Weg für alle, auf deren Rechner uv schon liegt."
+  },
+  "welcomeThen": {
+    "message": "Danach startet `video-tldr serve` den Dienst, und `video-tldr autostart on` startet ihn bei jeder Anmeldung. Dann ein YouTube-Video öffnen und auf das Symbol klicken."
+  },
+  "welcomeSettings": {
+    "message": "Einstellungen öffnen"
+  },
   "noServiceCommand": {
     "message": "video-tldr serve"
   },
