@@ -1,0 +1,74 @@
+---
+title: Datenschutz
+description: Was video-tldr liest, wohin es das schickt und was liegen bleibt.
+---
+
+_[English version](/docs/privacy)_
+
+video-tldr hat keinen Server. Es gibt kein Konto, keine Telemetrie, keine
+Statistik und keine Adresse dieses Projekts, die deine Daten erreichen
+könnten.
+
+## Was die Erweiterung liest
+
+- **Die Adresse des Tabs, in dem du bist**, wenn du auf das Symbol
+  klickst oder ein Video aus dem Kontextmenü übergibst. Sie braucht die
+  Adresse, um das Video weiterzureichen, und prüft vorher, ob es
+  überhaupt ein YouTube-Video ist.
+- **Markierten Text**, nur für „Alle Links öffnen", und nur so lange, wie
+  das Öffnen dauert.
+
+Beim normalen Surfen liest sie nichts. Es läuft kein Skript im
+Hintergrund auf deinen Seiten.
+
+## Wohin das geht
+
+An `http://127.0.0.1` und sonst nirgendwohin. Diese Adresse ist dein
+eigener Rechner. Die Berechtigung dafür ist optional: Die Erweiterung
+fragt beim ersten Mal danach, und bis du zustimmst, verlässt sie keine
+einzige Anfrage.
+
+## Was der Dienst damit macht
+
+Der Dienst läuft auf deinem Rechner und holt Video, Untertitel und
+Metadaten von YouTube, so wie es jedes Download-Werkzeug tut. Dann schickt
+er das Transkript, und die Bilder, wenn du sie wolltest, an das
+Sprachmodell aus deinen Einstellungen:
+
+- **Claude-Code-CLI, Anthropic- oder OpenAI-Schnittstelle** — der Text
+  verlässt deinen Rechner und erreicht dieses Unternehmen, zu dessen
+  Bedingungen. Das ist der Punkt, über den man vor einem vertraulichen
+  Video nachdenkt.
+- **LM Studio oder Ollama** — das Modell läuft bei dir, und nichts geht
+  hinaus.
+
+Welches es ist, entscheidest du und niemandes Voreinstellung.
+`video-tldr config` zeigt, was gerade gilt.
+
+## Was liegen bleibt, und wo
+
+Alles im Datenordner, standardmäßig `%LOCALAPPDATA%\video-tldr`:
+
+- `config.json` — deine Einstellungen, samt eingetragenem API-Schlüssel
+- `work/<video-id>/` — was ein Lauf gebraucht hat: Metadaten, Transkript,
+  Standbilder
+- `models/` — die Sprachmodelle, sobald sie geladen sind
+- `serve.log` — was der Dienst getan hat, um einen gescheiterten Lauf zu
+  verstehen
+
+Die fertigen Zusammenfassungen gehen dorthin, wohin die Einstellungen
+zeigen: in den Download-Ordner, in einen Obsidian-Vault, oder in beides.
+Nichts wird hinter deinem Rücken gelöscht; „Arbeitsdateien löschen" räumt
+sie auf, wenn du das willst, und wer den Datenordner löscht, löscht jede
+Spur.
+
+Die Erweiterung selbst legt die Verbindungsdaten und die letzten Läufe im
+Erweiterungsspeicher des Browsers ab. Wer sie deinstalliert, nimmt das
+mit.
+
+## Schlüssel
+
+Ein eingetragener API-Schlüssel steht in `config.json` auf deinem Rechner
+und geht nur an den Dienst, zu dem er gehört. Die Einstellungsseite zeigt
+einen Schlüssel nie vollständig zurück und schreibt nie einen maskierten
+über einen echten.
