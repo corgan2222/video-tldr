@@ -57,13 +57,14 @@ until it is done. A click on the notification asks the service to open
 the result: the note in Obsidian when that format was written, else the
 first document among PDF, Word and Markdown.
 
-| Request                    | Answer                                                            |
-| -------------------------- | ----------------------------------------------------------------- |
-| `POST /jobs {"url": ...}`  | `202` and the job; `400` when the URL is no YouTube video         |
-| `GET /jobs/<id>`           | the job: `status` (queued, running, done, error), `step`, results |
-| `POST /jobs/<id>/open`     | `{"opened": ...}`; `409` until the job is done                    |
-| `GET /config`              | the settings (secrets masked) and the choices for each of them    |
-| `PUT /config {key: value}` | writes the keys given to `config.json`, answers like `GET`        |
+| Request                     | Answer                                                            |
+| --------------------------- | ----------------------------------------------------------------- |
+| `POST /jobs {"url": ...}`   | `202` and the job; `400` when the URL is no YouTube video         |
+| `GET /jobs/<id>`            | the job: `status` (queued, running, done, error), `step`, results |
+| `POST /jobs/<id>/open`      | `{"opened": ...}`; `409` until the job is done                    |
+| `GET /config`               | the settings (secrets masked) and the choices for each of them    |
+| `PUT /config {key: value}`  | writes the keys given to `config.json`, answers like `GET`        |
+| `GET /models?llm=<backend>` | the names that backend accepts as `model`; `400` with the reason  |
 
 Every request must carry `Authorization: Bearer <token>` and a `Host`
 header of `127.0.0.1:<port>`; an `Origin` header is accepted only from

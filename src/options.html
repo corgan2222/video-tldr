@@ -16,6 +16,18 @@
         padding-bottom: 2px;
         border-bottom: 1px solid #ccc;
       }
+      h3 {
+        font-size: 13px;
+        margin: 16px 0 0;
+      }
+      fieldset {
+        border: 0;
+        padding: 0;
+        margin: 0;
+      }
+      fieldset:disabled {
+        opacity: 0.5;
+      }
       label {
         display: block;
         margin: 12px 0 4px;
@@ -51,6 +63,7 @@
     <p class="note">
       The toolbar icon hands the active YouTube tab to the local service,
       <code>corganshelper serve</code>, which prints its token when it starts.
+      The settings below live in the service's <code>config.json</code>.
     </p>
     <label for="service-url">Service URL</label>
     <input id="service-url" type="url" placeholder="http://127.0.0.1:8765" />
@@ -58,23 +71,54 @@
     <input id="token" type="password" autocomplete="off" />
     <div class="row">
       <button id="connect">Connect</button>
-      <span id="service-status" class="note"></span>
+      <span id="service-status" class="note">Not connected.</span>
     </div>
 
-    <div id="service-settings" hidden>
+    <fieldset id="service-settings" disabled>
+      <h3>Note</h3>
       <label for="language">Language of the note</label>
       <select id="language"></select>
       <label>Outputs besides the summary (none chosen falls back to md)</label>
       <div id="formats"></div>
       <label for="obsidian-vault">Obsidian vault (path)</label>
       <input id="obsidian-vault" type="text" />
-      <label for="llm">Language model</label>
+      <label for="obsidian-folder">Folder in the vault for the notes</label>
+      <input id="obsidian-folder" type="text" />
+      <label for="browser"
+        >Chrome or Edge for the PDF (path, empty searches)</label
+      >
+      <input id="browser" type="text" />
+
+      <h3>Language model</h3>
+      <label for="llm">Backend</label>
       <select id="llm"></select>
-      <label for="model">Model name (empty for the backend's default)</label>
-      <input id="model" type="text" />
-      <label for="stt">Speech to text</label>
+      <label for="model">Model (empty means the backend's default)</label>
+      <input id="model" type="text" list="models" autocomplete="off" />
+      <datalist id="models"></datalist>
+      <span id="model-hint" class="note"></span>
+      <label for="anthropic-api-key">Anthropic API key</label>
+      <input id="anthropic-api-key" type="password" autocomplete="off" />
+      <label for="openai-api-key">OpenAI API key</label>
+      <input id="openai-api-key" type="password" autocomplete="off" />
+      <p class="note">
+        Stars stand for a stored key; leave them to keep it, clear the field to
+        remove it.
+      </p>
+      <label for="openai-base-url"
+        >OpenAI base URL (empty for api.openai.com)</label
+      >
+      <input id="openai-base-url" type="text" />
+      <label for="lmstudio-url">LM Studio URL</label>
+      <input id="lmstudio-url" type="text" />
+      <label for="ollama-url">Ollama URL</label>
+      <input id="ollama-url" type="text" />
+
+      <h3>Speech to text</h3>
+      <label for="stt"
+        >Transcriber, when YouTube has no captions or on demand</label
+      >
       <select id="stt"></select>
-    </div>
+    </fieldset>
 
     <h2>Open all links</h2>
     <label for="blocklist"

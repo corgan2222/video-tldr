@@ -6,8 +6,9 @@ The contract, every answer JSON:
     POST /jobs {"url": ...}     202 the job; 400 when the URL is no video
     GET  /jobs/<id>             200 the job; 404
     POST /jobs/<id>/open        200 {"opened": ...}; 409 until it is done
-    GET  /config                200 {"settings", "choices", "home", "version"}
+    GET  /config                200 {"settings", "choices", "stt_models", ...}
     PUT  /config {key: value}   200 {"settings", ...}; 400 on a wrong key
+    GET  /models?llm=<backend>  200 {"models": [...]}; 400 when it cannot answer
 
 A job carries `id` (the video id), `url`, `status` (queued, running,
 done, error), `step` (the running or last step) and, once it ran, what
@@ -40,9 +41,9 @@ from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote
 
-from . import __version__
+from . import __version__, llm
 from .config import (
     FORMATS,
     LANGUAGES,
@@ -50,11 +51,13 @@ from .config import (
     MASK,
     SECRETS,
     STT_ENGINES,
+    STT_MODELS,
     ConfigError,
     Settings,
     store,
 )
 from .fetch import FetchError, video_id
+from .llm import LlmError
 from .run import run
 
 PORT = 8765
@@ -116,9 +119,18 @@ class Service:
                 "formats": FORMATS,
                 "language": list(LANGUAGES),
             },
+            # Speed class, error rate and languages per transcriber, for
+            # the options page to label the choice with.
+            "stt_models": STT_MODELS,
             "home": str(settings.home),
             "version": __version__,
         }
+
+    def models(self, backend: str | None = None) -> list[str]:
+        """What the backend accepts as `model`; `backend` looks past the
+        stored choice, so the options page can list them before saving."""
+        overrides = {**self.overrides, "llm": backend} if backend else self.overrides
+        return llm.models(Settings.load(self.home, overrides))
 
     def update_config(self, values: dict) -> dict:
         # The options page sends back what GET /config showed it; a masked
@@ -286,8 +298,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(HTTPStatus.OK, service.config())
             if method == "PUT" and parts == ["config"]:
                 return self.reply(HTTPStatus.OK, service.update_config(self.body()))
+            if method == "GET" and parts == ["models"]:
+                query = parse_qs(self.path.partition("?")[2])
+                backend = query.get("llm", [None])[0]
+                return self.reply(HTTPStatus.OK, {"models": service.models(backend)})
             raise KeyError(self.path)
-        except (FetchError, ConfigError, ValueError, TypeError) as error:
+        except (FetchError, ConfigError, LlmError, ValueError, TypeError) as error:
             self.reply(HTTPStatus.BAD_REQUEST, {"error": str(error)})
         except KeyError as error:
             self.reply(HTTPStatus.NOT_FOUND, {"error": f"no such thing: {error}"})

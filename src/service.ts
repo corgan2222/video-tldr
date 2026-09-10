@@ -28,9 +28,18 @@ export interface Job {
   written?: Record<string, string>;
 }
 
+export interface SttModel {
+  engine: string;
+  model: string;
+  speed: string;
+  wer: string;
+  languages: string;
+}
+
 export interface Config {
   settings: Record<string, string>;
   choices: Record<string, string[]>;
+  stt_models: Record<string, SttModel>;
   home: string;
   version: string;
 }

@@ -233,3 +233,23 @@ def test_a_second_serve_on_the_same_port_fails_instead_of_answering_nothing(
 ):
     with pytest.raises(OSError):
         Server(service, server.server_port)
+
+
+def test_models_lists_what_a_backend_offers_and_says_why_not(server, monkeypatch):
+    code, answer = call(server, "GET", "/models")
+    assert code == 200
+    assert "sonnet" in answer["models"]
+    assert call(server, "GET", "/models?llm=claude")[1] == answer
+    assert call(server, "GET", "/models?llm=nonsense")[0] == 400
+
+    def unreachable(settings):
+        raise module.LlmError(f"{settings.config['llm']}: no server")
+
+    monkeypatch.setattr(module.llm, "models", unreachable)
+    code, answer = call(server, "GET", "/models?llm=ollama")
+    assert code == 400
+    assert answer["error"] == "ollama: no server"
+
+    # The options page labels the transcribers with this table.
+    _, config = call(server, "GET", "/config")
+    assert config["stt_models"]["parakeet"]["speed"] == "fast"
