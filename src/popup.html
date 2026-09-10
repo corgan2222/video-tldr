@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html>
   <head>
     <meta charset="utf-8" />
     <title>video-tldr</title>
@@ -11,7 +11,7 @@
         font: 13px sans-serif;
         margin: 0;
         padding: 10px 12px;
-        width: 380px;
+        width: 400px;
         background: Canvas;
         color: CanvasText;
       }
@@ -19,11 +19,15 @@
         display: flex;
         justify-content: space-between;
         align-items: baseline;
-        margin-bottom: 6px;
       }
       h1 {
         font-size: 15px;
         margin: 0;
+      }
+      .tagline {
+        font-size: 11px;
+        opacity: 0.6;
+        margin: 0 0 6px;
       }
       a {
         color: LinkText;
@@ -31,7 +35,7 @@
       }
       #video {
         font-weight: bold;
-        margin: 4px 0 8px;
+        margin: 6px 0;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -40,10 +44,18 @@
         display: flex;
         gap: 8px;
         align-items: center;
+        flex-wrap: wrap;
       }
       button {
         font: inherit;
         padding: 4px 12px;
+      }
+      button.icon {
+        padding: 4px 8px;
+      }
+      label.check {
+        font-weight: normal;
+        white-space: nowrap;
       }
       .note {
         opacity: 0.75;
@@ -96,15 +108,21 @@
       .steps .failed {
         color: #d93025;
       }
+      .bar {
+        height: 6px;
+        border-radius: 3px;
+        background: color-mix(in srgb, CanvasText 15%, transparent);
+        overflow: hidden;
+        margin: 6px 0 2px;
+      }
+      .bar > div {
+        height: 100%;
+        background: #1a73e8;
+        transition: width 0.4s linear;
+      }
       .error {
         color: #d93025;
         white-space: pre-wrap;
-      }
-      .outputs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin: 4px 0;
       }
       pre {
         font: 11px monospace;
@@ -123,32 +141,95 @@
         cursor: pointer;
         font-weight: bold;
       }
+      table {
+        border-collapse: collapse;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 1px 10px 1px 0;
+      }
+      td.n {
+        text-align: right;
+      }
+      #no-service {
+        border: 1px solid #d93025;
+        border-radius: 4px;
+        padding: 6px 8px;
+        margin: 8px 0;
+      }
+      code {
+        font-family: monospace;
+        background: color-mix(in srgb, CanvasText 10%, transparent);
+        padding: 1px 4px;
+        border-radius: 3px;
+      }
     </style>
   </head>
   <body>
     <header>
       <h1>video-tldr</h1>
-      <a id="settings">Settings</a>
+      <a id="settings" data-i18n="settings"></a>
     </header>
+    <p class="tagline" data-i18n="tagline"></p>
     <div id="lights" class="note">
-      <span id="light-service" class="light unknown" title="">service</span>
-      <span id="light-llm" class="light unknown" title="">model</span>
-      <span id="light-stt" class="light unknown" title="">transcriber</span>
+      <span
+        id="light-service"
+        class="light unknown"
+        data-i18n="lightService"
+      ></span>
+      <span id="light-llm" class="light unknown" data-i18n="lightLlm"></span>
+      <span id="light-stt" class="light unknown" data-i18n="lightStt"></span>
     </div>
+
+    <div id="no-service" hidden>
+      <div><strong data-i18n="noService"></strong></div>
+      <div class="note" data-i18n="noServiceHelp"></div>
+      <div class="row">
+        <code id="start-command"></code>
+        <button id="copy-command" data-i18n="copyCommand"></button>
+      </div>
+    </div>
+
     <div id="video">…</div>
     <div class="row">
-      <button id="fast" disabled>Fast</button>
-      <button id="thorough" disabled>Thorough</button>
-      <span id="hint" class="note"></span>
+      <button id="fast" disabled data-i18n="fast"></button>
+      <button id="thorough" disabled data-i18n="thorough"></button>
+      <label class="check" data-i18n-title="timestampsHelp">
+        <input type="checkbox" id="timestamps" checked />
+        <span data-i18n="timestamps"></span>
+      </label>
+      <label class="check" data-i18n-title="condensedHelp">
+        <input type="checkbox" id="condensed" />
+        <span data-i18n="condensed"></span>
+      </label>
+      <label class="check" data-i18n-title="cleanupHelp">
+        <input type="checkbox" id="cleanup" />
+        <span data-i18n="cleanup"></span>
+      </label>
     </div>
-    <p class="note">
-      Fast keeps every cached result, takes YouTube's captions and the model in
-      the settings. Thorough redoes every step, transcribes with the large
-      Whisper and asks the strongest model the backend has.
-    </p>
+    <div class="row" style="margin-top: 6px">
+      <label class="check">
+        <span data-i18n="language"></span>
+        <select id="language"></select>
+      </label>
+      <label class="check" data-i18n-title="styleHelp">
+        <span data-i18n="style"></span>
+        <select id="style"></select>
+      </label>
+    </div>
+    <p class="note" data-i18n="profileHelp"></p>
+
     <div id="jobs"></div>
+
+    <details id="stats-box">
+      <summary data-i18n="statsHeading"></summary>
+      <div id="stats"></div>
+    </details>
     <details id="log-box">
-      <summary>Service log</summary>
+      <summary data-i18n="serviceLog"></summary>
       <pre id="log"></pre>
     </details>
     <p id="status" class="note"></p>

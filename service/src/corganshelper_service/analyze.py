@@ -145,7 +145,41 @@ def header(fetched: dict, info: dict) -> str:
     return "\n".join(lines)
 
 
-def instruction(language: str, part: bool = False) -> str:
+# What a wording adds to the prompt. `normal` adds nothing, and the keys
+# in this order are what `style=all` walks. `all` is no wording itself.
+STYLE_INSTRUCTIONS = {
+    "normal": "",
+    "caveman": (
+        "Terse. Fragments allowed. Drop articles, filler and hedging. "
+        "Keep every technical term and number."
+    ),
+    "noslop": (
+        "Plain, concrete language. No marketing words, no 'delve', "
+        "'seamless', 'robust', 'landscape', no filler openers, no closing "
+        "summaries."
+    ),
+    "engineer": (
+        "Precise and technical: name the commands, flags, versions and "
+        "numbers the video shows; prefer a command over a description."
+    ),
+    "human": (
+        "Warm and conversational, as a colleague would explain it over "
+        "coffee, still accurate."
+    ),
+}
+CONDENSED_INSTRUCTION = (
+    "The note is a two-minute read: three to five sections, at most five "
+    "key points, the summary under 120 words, the whole note under 300 "
+    "words. Keep the frame candidates as they are."
+)
+
+
+def instruction(
+    language: str,
+    part: bool = False,
+    style: str = "normal",
+    condensed: bool = False,
+) -> str:
     name = LANGUAGES.get(language, language)
     common = (
         f"You summarise a YouTube video for a personal knowledge base. Write "
@@ -163,14 +197,20 @@ def instruction(language: str, part: bool = False) -> str:
         "table that a reader would want to see; say why."
     )
     if part:
-        return common + " This is one part of a longer video; cover only this part."
-    return common + (
-        " kind: software-tutorial when the video installs or operates software "
-        "step by step, explainer when it explains concepts, review for tests, "
-        "benchmarks and comparisons, news for announcements, else other. "
-        "summary: five to eight sentences on what the video says and for whom. "
-        "links: every URL in the description, with its role."
-    )
+        common += " This is one part of a longer video; cover only this part."
+    else:
+        common += (
+            " kind: software-tutorial when the video installs or operates "
+            "software step by step, explainer when it explains concepts, "
+            "review for tests, benchmarks and comparisons, news for "
+            "announcements, else other. summary: five to eight sentences on "
+            "what the video says and for whom. links: every URL in the "
+            "description, with its role."
+        )
+    tail = [STYLE_INSTRUCTIONS.get(style, "")]
+    if condensed:
+        tail.append(CONDENSED_INSTRUCTION)
+    return " ".join([common, *filter(None, tail)])
 
 
 def split_parts(segments: list[dict], chapters: list[dict]) -> list[list[dict]]:
@@ -199,6 +239,58 @@ def links_from(info: dict) -> list[dict]:
     ]
 
 
+def one_analysis(
+    head: str,
+    segments: list[dict],
+    info: dict,
+    duration: float,
+    language: str,
+    style: str,
+    condensed: bool,
+    settings: Settings,
+    spend: list[dict],
+) -> tuple[dict, int]:
+    """One analysis in one wording, and how many parts it took. Every
+    request's cost lands on `spend`."""
+    whole = instruction(language, style=style, condensed=condensed)
+    if sum(len(s["text"]) for s in segments) <= PART_LIMIT:
+        data = head + "\n\nTranscript:\n" + "\n".join(transcript_lines(segments))
+        result = normalize(
+            llm.complete(whole, data, ANALYSIS_SCHEMA, settings), duration
+        )
+        spend.append(dict(llm.last_cost))
+        return result, 1
+
+    piece = instruction(language, part=True, style=style, condensed=condensed)
+    parts = split_parts(segments, info.get("chapters") or [])
+    partial = []
+    for index, part in enumerate(parts, 1):
+        data = (
+            f"{head}\n\nTranscript, part {index} of {len(parts)}, "
+            f"{stamp(part[0]['start'])} to {stamp(part[-1]['end'])}:\n"
+            + "\n".join(transcript_lines(part))
+        )
+        partial.append(
+            normalize(llm.complete(piece, data, PART_SCHEMA, settings), duration)
+        )
+        spend.append(dict(llm.last_cost))
+    stitched = llm.complete(
+        whole,
+        head
+        + "\n\nSummaries of the parts:\n"
+        + json.dumps(partial, ensure_ascii=False),
+        STITCH_SCHEMA,
+        settings,
+    )
+    spend.append(dict(llm.last_cost))
+    return {
+        **stitched,
+        "sections": [s for p in partial for s in p["sections"]],
+        "key_points": [k for p in partial for k in p["key_points"]],
+        "frame_candidates": [f for p in partial for f in p["frame_candidates"]],
+    }, len(parts)
+
+
 def analyze(
     url: str, settings: Settings, force: bool = False, language: str | None = None
 ) -> dict:
@@ -216,63 +308,42 @@ def analyze(
     head = header(fetched, info)
 
     segments = transcript["segments"]
-    spend: list[dict] = []
     duration = fetched.get("duration") or (segments[-1]["end"] if segments else 0)
-    text_size = sum(len(s["text"]) for s in segments)
-    if text_size <= PART_LIMIT:
-        data = head + "\n\nTranscript:\n" + "\n".join(transcript_lines(segments))
-        result = normalize(
-            llm.complete(instruction(language), data, ANALYSIS_SCHEMA, settings),
-            duration,
+    condensed = settings.config["condensed"] == "on"
+    wanted = settings.config["style"]
+    styles = list(STYLE_INSTRUCTIONS) if wanted == "all" else [wanted]
+
+    spend: list[dict] = []
+    written = []
+    for style in styles:
+        result, parts = one_analysis(
+            head, segments, info, duration, language, style, condensed, settings, spend
         )
-        spend.append(dict(llm.last_cost))
-    else:
-        parts = split_parts(segments, info.get("chapters") or [])
-        partial = []
-        for index, part in enumerate(parts, 1):
-            data = (
-                f"{head}\n\nTranscript, part {index} of {len(parts)}, "
-                f"{stamp(part[0]['start'])} to {stamp(part[-1]['end'])}:\n"
-                + "\n".join(transcript_lines(part))
-            )
-            partial.append(
-                normalize(
-                    llm.complete(
-                        instruction(language, part=True), data, PART_SCHEMA, settings
-                    ),
-                    duration,
-                )
-            )
-            spend.append(dict(llm.last_cost))
-        stitched = llm.complete(
-            instruction(language),
-            head
-            + "\n\nSummaries of the parts:\n"
-            + json.dumps(partial, ensure_ascii=False),
-            STITCH_SCHEMA,
-            settings,
+        written.append(
+            {
+                "id": vid,
+                "language": language,
+                "style": style,
+                "condensed": condensed,
+                "model": llm.describe(settings),
+                "parts": parts,
+                # One video, one bill: with `style=all` the five wordings
+                # are one job, so each file carries the whole run's cost.
+                "cost": {},
+                **result,
+            }
         )
-        spend.append(dict(llm.last_cost))
-        result = {
-            **stitched,
-            "sections": [s for p in partial for s in p["sections"]],
-            "key_points": [k for p in partial for k in p["key_points"]],
-            "frame_candidates": [f for p in partial for f in p["frame_candidates"]],
-        }
-    result = {
-        "id": vid,
-        "language": language,
-        "model": llm.describe(settings),
-        "parts": 1 if text_size <= PART_LIMIT else len(parts),
-        "cost": llm.totals(spend),
-        **result,
-    }
-    if not result.get("links"):
-        result["links"] = links_from(info)
-    result_path.write_text(
-        json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-    return result
+    for style, result in zip(styles, written):
+        result["cost"] = llm.totals(spend)
+        if not result.get("links"):
+            result["links"] = links_from(info)
+        # The first wording keeps analysis.json, the name every other step
+        # reads; the rest of a `style=all` run sit next to it.
+        path = result_path if style == styles[0] else folder / f"analysis-{style}.json"
+        path.write_text(
+            json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+    return written[0]
 
 
 def analysis_path(settings: Settings, vid: str) -> Path:

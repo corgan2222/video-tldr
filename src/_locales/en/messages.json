@@ -1,0 +1,173 @@
+{
+  "extensionName": { "message": "video-tldr" },
+  "tagline": { "message": "Watch it. Vault it." },
+  "settings": { "message": "Settings" },
+  "openAllLinks": { "message": "Open all links" },
+  "sendToVideoTldr": { "message": "Send to video-tldr" },
+
+  "popupNoVideo": { "message": "No YouTube video in this tab." },
+  "popupOpenVideo": { "message": "Open a YouTube video first." },
+  "fast": { "message": "Fast" },
+  "thorough": { "message": "Thorough" },
+  "cancel": { "message": "Cancel" },
+  "profileHelp": {
+    "message": "Fast keeps every cached result, takes YouTube's captions and the model from the settings. Thorough redoes every step, transcribes with the large Whisper and asks the strongest model the backend has."
+  },
+  "timestamps": { "message": "Timestamps" },
+  "timestampsHelp": {
+    "message": "Link every section and picture to its moment in the video."
+  },
+  "condensed": { "message": "Core message only" },
+  "condensedHelp": {
+    "message": "Boil the video down to a two-minute read."
+  },
+  "cleanup": { "message": "Delete work files" },
+  "cleanupHelp": {
+    "message": "Remove the intermediate files under work/ once the outputs are written."
+  },
+  "language": { "message": "Language" },
+  "style": { "message": "Style" },
+  "openNote": { "message": "Open the note in Obsidian" },
+  "openFolder": { "message": "Open the download folder" },
+  "serviceLog": { "message": "Service log" },
+  "queued": { "message": "queued" },
+  "running": { "message": "running" },
+  "done": { "message": "done" },
+  "error": { "message": "error" },
+  "cancelled": { "message": "cancelled" },
+  "waitingPosition": {
+    "message": "waiting, $1 ahead",
+    "placeholders": { "1": { "content": "$1" } }
+  },
+  "aboutLeft": {
+    "message": "About $1 left.",
+    "placeholders": { "1": { "content": "$1" } }
+  },
+  "noEstimate": { "message": "No earlier run to estimate from." },
+  "took": {
+    "message": "took $1",
+    "placeholders": { "1": { "content": "$1" } }
+  },
+  "pictures": {
+    "message": "$1 pictures",
+    "placeholders": { "1": { "content": "$1" } }
+  },
+  "tokens": {
+    "message": "$1 tokens",
+    "placeholders": { "1": { "content": "$1" } }
+  },
+  "tokensPerSecond": {
+    "message": "$1 tokens/s",
+    "placeholders": { "1": { "content": "$1" } }
+  },
+
+  "noService": { "message": "The service is not running." },
+  "noServiceHelp": {
+    "message": "Start it in a terminal, then press Connect in the settings:"
+  },
+  "noServiceCommand": { "message": "cd service && uv run video-tldr serve" },
+  "copyCommand": { "message": "Copy the command" },
+  "copied": { "message": "Copied." },
+
+  "lightService": { "message": "Service" },
+  "lightLlm": { "message": "Language model" },
+  "lightStt": { "message": "Transcriber" },
+  "lightCapabilities": { "message": "Model abilities" },
+  "notChecked": { "message": "not checked yet" },
+
+  "connect": { "message": "Connect" },
+  "notConnected": { "message": "Not connected." },
+  "save": { "message": "Save" },
+  "saved": { "message": "Saved." },
+  "browse": { "message": "Browse…" },
+  "serviceUrl": { "message": "Service URL" },
+  "token": { "message": "Token (only if the service has one)" },
+  "tokenPlaceholder": { "message": "empty unless config.json sets a token" },
+
+  "summaryHeading": { "message": "Summary" },
+  "languageOfNote": { "message": "Language the summary is written in" },
+  "languageHelp": {
+    "message": "The note, its sections and captions come out in this language. Quotes and technical terms stay as spoken in the video."
+  },
+  "styleHelp": {
+    "message": "How the note is worded. \"all\" writes one note per style, for comparing them."
+  },
+  "outputs": {
+    "message": "Outputs besides the summary (none chosen falls back to md)"
+  },
+  "downloadDir": { "message": "Download folder for the outputs" },
+  "downloadDirHelp": {
+    "message": "Empty means your browser's download folder, shown in grey."
+  },
+  "obsidianVault": { "message": "Obsidian vault" },
+  "obsidianFolder": { "message": "Folder in the vault for the notes" },
+  "browserForPdf": { "message": "Chrome or Edge for the PDF" },
+  "browserHelp": {
+    "message": "Empty means the one the service found on this machine, shown in grey."
+  },
+  "pdfTemplate": { "message": "PDF design template" },
+  "pdfTemplateHelp": {
+    "message": "An HTML file with a {{content}} placeholder, or a CSS file. Empty means the built-in look."
+  },
+
+  "modelHeading": { "message": "Language model" },
+  "modelHelp": {
+    "message": "Reads the transcript and writes the note. Choose where it runs (the backend) and which model there; Thorough asks for the strongest model of the backend instead."
+  },
+  "backend": { "message": "Backend" },
+  "model": { "message": "Model" },
+  "keyNote": {
+    "message": "Stars stand for a stored key; leave them to keep it, clear the field to remove it."
+  },
+  "sttHeading": { "message": "Transcription: speech to text" },
+  "sttHelp": {
+    "message": "Turns the audio into text, and only runs when YouTube has no captions or when a model is chosen here instead of auto. These models run on this machine or at OpenAI; they are not language models and cannot write the note. Thorough always transcribes with whisper-large."
+  },
+  "transcriber": { "message": "Transcriber" },
+
+  "statsHeading": { "message": "What your runs took" },
+  "statsHelp": {
+    "message": "Measured on this machine from the videos you ran; medians over the runs that did the step, cached steps left out."
+  },
+  "statsEmpty": { "message": "No run yet; the first video fills this in." },
+  "statsConnect": { "message": "Connect to see what your runs took." },
+  "colStep": { "message": "Step" },
+  "colMedian": { "message": "Median" },
+  "colModel": { "message": "Language model" },
+  "colRuns": { "message": "Runs" },
+  "colSummarise": { "message": "Summarise" },
+  "colTokensPerVideo": { "message": "Tokens per video" },
+  "colUsd": { "message": "USD" },
+  "colTranscribe": { "message": "Transcribe" },
+  "colTokensPerSecond": { "message": "Tokens/s" },
+
+  "benchHeading": { "message": "Benchmark" },
+  "benchHelp": {
+    "message": "Runs the same video through several models of the current backend and compares what each took."
+  },
+  "benchUrl": { "message": "Video URL" },
+  "benchModels": { "message": "Models to compare" },
+  "benchRepeat": { "message": "Runs per model" },
+  "benchStart": { "message": "Start the benchmark" },
+  "benchRunning": { "message": "Benchmark running…" },
+
+  "linksHeading": { "message": "Open all links" },
+  "blocklist": {
+    "message": "Blocked hosts, one per line (subdomains included)"
+  },
+  "seen": { "message": "Links already opened" },
+  "seenCount": {
+    "message": "$1 links",
+    "placeholders": { "1": { "content": "$1" } }
+  },
+  "forgetAll": { "message": "Forget all" },
+  "forgotten": { "message": "Forgotten." },
+
+  "stepFetch": { "message": "Fetch title, description, captions" },
+  "stepTranscribe": { "message": "Transcribe" },
+  "stepAnalyze": { "message": "Summarise with the language model" },
+  "stepNote": { "message": "Write the note" },
+  "stepEnrich": { "message": "Read the linked repositories" },
+  "stepFrames": { "message": "Pick and label pictures" },
+  "stepRender": { "message": "Render the outputs" }
+}

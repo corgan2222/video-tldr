@@ -18,7 +18,8 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from .analyze import analyze, stamp
-from .config import Settings, split_formats
+from .config import STYLES, Settings, split_formats
+from .documents import command_runs
 from .documents import docx as write_docx
 from .documents import html as to_html
 from .documents import pdf as write_pdf
@@ -28,6 +29,9 @@ from .frames import chosen_images, diagram_of
 
 RESULT_NAME = "summary.md"
 PICTURES_FOLDER = "_bilder"
+# The styles `style=all` writes a second analysis for, next to the one
+# analysis.json holds; each one becomes its own note.
+EXTRA_STYLES = [s for s in STYLES if s not in ("normal", "all")]
 # What Windows refuses in a file name, plus control characters.
 FORBIDDEN = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 TITLE_LENGTH = 80
@@ -100,14 +104,25 @@ def by_section(sections: list[dict], images: list[dict]) -> list[list[dict]]:
     return placed
 
 
-def picture(vid: str, image: dict, embed: Embed) -> list[str]:
+def moment(vid: str, seconds: float, text: str, timestamps: bool = True) -> str:
+    """`[m:ss](link) text`, or the text alone when the owner switched the
+    timestamps off."""
+    return f"[{stamp(seconds)}]({at(vid, seconds)}) {text}" if timestamps else text
+
+
+def bash(commands: list[str] | None) -> list[str]:
+    """A fenced block for the commands read off a picture; nothing when
+    there are none, and `commands` is missing from older frames.json."""
+    return ["", "```bash", *commands, "```"] if commands else []
+
+
+def picture(vid: str, image: dict, embed: Embed, timestamps: bool = True) -> list[str]:
     caption = image.get("caption", "")
-    return [
-        "",
-        embed(image["file"], caption),
-        "",
-        f"*[{stamp(image['time'])}]({at(vid, image['time'])}) {caption}*",
-    ]
+    lines = ["", embed(image["file"], caption), ""]
+    label = moment(vid, image["time"], caption, timestamps)
+    if label:
+        lines.append(f"*{label}*")
+    return lines + bash(image.get("commands"))
 
 
 def render_markdown(
@@ -118,12 +133,16 @@ def render_markdown(
     embed: Embed = plain,
     diagram: dict | None = None,
     with_source: bool = True,
+    timestamps: bool = True,
+    player: bool = False,
 ) -> str:
     """The note. `images` are the chosen frames (file, time, caption),
     `repositories` what enrich read out of the READMEs, `embed` writes a
     picture file into the text, `diagram` the drawn one after the summary,
     its Mermaid source below it when `with_source` (the printed formats
-    show the picture only)."""
+    show the picture only). `timestamps` links the stamps into the video,
+    `player` ends the note with the embedded video: Obsidian renders that
+    iframe, a PDF and a Word file cannot and keep the link in the head."""
     vid = fetched["id"]
     labels = LABELS.get(analysis.get("language", "de"), LABELS["en"])
     date = fetched.get("upload_date") or ""
@@ -149,20 +168,20 @@ def render_markdown(
     sections = analysis.get("sections", [])
     placed = by_section(sections, images or [])
     for image in placed[-1]:
-        lines += picture(vid, image, embed)
+        lines += picture(vid, image, embed, timestamps)
     for section, pictures in zip(sections, placed):
         lines += [
             "",
-            f"### [{stamp(section['start'])}]({at(vid, section['start'])}) {section['title']}",
+            f"### {moment(vid, section['start'], section['title'], timestamps)}",
             "",
             section["summary"].strip(),
         ]
         for image in pictures:
-            lines += picture(vid, image, embed)
+            lines += picture(vid, image, embed, timestamps)
     if analysis.get("key_points"):
         lines += ["", f"## {labels['key_points']}", ""]
         lines += [
-            f"- [{stamp(k['time'])}]({at(vid, k['time'])}) {k['text']}"
+            f"- {moment(vid, k['time'], k['text'], timestamps)}"
             for k in analysis["key_points"]
         ]
     for repository in repositories or []:
@@ -171,10 +190,24 @@ def render_markdown(
         lines += ["", f"### [{repository['repo']}]({repository['url']})", ""]
         if repository.get("what"):
             lines += [repository["what"].strip(), ""]
-        lines += [f"1. {step}" for step in repository.get("install") or []]
+        for index, (commands, steps) in enumerate(
+            command_runs(repository.get("install") or [])
+        ):
+            lines += [""] if index else []
+            lines += (
+                ["```bash", *steps, "```"] if commands else [f"1. {s}" for s in steps]
+            )
     if analysis.get("links"):
         lines += ["", f"## {labels['links']}", ""]
         lines += [f"- <{link['url']}> ({link['role']})" for link in analysis["links"]]
+    if player:
+        iframe = (
+            f'<iframe width="560" height="315" '
+            f'src="https://www.youtube.com/embed/{vid}" '
+            f'title="YouTube video player" frameborder="0" allowfullscreen>'
+            f"</iframe>"
+        )
+        lines += ["", f"## {labels['video']}", "", iframe]
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -200,6 +233,18 @@ def frontmatter(fetched: dict, analysis: dict) -> str:
             "",
         ]
     )
+
+
+def extra_analyses(folder: Path) -> dict[str, dict]:
+    """The analyses `style=all` wrote beside analysis.json, by style; an
+    empty dict after a run with one style. Read here rather than through
+    analyze, so that a note can be rendered again without it."""
+    found = {}
+    for style in EXTRA_STYLES:
+        path = folder / f"analysis-{style}.json"
+        if path.exists():
+            found[style] = json.loads(path.read_text(encoding="utf-8"))
+    return found
 
 
 def copy_pictures(source: Path, target: Path, names: list[str], prefix: str) -> None:
@@ -238,23 +283,39 @@ def render(
     pictures += [image["file"] for image in images]
     pictures += [diagram["file"]] if diagram else []
 
-    def note(embed: Embed = plain, with_source: bool = True) -> str:
+    timestamps = settings.config.get("timestamps", "on") != "off"
+
+    def note(
+        current: dict,
+        embed: Embed = plain,
+        with_source: bool = True,
+        player: bool = False,
+    ) -> str:
         return render_markdown(
-            fetched, analysis, images, repositories, embed, diagram, with_source
+            fetched,
+            current,
+            images,
+            repositories,
+            embed,
+            diagram,
+            with_source,
+            timestamps,
+            player,
         )
 
     written = {"summary": folder / RESULT_NAME}
-    written["summary"].write_text(note(), encoding="utf-8")
+    written["summary"].write_text(note(analysis), encoding="utf-8")
     wanted = (
         formats if formats is not None else split_formats(settings.config["formats"])
     )
     out = settings.out_dir
+    # Downloads is always there, a configured download_dir need not be.
+    if set(wanted) - {"obsidian"}:
+        out.mkdir(parents=True, exist_ok=True)
     if "md" in wanted:
         copy_pictures(folder, out, pictures, prefix)
-        written["md"] = out / f"{name}.md"
-        written["md"].write_text(
-            note(lambda file, alt: plain(prefix + file, alt)), encoding="utf-8"
-        )
+    notes = out
+    wikilink_prefix = ""
     if "obsidian" in wanted:
         vault = Path(settings.config["obsidian_vault"] or "")
         if not settings.config["obsidian_vault"]:
@@ -271,35 +332,59 @@ def render(
         copy_pictures(folder, notes / PICTURES_FOLDER, pictures, prefix)
         wikilink_prefix = "/".join(p for p in (subfolder, PICTURES_FOLDER) if p)
         wikilink_prefix = f"{wikilink_prefix}/{prefix}"
-        written["obsidian"] = notes / f"{name}.md"
-        written["obsidian"].write_text(
-            frontmatter(fetched, analysis)
-            + note(lambda file, alt: f"![[{wikilink_prefix}{file}]]"),
-            encoding="utf-8",
-        )
-    if "pdf" in wanted:
-        out.mkdir(parents=True, exist_ok=True)
-        page = to_html(
-            fetched.get("title") or vid,
-            note(lambda file, alt: plain((folder / file).as_uri(), alt), False),
-        )
-        written["pdf"] = write_pdf(
-            page, out / f"{name}.pdf", settings.config["browser"]
-        )
-        written["html"] = written["pdf"].with_suffix(".html")
     if "docx" in wanted:
         # A thumbnail fetched before 2026-09-10 lacks the JFIF segment
         # python-docx insists on; the repair sits behind fetch's cache.
         convert_thumbnail(folder, vid)
-        labels = LABELS.get(analysis.get("language", "de"), LABELS["en"])
-        written["docx"] = write_docx(
-            fetched,
-            analysis,
-            by_section(analysis.get("sections") or [], images),
-            repositories,
-            labels,
-            folder,
-            out / f"{name}.docx",
-            diagram,
-        )
+
+    def write(current: dict, stem: str, key: str) -> None:
+        """One note per wanted format out of one analysis; `key` tells the
+        styles of a `style=all` run apart in the result."""
+        if "md" in wanted:
+            written[f"md{key}"] = out / f"{stem}.md"
+            written[f"md{key}"].write_text(
+                note(current, lambda file, alt: plain(prefix + file, alt)),
+                encoding="utf-8",
+            )
+        if "obsidian" in wanted:
+            written[f"obsidian{key}"] = notes / f"{stem}.md"
+            written[f"obsidian{key}"].write_text(
+                frontmatter(fetched, current)
+                + note(
+                    current,
+                    lambda file, alt: f"![[{wikilink_prefix}{file}]]",
+                    player=True,
+                ),
+                encoding="utf-8",
+            )
+        if "pdf" in wanted:
+            printed = note(
+                current, lambda file, alt: plain((folder / file).as_uri(), alt), False
+            )
+            page = to_html(
+                fetched.get("title") or vid,
+                printed,
+                settings.config.get("pdf_template", ""),
+            )
+            written[f"pdf{key}"] = write_pdf(
+                page, out / f"{stem}.pdf", settings.config["browser"]
+            )
+            written[f"html{key}"] = written[f"pdf{key}"].with_suffix(".html")
+        if "docx" in wanted:
+            labels = LABELS.get(current.get("language", "de"), LABELS["en"])
+            written[f"docx{key}"] = write_docx(
+                fetched,
+                current,
+                by_section(current.get("sections") or [], images),
+                repositories,
+                labels,
+                folder,
+                out / f"{stem}.docx",
+                diagram,
+                timestamps,
+            )
+
+    write(analysis, name, "")
+    for style, extra in extra_analyses(folder).items():
+        write(extra, f"{name} - {style}", f":{style}")
     return written

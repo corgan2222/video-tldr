@@ -1,3 +1,4 @@
+import copy
 import json
 
 from corganshelper_service import analyze as analyze_module
@@ -5,6 +6,7 @@ from corganshelper_service import llm
 from corganshelper_service.analyze import (
     ANALYSIS_SCHEMA,
     PART_LIMIT,
+    STYLE_INSTRUCTIONS,
     analyze,
     header,
     split_parts,
@@ -131,6 +133,71 @@ def test_a_long_transcript_is_split_at_chapters_and_stitched(tmp_path, monkeypat
     assert len(result["sections"]) == result["parts"]
     # No links from the model, so the description's own are kept.
     assert result["links"] == [{"url": "https://github.com/a/b", "role": "other"}]
+
+
+def test_a_style_and_condensed_reach_the_prompt_and_the_result(tmp_path, monkeypatch):
+    settings, folder = prepare(tmp_path)
+    settings.config["style"] = "caveman"
+    settings.config["condensed"] = "on"
+    prompts = []
+
+    def fake(instruction, data, schema, settings, images=None, max_turns=1):
+        prompts.append(instruction)
+        return copy.deepcopy(FAKE_ANALYSIS)
+
+    monkeypatch.setattr(llm, "complete", fake)
+    result = analyze("https://youtu.be/Zvc5QkrWgAU", settings)
+
+    assert STYLE_INSTRUCTIONS["caveman"] in prompts[0]
+    assert "two-minute read" in prompts[0] and "under 120 words" in prompts[0]
+    assert result["style"] == "caveman" and result["condensed"] is True
+    # One wording, one file, and it keeps the name every other step reads.
+    assert not list(folder.glob("analysis-*.json"))
+    assert (folder / "analysis.json").exists()
+
+
+def test_the_plain_wording_adds_nothing_to_the_prompt(tmp_path, monkeypatch):
+    settings, _ = prepare(tmp_path)
+    prompts = []
+
+    def fake(instruction, data, schema, settings, images=None, max_turns=1):
+        prompts.append(instruction)
+        return copy.deepcopy(FAKE_ANALYSIS)
+
+    monkeypatch.setattr(llm, "complete", fake)
+    result = analyze("https://youtu.be/Zvc5QkrWgAU", settings)
+
+    assert prompts[0].endswith("with its role.")
+    assert result["style"] == "normal" and result["condensed"] is False
+
+
+def test_style_all_writes_one_note_per_wording_and_one_bill(tmp_path, monkeypatch):
+    settings, folder = prepare(tmp_path)
+    settings.config["style"] = "all"
+    prompts = []
+
+    def fake(instruction, data, schema, settings, images=None, max_turns=1):
+        prompts.append(instruction)
+        llm.last_cost.update(input=100, output=10, usd=0.01)
+        return copy.deepcopy(FAKE_ANALYSIS)
+
+    monkeypatch.setattr(llm, "complete", fake)
+    result = analyze("https://youtu.be/Zvc5QkrWgAU", settings)
+
+    assert len(prompts) == 5
+    assert STYLE_INSTRUCTIONS["human"] in prompts[-1]
+    assert sorted(p.name for p in folder.glob("analysis*.json")) == [
+        "analysis-caveman.json",
+        "analysis-engineer.json",
+        "analysis-human.json",
+        "analysis-noslop.json",
+        "analysis.json",
+    ]
+    # The normal wording comes back, and every file carries the whole bill.
+    assert result["style"] == "normal"
+    assert result["cost"] == {"requests": 5, "input": 500, "output": 50, "usd": 0.05}
+    other = json.loads((folder / "analysis-engineer.json").read_text(encoding="utf-8"))
+    assert other["style"] == "engineer" and other["cost"] == result["cost"]
 
 
 def test_parts_are_cut_only_at_chapter_starts_when_there_are_chapters():

@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="en">
+<html>
   <head>
     <meta charset="utf-8" />
-    <title>video-tldr settings</title>
+    <title>video-tldr</title>
     <style>
       /* The browser's own scheme: about:addons embeds this page, and a
          white box inside a dark browser is what the owner saw first. */
@@ -14,8 +14,26 @@
         margin: 0;
         padding: 12px;
         min-width: 420px;
+        max-width: 780px;
         background: Canvas;
         color: CanvasText;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      header img {
+        height: 32px;
+      }
+      h1 {
+        font-size: 16px;
+        margin: 0;
+      }
+      .tagline {
+        font-size: 12px;
+        opacity: 0.6;
+        margin: 0;
       }
       h2 {
         font-size: 14px;
@@ -40,6 +58,7 @@
       textarea,
       input[type='text'],
       input[type='url'],
+      input[type='number'],
       input[type='password'],
       select {
         width: 100%;
@@ -55,13 +74,20 @@
       .row input {
         flex: 1;
       }
-      #formats label {
-        display: inline;
+      #formats label,
+      #bench-models label {
+        display: inline-block;
         font-weight: normal;
         margin-right: 12px;
       }
       .note {
         opacity: 0.75;
+      }
+      code {
+        font-family: monospace;
+        background: color-mix(in srgb, CanvasText 10%, transparent);
+        padding: 1px 4px;
+        border-radius: 3px;
       }
       .lights {
         list-style: none;
@@ -97,74 +123,90 @@
       td.n {
         text-align: right;
       }
+      #no-service {
+        border: 1px solid #d93025;
+        border-radius: 4px;
+        padding: 6px 8px;
+        margin: 8px 0;
+      }
     </style>
   </head>
   <body>
-    <h2>Video summary</h2>
-    <p class="note">
-      The toolbar icon opens a window with two buttons, Fast and Thorough, that
-      hand the YouTube video in the active tab to the local service,
-      <code>video-tldr serve</code>. The settings below live in the service's
-      <code>config.json</code>; grey text shows the default.
-    </p>
-    <label for="service-url">Service URL</label>
+    <header>
+      <img src="icons/128.png" alt="" />
+      <div>
+        <h1>video-tldr</h1>
+        <p class="tagline" data-i18n="tagline"></p>
+      </div>
+    </header>
+
+    <h2 data-i18n="summaryHeading"></h2>
+    <label for="service-url" data-i18n="serviceUrl"></label>
     <input id="service-url" type="url" placeholder="http://127.0.0.1:8765" />
-    <label for="token">Token (only if the service has one)</label>
+    <label for="token" data-i18n="token"></label>
     <input
       id="token"
       type="password"
       autocomplete="off"
-      placeholder="empty unless config.json sets a token"
+      data-i18n-placeholder="tokenPlaceholder"
     />
     <div class="row">
-      <button id="connect">Connect</button>
-      <span id="service-status" class="note">Not connected.</span>
+      <button id="connect" data-i18n="connect"></button>
+      <span id="service-status" class="note" data-i18n="notConnected"></span>
+    </div>
+    <div id="no-service" hidden>
+      <div><strong data-i18n="noService"></strong></div>
+      <div class="note" data-i18n="noServiceHelp"></div>
+      <div class="row">
+        <code id="start-command"></code>
+        <button id="copy-command" data-i18n="copyCommand"></button>
+      </div>
     </div>
     <ul class="lights">
-      <li id="light-service" class="light unknown">Service: not checked yet</li>
-      <li id="light-llm" class="light unknown">
-        Language model: not checked yet
-      </li>
-      <li id="light-stt" class="light unknown">Transcriber: not checked yet</li>
+      <li id="light-service" class="light unknown"></li>
+      <li id="light-llm" class="light unknown"></li>
+      <li id="light-stt" class="light unknown"></li>
+      <li id="light-capabilities" class="light unknown"></li>
     </ul>
 
     <fieldset id="service-settings">
-      <h3>Summary</h3>
-      <label for="language">Language the summary is written in</label>
+      <label for="language" data-i18n="languageOfNote"></label>
       <select id="language"></select>
-      <p class="note">
-        The note, its sections and captions come out in this language. Quotes
-        and technical terms stay as spoken in the video.
-      </p>
-      <label>Outputs besides the summary (none chosen falls back to md)</label>
+      <p class="note" data-i18n="languageHelp"></p>
+      <label for="style" data-i18n="style"></label>
+      <select id="style"></select>
+      <p class="note" data-i18n="styleHelp"></p>
+      <label data-i18n="outputs"></label>
       <div id="formats"></div>
-      <label for="obsidian-vault">Obsidian vault</label>
+      <label for="download-dir" data-i18n="downloadDir"></label>
       <div class="row">
-        <input
-          id="obsidian-vault"
-          type="text"
-          placeholder="folder of the vault; empty means no Obsidian note"
-        />
-        <button id="pick-vault" type="button">Browse…</button>
+        <input id="download-dir" type="text" />
+        <button id="pick-download" type="button" data-i18n="browse"></button>
       </div>
-      <label for="obsidian-folder">Folder in the vault for the notes</label>
+      <p class="note" data-i18n="downloadDirHelp"></p>
+      <label for="obsidian-vault" data-i18n="obsidianVault"></label>
+      <div class="row">
+        <input id="obsidian-vault" type="text" />
+        <button id="pick-vault" type="button" data-i18n="browse"></button>
+      </div>
+      <label for="obsidian-folder" data-i18n="obsidianFolder"></label>
       <input id="obsidian-folder" type="text" placeholder="Videos" />
-      <label for="browser">Chrome or Edge for the PDF</label>
+      <label for="browser" data-i18n="browserForPdf"></label>
       <div class="row">
-        <input id="browser" type="text" placeholder="searching…" />
-        <button id="pick-browser" type="button">Browse…</button>
+        <input id="browser" type="text" />
+        <button id="pick-browser" type="button" data-i18n="browse"></button>
       </div>
-      <p class="note">
-        Empty means the one the service found on this machine, shown in grey.
-      </p>
+      <p class="note" data-i18n="browserHelp"></p>
+      <label for="pdf-template" data-i18n="pdfTemplate"></label>
+      <div class="row">
+        <input id="pdf-template" type="text" />
+        <button id="pick-template" type="button" data-i18n="browse"></button>
+      </div>
+      <p class="note" data-i18n="pdfTemplateHelp"></p>
 
-      <h3>Language model</h3>
-      <p class="note">
-        Reads the transcript and writes the note. Choose where it runs (the
-        backend) and which model there; Thorough asks for the strongest model of
-        the backend instead.
-      </p>
-      <label for="llm">Backend</label>
+      <h2 data-i18n="modelHeading"></h2>
+      <p class="note" data-i18n="modelHelp"></p>
+      <label for="llm" data-i18n="backend"></label>
       <select id="llm"></select>
       <p class="note" id="backend-info"></p>
       <div data-field="anthropic_api_key">
@@ -177,11 +219,7 @@
       </div>
       <div data-field="openai_base_url">
         <label for="openai-base-url">OpenAI base URL</label>
-        <input
-          id="openai-base-url"
-          type="text"
-          placeholder="empty for api.openai.com"
-        />
+        <input id="openai-base-url" type="text" />
       </div>
       <div data-field="lmstudio_url">
         <label for="lmstudio-url">LM Studio URL</label>
@@ -199,49 +237,48 @@
           placeholder="http://localhost:11434/v1"
         />
       </div>
-      <p class="note" id="key-note">
-        Stars stand for a stored key; leave them to keep it, clear the field to
-        remove it.
-      </p>
-      <label for="model">Model</label>
+      <p class="note" id="key-note" data-i18n="keyNote"></p>
+      <label for="model" data-i18n="model"></label>
       <input id="model" type="text" list="models" autocomplete="off" />
       <datalist id="models"></datalist>
       <span id="model-hint" class="note"></span>
 
-      <h3>Transcription: speech to text</h3>
-      <p class="note">
-        Turns the audio into text, and only runs when YouTube has no captions or
-        when a model is chosen here instead of auto. These models run on this
-        machine (whisper is Whisper large-v3-turbo on the GPU) or at OpenAI;
-        they are not language models and cannot write the note. Thorough always
-        transcribes with whisper-large.
-      </p>
-      <label for="stt">Transcriber</label>
+      <h2 data-i18n="sttHeading"></h2>
+      <p class="note" data-i18n="sttHelp"></p>
+      <label for="stt" data-i18n="transcriber"></label>
       <select id="stt"></select>
     </fieldset>
 
-    <h2>What your runs took</h2>
-    <p class="note" id="stats-note">
-      Measured on this machine from the videos you ran; medians over the runs
-      that did the step, cached steps left out.
-    </p>
+    <h2 data-i18n="statsHeading"></h2>
+    <p class="note" id="stats-note" data-i18n="statsHelp"></p>
     <div id="stats"></div>
 
-    <h2>Open all links</h2>
-    <label for="blocklist"
-      >Blocked hosts, one per line (subdomains included)</label
-    >
-    <textarea id="blocklist" rows="10"></textarea>
+    <h2 data-i18n="benchHeading"></h2>
+    <p class="note" data-i18n="benchHelp"></p>
+    <label for="bench-url" data-i18n="benchUrl"></label>
+    <input id="bench-url" type="url" placeholder="https://youtu.be/…" />
+    <label data-i18n="benchModels"></label>
+    <div id="bench-models" class="note"></div>
+    <label for="bench-repeat" data-i18n="benchRepeat"></label>
+    <input id="bench-repeat" type="number" min="1" max="5" value="1" />
+    <div class="row">
+      <button id="bench-start" data-i18n="benchStart"></button>
+      <span id="bench-status" class="note"></span>
+    </div>
+    <div id="bench-result"></div>
 
-    <label for="seen">Links already opened</label>
+    <h2 data-i18n="linksHeading"></h2>
+    <label for="blocklist" data-i18n="blocklist"></label>
+    <textarea id="blocklist" rows="10"></textarea>
+    <label for="seen" data-i18n="seen"></label>
     <textarea id="seen" rows="8" readonly></textarea>
     <div class="row">
-      <span id="seen-count">0 links</span>
-      <button id="clear">Forget all</button>
+      <span id="seen-count"></span>
+      <button id="clear" data-i18n="forgetAll"></button>
     </div>
 
     <div class="row">
-      <button id="save">Save</button>
+      <button id="save" data-i18n="save"></button>
       <span id="status"></span>
     </div>
     <script type="module" src="options.js"></script>

@@ -41,19 +41,66 @@ body { font-family: Segoe UI, Helvetica, Arial, sans-serif; max-width: 52em;
 img { max-width: 100%; height: auto; page-break-inside: avoid; }
 h2 { page-break-after: avoid; }
 code { font-family: Consolas, monospace; font-size: 0.95em; }
+pre { background: #f6f6f6; border: 1px solid #ddd; border-radius: 4px;
+      padding: 0.6em 0.8em; overflow-x: auto; page-break-inside: avoid; }
+pre code { font-size: 0.9em; background: none; border: none; }
 """
 
 
-def html(title: str, markdown_text: str) -> str:
-    """A complete page from the note's Markdown."""
+def html(title: str, markdown_text: str, template: str = "") -> str:
+    """A complete page from the note's Markdown. `template` is the file
+    `pdf_template` names: an `.html` page with `{{content}}` and
+    `{{title}}` in it replaces this page, anything else is read as CSS and
+    follows STYLE, so a few overriding rules are the short way in."""
     import markdown
 
     body = markdown.markdown(markdown_text, extensions=["tables", "fenced_code"])
+    style = STYLE
+    if template:
+        path = Path(template).expanduser()
+        if not path.is_file():
+            raise FetchError(f"pdf_template {path} does not exist")
+        text = path.read_text(encoding="utf-8")
+        if path.suffix.lower() == ".html":
+            return text.replace("{{content}}", body).replace("{{title}}", escape(title))
+        style = STYLE + text
     return (
         "<!doctype html>\n<html>\n<head>\n<meta charset='utf-8'>\n"
-        f"<title>{escape(title)}</title>\n<style>{STYLE}</style>\n</head>\n"
+        f"<title>{escape(title)}</title>\n<style>{style}</style>\n</head>\n"
         f"<body>\n{body}\n</body>\n</html>\n"
     )
+
+
+# What an install step starts with when it is meant for a shell. A step
+# that reads like a sentence stays prose; the READMEs enrich reads mix
+# both, and a paragraph inside a code block is unreadable.
+SHELL_STARTS = ("pip", "npm", "git", "uv", "docker", "curl", "$", ">")
+
+
+def is_command(step: str) -> bool:
+    """Whether an install step is a line to paste into a shell: no
+    sentence in it, and it opens lowercase or with a shell token."""
+    text = step.strip().strip("`").strip()
+    return (
+        bool(text)
+        and ". " not in text
+        and (text[:1].islower() or text.startswith(SHELL_STARTS))
+    )
+
+
+def command_runs(steps: list[str]) -> list[tuple[bool, list[str]]]:
+    """The steps in their order, grouped into runs of commands and runs
+    of prose: `(True, [command, ...])` becomes one code block, the rest
+    stays a list. Commands lose the backticks a README wraps them in."""
+    runs: list[tuple[bool, list[str]]] = []
+    for step in steps:
+        command = is_command(step)
+        text = step.strip().strip("`").strip() if command else step.strip()
+        if runs and runs[-1][0] == command:
+            runs[-1][1].append(text)
+        else:
+            runs.append((command, [text]))
+    return runs
 
 
 BROWSER_HINT = "`corganshelper config --set browser=<path to chrome.exe>`"
@@ -191,6 +238,22 @@ def mermaid_png(source: str, target: Path, configured_browser: str = "") -> Path
     return target
 
 
+def code_line(document, text: str) -> None:
+    """One line of a command block: Consolas on a light background.
+    python-docx has no shading API, so `w:shd` goes into the paragraph by
+    hand; that element is what Word paints a code block with."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import Pt
+
+    paragraph = document.add_paragraph()
+    paragraph.paragraph_format.space_after = Pt(0)
+    paragraph.add_run(text).font.name = "Consolas"
+    shading = OxmlElement("w:shd")
+    shading.set(qn("w:fill"), "F2F2F2")
+    paragraph._p.get_or_add_pPr().append(shading)
+
+
 def docx(
     fetched: dict,
     analysis: dict,
@@ -200,13 +263,18 @@ def docx(
     folder: Path,
     target: Path,
     diagram: dict | None = None,
+    timestamps: bool = True,
 ) -> Path:
     """The Word file. `placed` holds the pictures per section, the extra
     list at the end the ones before the first section, as `by_section`
     in render.py hands them over; the files lie in `folder`. `diagram`
-    is the drawn one, placed after the summary."""
+    is the drawn one, placed after the summary. Without `timestamps` the
+    headings, key points and captions carry the text alone."""
     from docx import Document
     from docx.shared import Inches
+
+    def moment(seconds: float, text: str) -> str:
+        return f"[{stamp(seconds)}] {text}" if timestamps else text
 
     vid = fetched["id"]
     doc = Document()
@@ -226,6 +294,8 @@ def docx(
         doc.add_picture(str(path), width=Inches(6))
         if caption:
             doc.add_paragraph().add_run(caption).italic = True
+        for command in image.get("commands") or []:
+            code_line(doc, command)
 
     if fetched.get("thumbnail"):
         picture({"file": fetched["thumbnail"]})
@@ -236,26 +306,28 @@ def docx(
     doc.add_heading(labels["sections"], 1)
     sections = analysis.get("sections") or []
     for image in placed[-1]:
-        picture(image, f"[{stamp(image['time'])}] {image.get('caption', '')}")
+        picture(image, moment(image["time"], image.get("caption", "")))
     for section, pictures in zip(sections, placed):
-        doc.add_heading(f"[{stamp(section['start'])}] {section['title']}", 2)
+        doc.add_heading(moment(section["start"], section["title"]), 2)
         doc.add_paragraph(section["summary"].strip())
         for image in pictures:
-            picture(image, f"[{stamp(image['time'])}] {image.get('caption', '')}")
+            picture(image, moment(image["time"], image.get("caption", "")))
     if analysis.get("key_points"):
         doc.add_heading(labels["key_points"], 1)
         for point in analysis["key_points"]:
-            doc.add_paragraph(
-                f"[{stamp(point['time'])}] {point['text']}", style="List Bullet"
-            )
+            doc.add_paragraph(moment(point["time"], point["text"]), style="List Bullet")
     if repositories:
         doc.add_heading(labels["install"], 1)
         for repository in repositories:
             doc.add_heading(f"{repository['repo']} ({repository['url']})", 2)
             if repository.get("what"):
                 doc.add_paragraph(repository["what"].strip())
-            for step in repository.get("install") or []:
-                doc.add_paragraph(step.replace("`", ""), style="List Number")
+            for commands, steps in command_runs(repository.get("install") or []):
+                for step in steps:
+                    if commands:
+                        code_line(doc, step)
+                    else:
+                        doc.add_paragraph(step.replace("`", ""), style="List Number")
     if analysis.get("links"):
         doc.add_heading(labels["links"], 1)
         for link in analysis["links"]:

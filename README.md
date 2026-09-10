@@ -1,5 +1,9 @@
 # video-tldr
 
+<p align="center"><img src="docs/assets/logo-light.png" alt="video-tldr" width="320"></p>
+
+**Watch it. Vault it.**
+
 _[Deutsche Fassung](docs/README_DE.md)_
 
 Too long to read? A Firefox and Chrome extension with a local service that

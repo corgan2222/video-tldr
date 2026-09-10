@@ -3,7 +3,10 @@ import {
   badgeFor,
   failureBadge,
   formatSeconds,
+  iconSet,
   isLocal,
+  NoServiceError,
+  progress,
   remainingSeconds,
   request,
   ServiceError,
@@ -73,11 +76,15 @@ describe('request', () => {
     );
   });
 
-  it('says how to start the service when nothing answers', async () => {
+  it('tells a dead service apart from a refusal, so the pages can help', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('refused')));
 
+    // NoServiceError: the pages then show the command that starts it.
     await expect(request(connection, 'GET', '/config')).rejects.toThrow(
-      'no service at http://127.0.0.1:8765; start it with "video-tldr serve"',
+      NoServiceError,
+    );
+    await expect(request(connection, 'GET', '/config')).rejects.toThrow(
+      'no service at http://127.0.0.1:8765',
     );
   });
 });
@@ -171,6 +178,13 @@ describe('time estimate', () => {
     expect(remainingSeconds(running, { ...stats, steps: {} }, now)).toBeNull();
   });
 
+  it('fills the bar with what is behind it, and the whole bar when done', () => {
+    // 9.2 s spent, 30 s in the running step, 297 s expected after it.
+    expect(progress(running, stats, now)).toBeCloseTo(39.2 / 336.2, 3);
+    expect(progress({ ...running, status: 'done' }, stats, now)).toBe(1);
+    expect(progress(running, { ...stats, steps: {} }, now)).toBe(0);
+  });
+
   it('marks the failed step and formats seconds as minutes', () => {
     const failed: Job = {
       ...running,
@@ -180,6 +194,13 @@ describe('time estimate', () => {
     expect(stepViews(failed, stats, now)[2].state).toBe('failed');
     expect(formatSeconds(42)).toBe('42 s');
     expect(formatSeconds(297)).toBe('4:57 min');
+  });
+});
+
+describe('iconSet', () => {
+  it('is grey while the service is away and coloured while it answers', () => {
+    expect(iconSet(false)[16]).toBe('icons/inactive-16.png');
+    expect(iconSet(true)[128]).toBe('icons/active-128.png');
   });
 });
 

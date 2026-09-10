@@ -2,7 +2,7 @@
 // relies on module-level state surviving from one event to the next: the
 // running jobs live in storage.local, and an alarm wakes the worker to
 // poll them. The toolbar icon opens popup.html; the popup asks this
-// worker to start a job or open a result, because only the worker
+// worker to start, cancel or open a job, because only the worker
 // outlives the popup.
 //
 // The manifest lists this file under both `service_worker` and `scripts`:
@@ -16,39 +16,62 @@
 // Firefox, Inspect next to video-tldr (chrome://extensions, service
 // worker link, in Chrome).
 import { api } from './api.js';
+import { t } from './i18n.js';
 import { DEFAULT_BLOCKLIST, planOpen, type Selection } from './links.js';
 import {
   badgeFor,
   DEFAULT_CONNECTION,
   failureBadge,
+  iconSet,
   NAME,
   request,
+  videoId,
   type Badge,
   type Connection,
   type Job,
   type Profile,
+  type RunOptions,
 } from './service.js';
 
 const MENU_ID = 'open-all-links';
 const SETTINGS_MENU_ID = 'settings';
+const SEND_MENU_ID = 'send-to-video-tldr';
 const POLL_ALARM = 'poll-job';
+const BLINK_ALARM = 'blink';
 // Chrome's floor for a repeating alarm; a job takes minutes anyway.
 const POLL_MINUTES = 0.5;
+// How often the icon flips while it blinks, and how long it does.
+const BLINK_MS = 500;
+const BLINK_TIMES = 12;
 
 // What the popup may ask of this worker.
 export type Ask =
-  | { type: 'start'; url: string; profile: Profile }
-  | { type: 'open'; id: string };
+  | { type: 'start'; url: string; profile: Profile; options?: RunOptions }
+  | { type: 'cancel'; id: string }
+  | { type: 'open'; id: string; what?: 'obsidian' | 'folder' | 'auto' };
 
 api.runtime.onInstalled.addListener(() => {
   api.contextMenus.create({
     id: MENU_ID,
-    title: 'Open all links',
+    title: t('openAllLinks'),
     contexts: ['selection'],
+  });
+  // On a link to a video, and on the video page itself: hand it over
+  // without opening the tab first.
+  api.contextMenus.create({
+    id: SEND_MENU_ID,
+    title: t('sendToVideoTldr'),
+    contexts: ['link', 'video', 'page'],
+    targetUrlPatterns: [
+      '*://*.youtube.com/*',
+      '*://youtu.be/*',
+      '*://*.youtu.be/*',
+    ],
+    documentUrlPatterns: ['*://*.youtube.com/*', '*://youtu.be/*'],
   });
   api.contextMenus.create({
     id: SETTINGS_MENU_ID,
-    title: 'Settings',
+    title: t('settings'),
     contexts: ['action'],
   });
 });
@@ -74,35 +97,51 @@ async function showBadge(badge: Badge): Promise<void> {
   await api.action.setTitle({ title: badge.title });
 }
 
+// Grey while the service does not answer, coloured while it does.
+async function showIcon(connected: boolean): Promise<void> {
+  await api.action.setIcon({ path: iconSet(connected) });
+  await api.storage.local.set({ connected });
+}
+
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function startJob(url: string, profile: Profile): Promise<Job> {
+async function startJob(
+  url: string,
+  profile: Profile,
+  options?: RunOptions,
+): Promise<Job> {
   const job = await request<Job>(await connection(), 'POST', '/jobs', {
     url,
     profile,
+    options,
   });
-  console.info(`${NAME}: job`, job.id, job.status, profile, url);
+  console.info(`${NAME}: job`, job.id, job.status, profile, url, options);
   const jobs = await trackedJobs();
   await api.storage.local.set({
     jobs: [...jobs.filter((id) => id !== job.id), job.id],
   });
+  await showIcon(true);
   await showBadge(badgeFor(job));
   await api.alarms.create(POLL_ALARM, { periodInMinutes: POLL_MINUTES });
   return job;
 }
 
-async function openResult(id: string): Promise<{ opened: string }> {
-  return request(await connection(), 'POST', `/jobs/${id}/open`);
-}
-
 async function answer(ask: Ask): Promise<unknown> {
   switch (ask.type) {
     case 'start':
-      return { job: await startJob(ask.url, ask.profile) };
+      return { job: await startJob(ask.url, ask.profile, ask.options) };
+    case 'cancel':
+      return await request(
+        await connection(),
+        'POST',
+        `/jobs/${ask.id}/cancel`,
+      );
     case 'open':
-      return await openResult(ask.id);
+      return await request(await connection(), 'POST', `/jobs/${ask.id}/open`, {
+        what: ask.what ?? 'auto',
+      });
   }
 }
 
@@ -117,9 +156,43 @@ api.runtime.onMessage.addListener((ask: Ask, _sender, sendResponse) => {
   return true;
 });
 
-api.contextMenus.onClicked.addListener((info) => {
-  if (info.menuItemId === SETTINGS_MENU_ID) void api.runtime.openOptionsPage();
+api.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === SETTINGS_MENU_ID) {
+    void api.runtime.openOptionsPage();
+    return;
+  }
+  if (info.menuItemId !== SEND_MENU_ID) return;
+  const url = info.linkUrl ?? info.srcUrl ?? info.pageUrl ?? tab?.url ?? '';
+  if (!videoId(url)) {
+    await showBadge(failureBadge(`not a YouTube video: ${url}`));
+    return;
+  }
+  try {
+    await startJob(url, 'fast');
+  } catch (error) {
+    await showBadge(failureBadge(message(error)));
+  }
 });
+
+// A finished job should catch the eye without stealing focus: the icon
+// flips between the coloured and the grey one for a few seconds.
+async function blink(): Promise<void> {
+  await api.storage.local.set({ blinks: BLINK_TIMES });
+  await api.alarms.create(BLINK_ALARM, { periodInMinutes: BLINK_MS / 60000 });
+}
+
+async function blinkStep(): Promise<void> {
+  const { blinks } = (await api.storage.local.get({ blinks: 0 })) as {
+    blinks: number;
+  };
+  if (blinks <= 0) {
+    await api.alarms.clear(BLINK_ALARM);
+    await showIcon(true);
+    return;
+  }
+  await api.action.setIcon({ path: iconSet(blinks % 2 === 0) });
+  await api.storage.local.set({ blinks: blinks - 1 });
+}
 
 async function notify(job: Job): Promise<void> {
   const what = job.title ?? job.id;
@@ -128,13 +201,14 @@ async function notify(job: Job): Promise<void> {
     iconUrl: api.runtime.getURL('icons/128.png'),
     title:
       job.status === 'done'
-        ? `${NAME}: summary ready`
-        : `${NAME}: ${job.error?.step ?? 'job'} failed`,
+        ? `${NAME}: ${t('done')}`
+        : `${NAME}: ${job.error?.step ?? 'job'} ${t('error')}`,
     message:
       job.status === 'done'
-        ? `${what}. Click to open it.`
+        ? `${what}. ${t('openNote')}`
         : `${what}: ${job.error?.message ?? 'unknown error'}`,
   });
+  if (job.status === 'done') await blink();
 }
 
 // One round over every tracked job. A finished one gets its notification
@@ -156,11 +230,16 @@ async function poll(): Promise<void> {
     } catch (error) {
       console.warn(`${NAME}: GET /jobs failed:`, id, message(error));
       badge = failureBadge(message(error));
+      await showIcon(false);
       continue;
     }
     console.info(`${NAME}: job`, job.id, job.status, job.step);
     if (job.status === 'done' || job.status === 'error') {
       await notify(job);
+      badge ??= badgeFor(job);
+      continue;
+    }
+    if (job.status === 'cancelled') {
       badge ??= badgeFor(job);
       continue;
     }
@@ -174,6 +253,7 @@ async function poll(): Promise<void> {
 
 api.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === POLL_ALARM) void poll();
+  if (alarm.name === BLINK_ALARM) void blinkStep();
 });
 
 // The notification's id carries the outcome: only a finished summary has
@@ -184,12 +264,24 @@ api.notifications.onClicked.addListener(async (id) => {
   await api.notifications.clear(id);
   if (status !== 'done' || !jobId) return;
   try {
-    await openResult(jobId);
+    await answer({ type: 'open', id: jobId });
   } catch (error) {
     console.warn(`${NAME}: open failed:`, jobId, message(error));
     await showBadge(failureBadge(message(error)));
   }
 });
+
+// On every start of the worker: ask the service once, so the icon says
+// whether it is there before the first click.
+async function checkService(): Promise<void> {
+  try {
+    await request(await connection(), 'GET', '/health');
+    await showIcon(true);
+  } catch {
+    await showIcon(false);
+  }
+}
+void checkService();
 
 // ----------------------------------------------------------- open all links
 

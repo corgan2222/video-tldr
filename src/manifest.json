@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "video-tldr",
-  "version": "0.1.33",
-  "description": "Too long to read? One click turns the YouTube video in the active tab into a summary with pictures, as a note, PDF or Word file.",
+  "version": "0.1.38",
+  "description": "Watch it. Vault it. One click turns the YouTube video in the active tab into a summary with pictures, as a note, PDF or Word file.",
   "icons": {
     "16": "icons/16.png",
     "32": "icons/32.png",
@@ -32,7 +32,13 @@
   "host_permissions": ["http://127.0.0.1/*"],
   "action": {
     "default_title": "video-tldr",
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/inactive-16.png",
+      "32": "icons/inactive-32.png",
+      "48": "icons/inactive-48.png",
+      "128": "icons/inactive-128.png"
+    }
   },
   "options_ui": {
     "page": "options.html"
@@ -41,5 +47,6 @@
     "service_worker": "background.js",
     "scripts": ["background.js"],
     "type": "module"
-  }
+  },
+  "default_locale": "en"
 }
