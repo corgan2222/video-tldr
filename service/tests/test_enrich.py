@@ -152,6 +152,85 @@ def test_enrich_reads_the_readmes_and_stores_the_steps(tmp_path, monkeypatch):
     assert json.loads((folder / "enrich.json").read_text(encoding="utf-8")) == result
 
 
+def prepared(tmp_path, links: list[dict]):
+    """A video whose analysis already carries `links`."""
+    settings = Settings(home=tmp_path)
+    folder = work_folder(settings, VID)
+    folder.mkdir(parents=True)
+    (folder / "fetch.json").write_text(json.dumps({"id": VID}), encoding="utf-8")
+    (folder / "analysis.json").write_text(
+        json.dumps({"id": VID, "language": "de", "kind": "review", "links": links}),
+        encoding="utf-8",
+    )
+    return settings
+
+
+def test_a_repository_the_model_invents_is_dropped(tmp_path, monkeypatch):
+    settings = prepared(
+        tmp_path,
+        [{"url": "https://github.com/openai/human-eval", "role": "repository"}],
+    )
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        serving(
+            {
+                "https://raw.githubusercontent.com/openai/human-eval/HEAD/README.md": (
+                    b"# HumanEval"
+                )
+            }
+        ),
+    )
+
+    def fake_complete(instruction, data, schema, settings, images=None, max_turns=1):
+        return {
+            "repositories": [
+                {"repo": "OpenAI/Human-Eval", "what": "Der Benchmark.", "install": []},
+                {"repo": "someone/else", "what": "Aus dem README.", "install": []},
+            ]
+        }
+
+    monkeypatch.setattr(llm, "complete", fake_complete)
+    result = enrich(f"https://youtu.be/{VID}", settings)
+
+    # The name this run asked about comes back as it was asked, whatever
+    # case the answer wrote it in; the other name has no README behind it.
+    assert [r["repo"] for r in result["repositories"]] == ["openai/human-eval"]
+    assert result["repositories"][0]["url"] == "https://github.com/openai/human-eval"
+    assert result["skipped"] == ["an answer named a repository nobody read"]
+
+
+def test_the_readmes_of_one_request_share_one_budget(tmp_path, monkeypatch):
+    names = ["a/b", "c/d", "e/f"]
+    settings = prepared(
+        tmp_path,
+        [{"url": f"https://github.com/{n}", "role": "repository"} for n in names],
+    )
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        serving(
+            {
+                f"https://raw.githubusercontent.com/{n}/HEAD/README.md": b"x" * 80_000
+                for n in names
+            }
+        ),
+    )
+    sent = []
+
+    def fake_complete(instruction, data, schema, settings, images=None, max_turns=1):
+        sent.append(data)
+        return {"repositories": []}
+
+    monkeypatch.setattr(llm, "complete", fake_complete)
+    enrich(f"https://youtu.be/{VID}", settings)
+
+    # Three READMEs, one request, and together no longer than one README
+    # may be; the headings are the only thing on top.
+    assert sent[0].count("## ") == 3
+    assert len(sent[0]) <= enrich_module.SIZE_LIMIT + 200
+
+
 def test_without_a_repository_no_request_is_made(tmp_path, monkeypatch):
     settings = Settings(home=tmp_path)
     folder = work_folder(settings, VID)
