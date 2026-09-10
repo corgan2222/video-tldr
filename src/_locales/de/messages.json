@@ -149,12 +149,6 @@
   "welcomeIntro": {
     "message": "Die eine Hälfte ist installiert. Die andere ist ein kleiner Dienst, der auf diesem Rechner läuft und die Arbeit macht: das Video holen, es transkribieren, ein Sprachmodell fragen. Nimm den Weg, der dir passt; alle drei führen zum selben Programm."
   },
-  "welcomeWingetTitle": {
-    "message": "Mit winget"
-  },
-  "welcomeWingetHelp": {
-    "message": "Den Paketmanager bringt Windows mit, mehr braucht es nicht — ab dem ersten Release, sobald das Paket im winget-Repository liegt."
-  },
   "welcomeScriptTitle": {
     "message": "Mit dem Installationsskript"
   },
@@ -165,7 +159,7 @@
     "message": "Mit uv, falls du es schon hast"
   },
   "welcomeUvHelp": {
-    "message": "Der kürzeste Weg für alle, auf deren Rechner uv schon liegt."
+    "message": "Der kürzeste Weg für alle, auf deren Rechner uv schon liegt — sobald das Paket auf PyPI steht."
   },
   "welcomeThen": {
     "message": "Danach startet `video-tldr serve` den Dienst, und `video-tldr autostart on` startet ihn bei jeder Anmeldung. Dann ein YouTube-Video öffnen und auf das Symbol klicken."
@@ -450,5 +444,11 @@
   },
   "openSettings": {
     "message": "Einstellungen"
+  },
+  "welcomeSourceTitle": {
+    "message": "Aus dem Quelltext"
+  },
+  "welcomeSourceHelp": {
+    "message": "Geht heute, ohne jedes Release. Klonen, dann `npm ci && npm run build` für die Erweiterung und `uv sync --project service --extra gpu` für den Dienst."
   }
 }
