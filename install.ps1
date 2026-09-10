@@ -168,6 +168,11 @@ finally {
 
 Add-ToUserPath $binDir
 
+# An update leaves the version it replaced in uv's cache, and these wheels
+# run to two gigabytes. Prune drops what nothing references any more, so it
+# takes the old one and leaves every other tool's alone.
+& uv cache prune | Out-Null
+
 $installed = Join-Path $binDir 'video-tldr.exe'
 & $installed --version
 Write-Step 'Done. `video-tldr probe` checks the tools, `video-tldr serve` starts it.'
