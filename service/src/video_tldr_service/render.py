@@ -15,12 +15,13 @@ import json
 import shutil
 from collections.abc import Callable
 from datetime import UTC, date, datetime
+from html import escape
 from pathlib import Path
 
 from .analyze import analyze, stamp
 from .config import EXTRA_STYLES as config_styles
 from .config import Settings, split_formats
-from .documents import command_runs
+from .documents import command_runs, safe_target
 from .documents import docx as write_docx
 from .documents import html as to_html
 from .documents import pdf as write_pdf
@@ -79,6 +80,34 @@ LABELS = {
 
 # How a picture file is written into the Markdown: (file name, alt text).
 Embed = Callable[[str, str], str]
+
+
+def outside(value: object) -> str:
+    """A short field from outside the run: the title, the channel, the
+    upload date, the kind, a section's heading, a key point. Its angle
+    brackets go here, once, rather than in each of the three formats the
+    Markdown is made into. The ampersand stays as it is: `<` and `>` alone
+    take a tag apart, while `Docker &amp; Podman` is what a reader of the
+    .md file and Obsidian would be left with.
+
+    Who needs this: the .md file and the Obsidian note. The page for the
+    PDF escapes a raw tag itself, in documents.py, but those two are read
+    as Markdown, and Obsidian is assumed to render raw HTML in a note
+    (assumption of 2026-09-10, not measured here: no Obsidian on this
+    machine). A link target is a different matter and goes through
+    `safe_target` from documents.py.
+
+    The limit, 2026-09-10: the short fields are all this closes. The prose
+    a model writes keeps its angle brackets, because `analysis['summary']`
+    and a section's summary are Markdown meant to be rendered, and an
+    earlier round that masked them cost a prose line its `>`; the two are
+    held by `test_a_prose_line_reaches_the_md_file_as_the_model_wrote_it`
+    and `test_a_code_block_shows_the_tag_it_carries`. A tag the model
+    carries back out of a description therefore stands raw in the .md file
+    and in the Obsidian note. The HTML and the PDF are out of it: there
+    documents.py deregisters python-markdown's two raw-HTML handlers, so
+    every tag in the note becomes text on the page."""
+    return str(value).replace("<", "&lt;").replace(">", "&gt;") if value else ""
 
 
 def plain(name: str, alt: str) -> str:
@@ -148,20 +177,27 @@ def render_markdown(
     show the picture only). `timestamps` links the stamps into the video,
     `player` ends the note with the embedded video: Obsidian renders that
     iframe, a PDF and a Word file cannot and keep the link in the head."""
-    vid = fetched["id"]
+    # The id also rides inside the player's src attribute below, so unlike
+    # the other fields from outside it gives up its quotes as well.
+    vid = escape(str(fetched["id"]))
     labels = LABELS.get(analysis.get("language", "de"), LABELS["en"])
-    date = fetched.get("upload_date") or ""
+    title = outside(fetched.get("title")) or vid
+    date = outside(fetched.get("upload_date"))
     date = f"{date[:4]}-{date[4:6]}-{date[6:]}" if len(date) == 8 else date
     lines = []
     if fetched.get("thumbnail"):
-        lines.append(embed(fetched["thumbnail"], fetched.get("title") or vid))
+        lines.append(embed(fetched["thumbnail"], title))
         lines.append("")
-    lines.append(f"# {fetched.get('title')}")
+    lines.append(f"# {title}")
     lines.append("")
+    # A kind this project has a label for is that label; anything else is
+    # whatever came back and goes the way the other short fields go.
+    kind = labels["kinds"].get(analysis.get("kind")) or outside(analysis.get("kind"))
     lines.append(
-        f"{fetched.get('channel')} · {date} · {stamp(fetched.get('duration') or 0)} · "
+        f"{outside(fetched.get('channel'))} · {date} · "
+        f"{stamp(fetched.get('duration') or 0)} · "
         f"[{labels['video']}](https://youtu.be/{vid}) · "
-        f"{labels['kind']}: {labels['kinds'].get(analysis.get('kind'), analysis.get('kind'))}"
+        f"{labels['kind']}: {kind}"
     )
     lines += ["", f"## {labels['summary']}", "", analysis.get("summary", "").strip()]
     if diagram:
@@ -177,7 +213,7 @@ def render_markdown(
     for section, pictures in zip(sections, placed):
         lines += [
             "",
-            f"### {moment(vid, section['start'], section['title'], timestamps)}",
+            f"### {moment(vid, section['start'], outside(section['title']), timestamps)}",
             "",
             section["summary"].strip(),
         ]
@@ -186,13 +222,18 @@ def render_markdown(
     if analysis.get("key_points"):
         lines += ["", f"## {labels['key_points']}", ""]
         lines += [
-            f"- {moment(vid, k['time'], k['text'], timestamps)}"
+            f"- {moment(vid, k['time'], outside(k['text']), timestamps)}"
             for k in analysis["key_points"]
         ]
     for repository in repositories or []:
         if repository is repositories[0]:
             lines += ["", f"## {labels['install']}"]
-        lines += ["", f"### [{repository['repo']}]({repository['url']})", ""]
+        # A link target, not prose: enrich builds this URL from a repo name
+        # it read itself, but the note is rendered from enrich.json on disk
+        # and whatever a caller hands over, so the scheme is checked here
+        # the way every target in the page is.
+        url = safe_target(str(repository["url"]))
+        lines += ["", f"### [{repository['repo']}]({url})", ""]
         if repository.get("what"):
             lines += [repository["what"].strip(), ""]
         for index, (commands, steps) in enumerate(
@@ -204,8 +245,17 @@ def render_markdown(
             )
     if analysis.get("links"):
         lines += ["", f"## {labels['links']}", ""]
+        # A target in plain sight, unlike the heading above: this line is
+        # the URL's own text, so a reader of the .md file sees a
+        # `javascript:` one standing there (measured 2026-09-10, it reaches
+        # the file as the autolink `<javascript:alert(1)>`). The page
+        # defuses it in the tree; a click on it in Obsidian is the open
+        # case, under the assumption `outside` states.
         lines += [f"- <{link['url']}> ({link['role']})" for link in analysis["links"]]
     if player:
+        # The only tag this note writes itself. Its src carries the video
+        # id, which comes from yt-dlp like every other field from outside,
+        # so the id is escaped above and cannot close the attribute.
         iframe = (
             f'<iframe width="560" height="315" '
             f'src="https://www.youtube.com/embed/{vid}" '
