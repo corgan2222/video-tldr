@@ -11,13 +11,19 @@ and finally a plain VERSION file if none of those carry a version.
     bump_version.py --set 1.2.3
     bump_version.py --patch
     bump_version.py --patch --stage
-    bump_version.py --patch --force
+    bump_version.py --force
 
 Until the first release tag, every commit is meant to bump the patch
 number on its own. A git tag means a release has happened and the version
-now moves only with a release, not with every commit -- so the plain,
+now moves only with a release, not with every commit. So the plain,
 no-flag form checks `git tag --list` first and does nothing once a tag
 exists. --force runs the bump anyway, for the rare deliberate case.
+
+That check is the only reader of the tags, which makes --force the only
+switch that can skip it. --show, --set and --patch each name what to do,
+and a tag changes none of them, so none of the three asks. --patch
+therefore raises the number in a shallow clone as well, where the no-flag
+form stops because the tags it wants to read are not in the checkout.
 """
 
 from __future__ import annotations
@@ -31,9 +37,9 @@ from pathlib import Path
 
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
-# version = "x.y.z" at the start of a line -- Cargo's [package] table and a
-# hatchling [project] table both write it exactly this way, and neither
-# other file puts a bare `version = "..."` at column zero.
+# version = "x.y.z" at the start of a line. Cargo's [package] table and a
+# hatchling [project] table both write it exactly this way, and no other
+# file puts a bare `version = "..."` at column zero.
 _TOML_VERSION = re.compile(r'^version\s*=\s*"(\d+\.\d+\.\d+)"', re.MULTILINE)
 _PACKAGE_JSON_VERSION = re.compile(r'"version"\s*:\s*"(\d+\.\d+\.\d+)"')
 # project() can wrap across lines, so DOTALL over the parenthesised part.
@@ -144,6 +150,32 @@ def write_mirrors(root: Path, new_version: str, do_stage: bool) -> None:
 
 
 def has_tags(root: Path) -> bool:
+    """Whether a release has happened, read from the local tags.
+
+    Local only, on purpose: asking the remote would cost a network round
+    trip on every commit, and the hook this runs in fires in a developer's
+    full clone. A shallow checkout carries no tags, however many releases
+    the history behind it holds, so it would read "no release yet" here and
+    raise the patch number again after the first release. That case stops
+    the script instead of guessing. --force does not reach this function, so
+    it remains the way past the tags and past this stop alike.
+    """
+    # `actions/checkout` without `fetch-depth: 0` is the usual way into one.
+    # check=False: a git too old for the flag answers on stderr and exits
+    # non-zero, and then the tag read below decides as before.
+    shallow = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if shallow.stdout.strip() == "true":
+        raise SystemExit(
+            "shallow clone: the local tags cannot say whether a release has "
+            "happened, so this script will not decide. Run `git fetch "
+            "--unshallow --tags` first, or name the version with --set X.Y.Z."
+        )
     out = subprocess.run(
         ["git", "tag", "--list"],
         cwd=root,
@@ -174,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="bump even though the repository already carries a tag",
+        help="bump without reading the tags: tagged repository, shallow clone",
     )
     args = parser.parse_args(argv)
 
@@ -185,7 +217,11 @@ def main(argv: list[str] | None = None) -> int:
     action_given = args.show or args.set is not None or args.patch
 
     if not action_given:
-        if has_tags(root) and not args.force:
+        # --force on the left, and not only for the short circuit: has_tags()
+        # ends the script in a shallow clone, and --force has to bump there
+        # too. The other order would let that stop reach the one caller that
+        # asked not to be stopped.
+        if not args.force and has_tags(root):
             print("tagged repository: versions come from releases now")
             return 0
         args.patch = True
