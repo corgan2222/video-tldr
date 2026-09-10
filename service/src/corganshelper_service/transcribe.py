@@ -281,7 +281,18 @@ def stt_status(settings: Settings) -> dict:
             where = f"GPU cuda:{index} of {count}, {compute}"
         if count <= index:
             ok = False
-            where = f"GPU cuda:{index} not found ({count} CUDA devices); set CORGANSHELPER_WHISPER=cpu"
+            where = f"GPU cuda:{index} not found ({count} CUDA devices)"
+            if count == 0:
+                # CUDA keeps a failed start for the life of the process: a
+                # driver busy with another program at the wrong moment
+                # leaves this one blind until it is restarted, while a
+                # fresh process sees every card (owner, 2026-09-10).
+                where += (
+                    "; this process lost CUDA, restart the service. Only if "
+                    "it stays away, set CORGANSHELPER_WHISPER=cpu"
+                )
+            else:
+                where += "; set CORGANSHELPER_WHISPER=cuda:0 or =cpu"
     return {"ok": ok, "detail": f"{prefix}{chosen} ({spec['model']}), {disk}, {where}"}
 
 

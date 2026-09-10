@@ -291,3 +291,40 @@ def test_stt_status_says_what_would_run_and_whether_it_can(tmp_path, monkeypatch
     state = module.stt_status(settings)
     assert state["ok"] is True
     assert state["detail"].startswith("parakeet (nemo-parakeet-tdt-0.6b-v3)")
+
+
+def test_a_process_without_cuda_is_told_to_restart_the_service(tmp_path, monkeypatch):
+    """The owner met this on 2026-09-10: the light went red with 0 CUDA
+    devices while a fresh process saw both cards. CUDA keeps a failed
+    start for the life of the process, so the advice is a restart, not a
+    switch to the CPU."""
+    import sys
+    import types
+
+    from corganshelper_service import transcribe as module
+
+    monkeypatch.setenv("CORGANSHELPER_WHISPER", "cuda:0")
+    monkeypatch.setattr(module, "add_nvidia_dll_dirs", lambda: None)
+    settings = Settings(home=tmp_path)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "ctranslate2",
+        types.SimpleNamespace(get_cuda_device_count=lambda: 0),
+    )
+    state = module.stt_status(settings)
+    assert state["ok"] is False
+    assert "restart the service" in state["detail"]
+    assert "Only if it stays away" in state["detail"]
+
+    # A card that is simply not there gets the other advice.
+    monkeypatch.setenv("CORGANSHELPER_WHISPER", "cuda:3")
+    monkeypatch.setitem(
+        sys.modules,
+        "ctranslate2",
+        types.SimpleNamespace(get_cuda_device_count=lambda: 2),
+    )
+    state = module.stt_status(settings)
+    assert state["ok"] is False
+    assert "cuda:3 not found (2 CUDA devices)" in state["detail"]
+    assert "restart the service" not in state["detail"]
