@@ -209,6 +209,69 @@ def test_style_all_writes_one_note_per_wording_and_one_bill(tmp_path, monkeypatc
     assert other["style"] == "engineer" and other["cost"] == result["cost"]
 
 
+def test_a_link_the_model_adds_does_not_reach_the_note(tmp_path, monkeypatch):
+    settings, folder = prepare(tmp_path)
+    (folder / "Zvc5QkrWgAU.info.json").write_text(
+        json.dumps(
+            {"description": "see https://github.com/a/b and https://b.example/docs"}
+        ),
+        encoding="utf-8",
+    )
+
+    def fake(instruction, data, schema, settings, images=None, max_turns=1):
+        answer = copy.deepcopy(FAKE_ANALYSIS)
+        answer["links"] = [
+            {"url": "https://github.com/a/b", "role": "repository"},
+            {"url": "https://b.example/docs", "role": "trust me"},
+            {"url": "https://github.com/someone/else", "role": "repository"},
+        ]
+        return answer
+
+    monkeypatch.setattr(llm, "complete", fake)
+    result = analyze("https://youtu.be/Zvc5QkrWgAU", settings)
+
+    # Only the description's own URLs stay, each with the role the model
+    # gave it. The third URL is nowhere in the description, and a role
+    # outside LINK_ROLES is no role.
+    assert result["links"] == [
+        {"url": "https://github.com/a/b", "role": "repository"},
+        {"url": "https://b.example/docs", "role": "other"},
+    ]
+
+
+def test_condensed_keeps_its_limits_over_the_parts_of_a_long_video(
+    tmp_path, monkeypatch
+):
+    settings, _ = prepare(tmp_path, text_size=PART_LIMIT // 20)
+    settings.config["condensed"] = "on"
+    seen = []
+
+    def fake(instruction, data, schema, settings, images=None, max_turns=1):
+        if schema is not analyze_module.PART_SCHEMA:
+            return {"kind": "review", "summary": "sum", "links": []}
+        index = len(seen)
+        seen.append(index)
+        return {
+            "sections": [
+                {"title": f"p{index}s{i}", "start": i, "end": i + 1, "summary": "s"}
+                for i in range(4)
+            ],
+            "key_points": [{"time": i, "text": f"p{index}k{i}"} for i in range(4)],
+            "frame_candidates": [{"time": 1, "kind": "code", "why": "w"}],
+        }
+
+    monkeypatch.setattr(llm, "complete", fake)
+    result = analyze("https://youtu.be/Zvc5QkrWgAU", settings)
+
+    assert result["parts"] >= 2
+    assert len(result["sections"]) == analyze_module.CONDENSED_LIMIT
+    assert len(result["key_points"]) == analyze_module.CONDENSED_LIMIT
+    # Spread over the whole video: the last part is still in there.
+    assert result["sections"][-1]["title"].startswith(f"p{len(seen) - 1}")
+    # The frame candidates stay as they are, the instruction says so.
+    assert len(result["frame_candidates"]) == result["parts"]
+
+
 def test_parts_are_cut_only_at_chapter_starts_when_there_are_chapters():
     segments = [{"start": i, "end": i + 1, "text": "y" * 100} for i in range(1000)]
     chapters = [{"start_time": 0}, {"start_time": 700}]
