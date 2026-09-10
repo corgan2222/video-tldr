@@ -20,3 +20,7 @@ service/dist
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+
+# The service's own data directory, when VIDEO_TLDR_HOME points inside the
+# checkout: config.json carries API keys, models/ runs to ten gigabytes.
+/data/
