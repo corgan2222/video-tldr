@@ -4,3 +4,6 @@ website/
 CODE_OF_CONDUCT.md
 # A minified library shipped as published, see its LICENSE next to it.
 service/src/video_tldr_service/assets/
+# Rendered by the diagram tool, spec and artifact both; reformatting the
+# JSON would break the checksum the delivery recorded.
+docs/diagrams/

@@ -1,0 +1,240 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Six steps, and what each one leaves behind",
+    "output": "pipeline.html",
+    "visual_preset": "editorial",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "the-spine",
+        "label": "The spine",
+        "focus": [
+          "video",
+          "fetch",
+          "transcribe",
+          "analyze",
+          "render",
+          "outputs"
+        ],
+        "note": "The path every run takes: get it, read it, understand it, write it."
+      },
+      {
+        "id": "the-extras",
+        "label": "What Thorough adds",
+        "focus": [
+          "transcribe",
+          "enrich",
+          "frames"
+        ],
+        "note": "Transcribing when there are no captions, reading linked repositories, pulling the frames worth keeping."
+      },
+      {
+        "id": "what-leaves",
+        "label": "What the model sees",
+        "focus": [
+          "analyze",
+          "enrich",
+          "frames"
+        ],
+        "note": "Three steps talk to a language model. Pick a local one and even those stay on the machine."
+      }
+    ],
+    "viewBox": [
+      1240,
+      560
+    ]
+  },
+  "stages": [
+    {
+      "label": "Source"
+    },
+    {
+      "label": "Gather"
+    },
+    {
+      "label": "Understand"
+    },
+    {
+      "label": "Look closer"
+    },
+    {
+      "label": "Write"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "video",
+      "type": "external",
+      "label": "YouTube video",
+      "sublabel": "the tab you are on",
+      "stage": 0,
+      "row": 0
+    },
+    {
+      "id": "fetch",
+      "type": "backend",
+      "label": "fetch",
+      "sublabel": "metadata, chapters, captions",
+      "stage": 1,
+      "row": 0
+    },
+    {
+      "id": "transcribe",
+      "type": "backend",
+      "label": "transcribe",
+      "sublabel": "only without captions",
+      "stage": 1,
+      "row": 1,
+      "tag": "Whisper, Parakeet"
+    },
+    {
+      "id": "analyze",
+      "type": "backend",
+      "label": "analyze",
+      "sublabel": "sorts and summarises",
+      "stage": 2,
+      "row": 0,
+      "tag": "language model"
+    },
+    {
+      "id": "enrich",
+      "type": "backend",
+      "label": "enrich",
+      "sublabel": "reads linked repositories",
+      "stage": 3,
+      "row": 1
+    },
+    {
+      "id": "frames",
+      "type": "backend",
+      "label": "frames",
+      "sublabel": "picks and labels stills",
+      "stage": 3,
+      "row": 0
+    },
+    {
+      "id": "render",
+      "type": "backend",
+      "label": "render",
+      "sublabel": "assembles the note",
+      "stage": 4,
+      "row": 0
+    },
+    {
+      "id": "outputs",
+      "type": "database",
+      "label": "Your outputs",
+      "sublabel": "Obsidian, PDF, Word",
+      "stage": 4,
+      "row": 1
+    }
+  ],
+  "flows": [
+    {
+      "id": "to-fetch",
+      "from": "video",
+      "to": "fetch",
+      "label": "URL",
+      "classification": "public",
+      "variant": "emphasis"
+    },
+    {
+      "id": "fetch-transcribe",
+      "from": "fetch",
+      "to": "transcribe",
+      "label": "audio, if no captions",
+      "classification": "local only",
+      "variant": "dashed"
+    },
+    {
+      "id": "fetch-analyze",
+      "from": "fetch",
+      "to": "analyze",
+      "label": "info, captions",
+      "classification": "local only",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": -42
+    },
+    {
+      "id": "transcribe-analyze",
+      "from": "transcribe",
+      "to": "analyze",
+      "label": "transcript.json",
+      "classification": "local only"
+    },
+    {
+      "id": "analyze-enrich",
+      "from": "analyze",
+      "to": "enrich",
+      "label": "the links",
+      "classification": "to the model"
+    },
+    {
+      "id": "analyze-frames",
+      "from": "analyze",
+      "to": "frames",
+      "label": "the moments",
+      "classification": "to the model",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": -42
+    },
+    {
+      "id": "enrich-render",
+      "from": "enrich",
+      "to": "render",
+      "label": "install steps",
+      "classification": "to the model"
+    },
+    {
+      "id": "frames-render",
+      "from": "frames",
+      "to": "render",
+      "label": "labelled stills",
+      "classification": "to the model",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": -42
+    },
+    {
+      "id": "render-outputs",
+      "from": "render",
+      "to": "outputs",
+      "label": "note, PDF, docx",
+      "classification": "yours",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Where the pieces live",
+      "items": [
+        "Each step writes into work/<video id>/",
+        "info.json, transcript.json, analysis.json, frames and clips",
+        "A step that already ran is not run again unless you say Thorough"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Every step is also a command",
+      "items": [
+        "video-tldr fetch, transcribe, analyze, enrich, frames, render",
+        "video-tldr run does all six in a row",
+        "So a failing step can be repeated on its own, without the browser"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What reaches a language model",
+      "items": [
+        "analyze: the transcript",
+        "enrich: the README of a linked repository",
+        "frames: the pictures, to label them"
+      ]
+    }
+  ]
+}

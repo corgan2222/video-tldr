@@ -1,0 +1,365 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "video-tldr: extension and local service",
+    "output": "architecture.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "one-click",
+        "label": "From click to note",
+        "focus": [
+          "tab",
+          "popup",
+          "service",
+          "pipeline",
+          "outputs"
+        ],
+        "note": "The path a click takes: the popup hands the URL over, the service runs the job, the note lands in your vault."
+      },
+      {
+        "id": "what-it-uses",
+        "label": "What the service uses",
+        "focus": [
+          "pipeline",
+          "media",
+          "stt",
+          "llm"
+        ],
+        "note": "Downloading, transcribing and summarising, each with the tool that does it."
+      },
+      {
+        "id": "your-choice",
+        "label": "What leaves the machine",
+        "focus": [
+          "service",
+          "llm",
+          "youtube",
+          "data"
+        ],
+        "note": "Only two arrows cross the boundary, and one of them you can turn off by picking a local model."
+      }
+    ],
+    "viewBox": [
+      1500,
+      720
+    ],
+    "visual_preset": "editorial"
+  },
+  "components": [
+    {
+      "id": "tab",
+      "type": "external",
+      "label": "YouTube tab",
+      "sublabel": "the video you are on",
+      "pos": [
+        40,
+        250
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "options",
+      "type": "frontend",
+      "label": "Settings page",
+      "sublabel": "options.html",
+      "pos": [
+        280,
+        80
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "popup",
+      "type": "frontend",
+      "label": "Popup",
+      "sublabel": "Fast / Thorough",
+      "pos": [
+        280,
+        250
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "tag": "asks for 127.0.0.1"
+    },
+    {
+      "id": "worker",
+      "type": "frontend",
+      "label": "Background worker",
+      "sublabel": "MV3 service worker",
+      "pos": [
+        280,
+        430
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "service",
+      "type": "backend",
+      "label": "Local service",
+      "sublabel": "127.0.0.1:8765",
+      "pos": [
+        540,
+        250
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "tag": "one job at a time"
+    },
+    {
+      "id": "pipeline",
+      "type": "backend",
+      "label": "Pipeline",
+      "sublabel": "fetch to render",
+      "pos": [
+        800,
+        250
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "media",
+      "type": "backend",
+      "label": "yt-dlp, ffmpeg",
+      "sublabel": "video, captions, frames",
+      "pos": [
+        800,
+        80
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "stt",
+      "type": "backend",
+      "label": "Whisper, Parakeet",
+      "sublabel": "when there are no captions",
+      "pos": [
+        800,
+        430
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "data",
+      "type": "database",
+      "label": "Data directory",
+      "sublabel": "work, models, config",
+      "pos": [
+        540,
+        430
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "outputs",
+      "type": "database",
+      "label": "Your outputs",
+      "sublabel": "Obsidian, PDF, Word",
+      "pos": [
+        1080,
+        250
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "youtube",
+      "type": "external",
+      "label": "YouTube",
+      "sublabel": "video and captions",
+      "pos": [
+        1080,
+        80
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "llm",
+      "type": "external",
+      "label": "Language model",
+      "sublabel": "Claude, OpenAI, LM Studio, Ollama",
+      "pos": [
+        1080,
+        430
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "tag": "local or remote"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Your machine",
+      "wraps": [
+        "options",
+        "popup",
+        "worker",
+        "service",
+        "pipeline",
+        "media",
+        "stt",
+        "data",
+        "outputs"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Browser extension",
+      "wraps": [
+        "options",
+        "popup",
+        "worker"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "tab-to-popup",
+      "from": "tab",
+      "to": "popup",
+      "label": "active tab URL"
+    },
+    {
+      "id": "popup-to-service",
+      "from": "popup",
+      "to": "service",
+      "label": "POST /jobs",
+      "variant": "emphasis"
+    },
+    {
+      "id": "worker-polls",
+      "from": "worker",
+      "to": "service",
+      "label": "polls the job",
+      "variant": "dashed"
+    },
+    {
+      "id": "options-config",
+      "from": "options",
+      "to": "service",
+      "label": "GET, PUT /config",
+      "labelDy": -30,
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "service-runs",
+      "from": "service",
+      "to": "pipeline",
+      "label": "runs the steps",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pipeline-media",
+      "from": "pipeline",
+      "to": "media",
+      "label": "download",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "media-youtube",
+      "from": "media",
+      "to": "youtube",
+      "label": "HTTPS"
+    },
+    {
+      "id": "pipeline-stt",
+      "from": "pipeline",
+      "to": "stt",
+      "label": "audio",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 52
+    },
+    {
+      "id": "pipeline-llm",
+      "from": "pipeline",
+      "to": "llm",
+      "label": "transcript, frames",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "service-data",
+      "from": "service",
+      "to": "data",
+      "label": "config, log, models",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 52
+    },
+    {
+      "id": "pipeline-outputs",
+      "from": "pipeline",
+      "to": "outputs",
+      "label": "the note",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "The extension",
+      "items": [
+        "Reads the tab URL only when you click",
+        "Asks once for access to 127.0.0.1",
+        "The worker outlives the popup and polls the job"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "The service",
+      "items": [
+        "Every step is also a command line call",
+        "One job at a time, the next one queues",
+        "Never reachable from a web page: Host and Origin are checked"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What crosses the line",
+      "items": [
+        "YouTube, for the video and its captions",
+        "The model you picked, for transcript and frames",
+        "Pick LM Studio or Ollama and nothing leaves at all"
+      ]
+    }
+  ]
+}
