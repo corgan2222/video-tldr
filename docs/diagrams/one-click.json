@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "One click, from the toolbar to the note",
+    "output": "one-click.html",
+    "viewBox": [
+      980,
+      600
+    ],
+    "visual_preset": "editorial",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "the-click",
+        "label": "The click",
+        "focus": [
+          "you",
+          "popup",
+          "worker"
+        ],
+        "note": "The popup asks for access once, then hands the job to the worker, because the popup dies when it closes."
+      },
+      {
+        "id": "the-run",
+        "label": "The run",
+        "focus": [
+          "worker",
+          "service",
+          "pipeline"
+        ],
+        "note": "The service takes the job and answers immediately; the worker asks how far it got."
+      },
+      {
+        "id": "the-result",
+        "label": "The result",
+        "focus": [
+          "pipeline",
+          "vault",
+          "worker",
+          "you"
+        ],
+        "note": "The note is written before you are told about it, so the notification always leads somewhere."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "you",
+      "type": "external",
+      "label": "You",
+      "sublabel": "on a YouTube video"
+    },
+    {
+      "id": "popup",
+      "type": "frontend",
+      "label": "Popup",
+      "sublabel": "lives while open"
+    },
+    {
+      "id": "worker",
+      "type": "frontend",
+      "label": "Worker",
+      "sublabel": "outlives the popup"
+    },
+    {
+      "id": "service",
+      "type": "backend",
+      "label": "Local service",
+      "sublabel": "127.0.0.1"
+    },
+    {
+      "id": "pipeline",
+      "type": "backend",
+      "label": "Pipeline",
+      "sublabel": "fetch to render"
+    },
+    {
+      "id": "vault",
+      "type": "database",
+      "label": "Your vault",
+      "sublabel": "note, PDF, Word"
+    }
+  ],
+  "segments": [
+    {
+      "from": 148,
+      "to": 262,
+      "label": "The click"
+    },
+    {
+      "from": 272,
+      "to": 410,
+      "label": "The run"
+    },
+    {
+      "from": 420,
+      "to": 530,
+      "label": "The result"
+    }
+  ],
+  "messages": [
+    {
+      "id": "click-fast",
+      "from": "you",
+      "to": "popup",
+      "y": 172,
+      "label": "clicks Fast",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ask-permission",
+      "from": "popup",
+      "to": "you",
+      "y": 206,
+      "label": "may I reach 127.0.0.1?",
+      "variant": "security",
+      "note": "First click only. Until you allow it, no request leaves the extension."
+    },
+    {
+      "id": "hand-over",
+      "from": "popup",
+      "to": "worker",
+      "y": 240,
+      "label": "start this video",
+      "variant": "default"
+    },
+    {
+      "id": "post-job",
+      "from": "worker",
+      "to": "service",
+      "y": 286,
+      "label": "POST /jobs",
+      "variant": "emphasis"
+    },
+    {
+      "id": "accepted",
+      "from": "service",
+      "to": "worker",
+      "y": 320,
+      "label": "202, queued",
+      "variant": "return",
+      "note": "A second video queues behind the first instead of starting beside it."
+    },
+    {
+      "id": "run-steps",
+      "from": "service",
+      "to": "pipeline",
+      "y": 354,
+      "label": "runs the steps",
+      "variant": "emphasis"
+    },
+    {
+      "id": "poll",
+      "from": "worker",
+      "to": "service",
+      "y": 388,
+      "label": "how far? step and seconds back",
+      "variant": "dashed"
+    },
+    {
+      "id": "write",
+      "from": "pipeline",
+      "to": "vault",
+      "y": 434,
+      "label": "writes the note and the pictures",
+      "variant": "emphasis"
+    },
+    {
+      "id": "done",
+      "from": "service",
+      "to": "worker",
+      "y": 468,
+      "label": "done, with what was written",
+      "variant": "return"
+    },
+    {
+      "id": "notify",
+      "from": "worker",
+      "to": "you",
+      "y": 502,
+      "label": "notification",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Why a worker at all",
+      "items": [
+        "The popup is gone the moment you look elsewhere",
+        "The worker survives it and keeps asking"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Why it answers before it is finished",
+      "items": [
+        "The job is accepted, not awaited",
+        "Progress comes from asking, not from a held-open connection"
+      ]
+    }
+  ]
+}
