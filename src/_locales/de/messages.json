@@ -239,6 +239,9 @@
   "keyNote": {
     "message": "Sterne stehen für einen gespeicherten Schlüssel; stehen lassen behält ihn, Feld leeren löscht ihn."
   },
+  "openaiBaseUrlHelp": {
+    "message": "Leer heißt OpenAI selbst. Trage eine Adresse ein, um stattdessen einen kompatiblen Server zu erreichen, etwa Azure OpenAI, OpenRouter oder einen auf diesem Rechner. Sie gilt für das Sprachmodell und für das Audiomodell openai."
+  },
   "sttHeading": {
     "message": "Transkription: Sprache zu Text"
   },

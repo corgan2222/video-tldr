@@ -239,6 +239,9 @@
   "keyNote": {
     "message": "Stars stand for a stored key; leave them to keep it, clear the field to remove it."
   },
+  "openaiBaseUrlHelp": {
+    "message": "Empty means OpenAI itself. Enter an address to reach a compatible server instead, for example Azure OpenAI, OpenRouter or one on this machine. It serves the language model and the openai transcriber alike."
+  },
   "sttHeading": {
     "message": "Transcription: speech to text"
   },
