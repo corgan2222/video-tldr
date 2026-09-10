@@ -69,6 +69,9 @@ STT_ENGINES = ["auto", "subtitles", *STT_MODELS]
 # config.json is a comma list of these; the options page will edit it.
 FORMATS = ["md", "obsidian", "pdf", "docx"]
 
+# The languages the note can be written in; the prompts name them in full.
+LANGUAGES = {"de": "German", "en": "English"}
+
 # Every key config.json may carry, with the environment variable that
 # overrides it. The vendor variables are the ones their SDKs read anyway.
 KEYS = {
@@ -111,7 +114,7 @@ DEFAULTS = {
 }
 SECRETS = ("openai_api_key", "anthropic_api_key", "token")
 MASK = "*" * 8
-CHOICES = {"llm": LLM_BACKENDS, "stt": STT_ENGINES}
+CHOICES = {"llm": LLM_BACKENDS, "stt": STT_ENGINES, "language": list(LANGUAGES)}
 
 
 class ConfigError(Exception):
@@ -173,9 +176,14 @@ def store(home: Path | None, values: dict) -> Path:
     path = resolve_home(home) / CONFIG_NAME
     config = {**DEFAULTS, **read_config(path), **validate(values)}
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    # Written beside and renamed over: the service's worker thread reads
+    # this file while the options page writes it, and a truncated file
+    # in between would fail that job with "not valid JSON".
+    staging = path.with_suffix(".json.tmp")
+    staging.write_text(
         json.dumps({k: config[k] for k in KEYS}, indent=2) + "\n", encoding="utf-8"
     )
+    os.replace(staging, path)
     return path
 
 
@@ -198,6 +206,11 @@ def validate(values: dict) -> dict:
         raise ConfigError(
             f"unknown setting {', '.join(unknown)}; known: {', '.join(KEYS)}"
         )
+    # PUT /config takes JSON, and a number where a path belongs would be
+    # stored and then break the next render.
+    odd = sorted(k for k, v in values.items() if not isinstance(v, str))
+    if odd:
+        raise ConfigError(f"every setting is a string, not {', '.join(odd)}")
     for key, allowed in CHOICES.items():
         if key in values and values[key] not in allowed:
             raise ConfigError(f"{key} must be one of {', '.join(allowed)}")

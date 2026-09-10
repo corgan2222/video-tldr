@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   badgeFor,
   failureBadge,
+  isLocal,
   request,
   ServiceError,
   type Job,
@@ -70,6 +71,28 @@ describe('request', () => {
     await expect(request(connection, 'GET', '/config')).rejects.toThrow(
       'no service at http://127.0.0.1:8765; start it with "corganshelper serve"',
     );
+  });
+});
+
+describe('isLocal', () => {
+  it('accepts 127.0.0.1 over http with any port and nothing else', async () => {
+    expect(isLocal('http://127.0.0.1:8765')).toBe(true);
+    expect(isLocal('http://127.0.0.1')).toBe(true);
+    expect(isLocal('https://127.0.0.1:8765')).toBe(false);
+    expect(isLocal('http://localhost:8765')).toBe(false);
+    expect(isLocal('http://attacker.example/127.0.0.1')).toBe(false);
+    expect(isLocal('not a url')).toBe(false);
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      request(
+        { ...connection, serviceUrl: 'https://evil.example' },
+        'GET',
+        '/config',
+      ),
+    ).rejects.toThrow('the service URL must be http://127.0.0.1');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

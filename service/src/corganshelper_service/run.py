@@ -111,8 +111,8 @@ def paths(written: dict[str, Path]) -> dict[str, str]:
 
 def urls_in(path: Path) -> list[str]:
     """One URL per line; blank lines and `#` comments are skipped."""
-    lines = path.read_text(encoding="utf-8").splitlines()
-    return [line.strip() for line in lines if line.strip() and not line.startswith("#")]
+    lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines()]
+    return [line for line in lines if line and not line.startswith("#")]
 
 
 COLUMNS = ["id", "status", "s", *STEPS, "images", "input", "output", "usd"]

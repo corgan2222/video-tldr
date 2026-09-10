@@ -119,6 +119,8 @@ def test_the_table_has_one_cell_per_column(steps, tmp_path):
 
 def test_urls_in_skips_blank_lines_and_comments(tmp_path):
     listing = tmp_path / "urls.txt"
-    listing.write_text("# the test videos\n\nhttps://a\n  https://b  \n", "utf-8")
+    listing.write_text(
+        "# the test videos\n\nhttps://a\n  https://b  \n  # indented note\n", "utf-8"
+    )
 
     assert urls_in(Path(listing)) == ["https://a", "https://b"]

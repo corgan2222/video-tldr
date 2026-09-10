@@ -192,3 +192,44 @@ def test_config_is_read_and_written_through_the_service(server, tmp_path):
     code, answer = call(server, "PUT", "/config", {"colour": "blue"})
     assert code == 400
     assert "unknown setting colour" in answer["error"]
+    code, answer = call(server, "PUT", "/config", {"obsidian_folder": 5})
+    assert code == 400
+    assert "every setting is a string" in answer["error"]
+
+
+def test_a_token_sent_to_config_is_not_written(server, tmp_path):
+    # This process would keep its own token anyway; the file must not drift.
+    code, _ = call(server, "PUT", "/config", {"token": "new"})
+
+    assert code == 200
+    assert Settings.load(tmp_path).config["token"] == server.service.token
+
+
+def test_a_non_ascii_authorization_header_is_a_401_not_a_dead_thread(server):
+    # http.server hands the header over as latin-1 text; compare_digest
+    # refuses such a str and killed the handler thread (2026-09-10).
+    code, answer = call(server, "GET", "/config", token="tüken")
+
+    assert code == 401
+    assert "Bearer" in answer["error"]
+
+
+def test_open_answers_with_the_reason_when_the_file_is_gone(server, monkeypatch):
+    def gone(target):
+        raise FileNotFoundError(f"no such file: {target}")
+
+    monkeypatch.setattr(module, "start", gone)
+    _, job = call(server, "POST", "/jobs", {"url": URL})
+    wait_for(server, job["id"], "done")
+
+    code, answer = call(server, "POST", f"/jobs/{job['id']}/open")
+
+    assert code == 500
+    assert "no such file" in answer["error"]
+
+
+def test_a_second_serve_on_the_same_port_fails_instead_of_answering_nothing(
+    server, service
+):
+    with pytest.raises(OSError):
+        Server(service, server.server_port)

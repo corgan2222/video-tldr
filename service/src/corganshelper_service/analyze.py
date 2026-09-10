@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from . import llm
-from .config import Settings
+from .config import LANGUAGES, Settings
 from .fetch import URL_IN_TEXT, FetchError, fetch, work_folder
 from .transcribe import RESULT_NAME as TRANSCRIPT_NAME
 from .transcribe import transcribe
@@ -23,8 +23,6 @@ PART_LIMIT = 60_000
 KINDS = ["software-tutorial", "explainer", "review", "news", "other"]
 FRAME_KINDS = ["code", "diagram", "ui", "table", "other"]
 LINK_ROLES = ["repository", "docs", "sponsor", "other"]
-
-LANGUAGES = {"de": "German", "en": "English"}
 
 
 def _obj(properties: dict, required: list[str] | None = None) -> dict:

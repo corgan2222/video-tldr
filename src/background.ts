@@ -1,7 +1,7 @@
 // A Manifest V3 service worker restarts between events, so nothing here
 // relies on module-level state surviving from one event to the next: the
-// running job lives in storage.local, and an alarm wakes the worker to
-// poll it.
+// running jobs live in storage.local, and an alarm wakes the worker to
+// poll them.
 //
 // The manifest lists this file under both `service_worker` and `scripts`:
 // Chrome reads the former, Firefox the latter, and each ignores the key it
@@ -41,6 +41,15 @@ async function connection(): Promise<Connection> {
   return (await api.storage.local.get(DEFAULT_CONNECTION)) as Connection;
 }
 
+// The ids of the jobs handed to the service and not yet reported: two
+// clicks on two videos queue two jobs, and each gets its notification.
+async function trackedJobs(): Promise<string[]> {
+  const { jobs } = (await api.storage.local.get({ jobs: [] as string[] })) as {
+    jobs: string[];
+  };
+  return jobs;
+}
+
 async function showBadge(badge: Badge): Promise<void> {
   await api.action.setBadgeBackgroundColor({ color: badge.color });
   await api.action.setBadgeText({ text: badge.text });
@@ -66,7 +75,10 @@ api.action.onClicked.addListener(async (tab) => {
     const job = await request<Job>(await connection(), 'POST', '/jobs', {
       url: tab.url,
     });
-    await api.storage.local.set({ job: job.id });
+    const jobs = await trackedJobs();
+    await api.storage.local.set({
+      jobs: [...jobs.filter((id) => id !== job.id), job.id],
+    });
     await showBadge(badgeFor(job));
     await api.alarms.create(POLL_ALARM, { periodInMinutes: POLL_MINUTES });
   } catch (error) {
@@ -74,9 +86,7 @@ api.action.onClicked.addListener(async (tab) => {
   }
 });
 
-async function finish(job: Job): Promise<void> {
-  await api.alarms.clear(POLL_ALARM);
-  await api.storage.local.set({ job: '' });
+async function notify(job: Job): Promise<void> {
   const what = job.title ?? job.id;
   await api.notifications.create(`${job.status}:${job.id}`, {
     type: 'basic',
@@ -92,24 +102,37 @@ async function finish(job: Job): Promise<void> {
   });
 }
 
+// One round over every tracked job. A finished one gets its notification
+// and leaves the list; one the service no longer knows leaves it too. The
+// badge shows a job still running, else the last one that finished.
 async function poll(): Promise<void> {
-  const { job: id } = (await api.storage.local.get({ job: '' })) as {
-    job: string;
-  };
-  if (!id) {
+  const jobs = await trackedJobs();
+  if (jobs.length === 0) {
     await api.alarms.clear(POLL_ALARM);
     return;
   }
-  let job: Job;
-  try {
-    job = await request<Job>(await connection(), 'GET', `/jobs/${id}`);
-  } catch (error) {
-    await showBadge(failureBadge(message(error)));
-    await api.alarms.clear(POLL_ALARM);
-    return;
+  const to = await connection();
+  const remaining: string[] = [];
+  let badge: Badge | undefined;
+  for (const id of jobs) {
+    let job: Job;
+    try {
+      job = await request<Job>(to, 'GET', `/jobs/${id}`);
+    } catch (error) {
+      badge = failureBadge(message(error));
+      continue;
+    }
+    if (job.status === 'done' || job.status === 'error') {
+      await notify(job);
+      badge ??= badgeFor(job);
+      continue;
+    }
+    remaining.push(id);
+    badge = badgeFor(job);
   }
-  await showBadge(badgeFor(job));
-  if (job.status === 'done' || job.status === 'error') await finish(job);
+  await api.storage.local.set({ jobs: remaining });
+  if (badge) await showBadge(badge);
+  if (remaining.length === 0) await api.alarms.clear(POLL_ALARM);
 }
 
 api.alarms.onAlarm.addListener((alarm) => {

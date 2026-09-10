@@ -44,6 +44,17 @@ export class ServiceError extends Error {
   }
 }
 
+// The token goes to this host and to no other: a URL pasted into the
+// options must not turn the extension into a courier.
+export function isLocal(serviceUrl: string): boolean {
+  try {
+    const url = new URL(serviceUrl);
+    return url.protocol === 'http:' && url.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
 // One request to the service. The token travels as a bearer header; the
 // service answers JSON on every path, errors included, and a network
 // failure means the service is not running.
@@ -54,6 +65,11 @@ export async function request<T>(
   body?: unknown,
 ): Promise<T> {
   const base = connection.serviceUrl.replace(/\/+$/, '');
+  if (!isLocal(base)) {
+    throw new ServiceError(
+      `the service URL must be http://127.0.0.1 with a port, not ${base}`,
+    );
+  }
   const headers: Record<string, string> = {
     Authorization: `Bearer ${connection.token}`,
   };

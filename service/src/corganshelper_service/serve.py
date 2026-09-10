@@ -16,8 +16,10 @@ done, error), `step` (the running or last step) and, once it ran, what
 Who gets in, after decision 0001: the Host header must read
 127.0.0.1:<port>, an Origin header must be absent (curl, the command
 line) or start with moz-extension:// or chrome-extension://, and
-Authorization must carry the token from config.json. No CORS headers go
-out, so a web page fails its preflight before it reaches any of this.
+Authorization must carry the token from config.json. A web page's
+simple request or navigation does reach the guard and stops there, at
+the Origin check or at the token; no CORS headers go out, so a page can
+never read an answer either.
 
 One job at a time on purpose: two `frames` runs side by side both broke
 in the clip download (2026-09-10).
@@ -41,9 +43,9 @@ from pathlib import Path
 from urllib.parse import quote
 
 from . import __version__
-from .analyze import LANGUAGES
 from .config import (
     FORMATS,
+    LANGUAGES,
     LLM_BACKENDS,
     MASK,
     SECRETS,
@@ -120,10 +122,17 @@ class Service:
 
     def update_config(self, values: dict) -> dict:
         # The options page sends back what GET /config showed it; a masked
-        # secret must not overwrite the real one.
+        # secret must not overwrite the real one. The token is not written
+        # either: this process keeps the one it started with, so a change
+        # here would look accepted and lock the extension out until the
+        # next start. `corganshelper config --set token=...` is the way.
         store(
             self.home,
-            {k: v for k, v in values.items() if not (k in SECRETS and v == MASK)},
+            {
+                k: v
+                for k, v in values.items()
+                if k != "token" and not (k in SECRETS and v == MASK)
+            },
         )
         return self.config()
 
@@ -197,6 +206,11 @@ class Service:
 
 
 class Server(ThreadingHTTPServer):
+    # HTTPServer sets SO_REUSEADDR, and on Windows that lets a second
+    # `serve` bind a port that is already listening: it prints a token
+    # and answers nothing (2026-09-10). Without it the second start fails.
+    allow_reuse_address = False
+
     def __init__(self, service: Service, port: int = PORT) -> None:
         super().__init__(("127.0.0.1", port), Handler)
         self.service = service
@@ -204,6 +218,9 @@ class Server(ThreadingHTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     server: Server
+    # A connection that never finishes its request line would otherwise
+    # hold its thread for good; no request here takes that long to send.
+    timeout = 30
 
     def do_GET(self) -> None:
         self.route("GET")
@@ -225,8 +242,12 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def authorised(self) -> bool:
-        sent = self.headers.get("Authorization", "")
-        return hmac.compare_digest(sent, f"Bearer {self.server.service.token}")
+        # Compared as bytes: http.server decodes headers as latin-1, and
+        # compare_digest refuses a str with a non-ASCII character in it,
+        # which killed the handler thread instead of answering 401.
+        sent = self.headers.get("Authorization", "").encode("latin-1", "replace")
+        expected = f"Bearer {self.server.service.token}".encode()
+        return hmac.compare_digest(sent, expected)
 
     def body(self) -> dict:
         length = int(self.headers.get("Content-Length") or 0)
@@ -272,6 +293,10 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(HTTPStatus.NOT_FOUND, {"error": f"no such thing: {error}"})
         except NotReady as error:
             self.reply(HTTPStatus.CONFLICT, {"error": str(error)})
+        except OSError as error:
+            # `open` on a file that was cleared away, or a URL scheme with
+            # no handler: an answer with the reason, not a dropped socket.
+            self.reply(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(error)})
 
     def reply(self, status: HTTPStatus, payload: dict) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
