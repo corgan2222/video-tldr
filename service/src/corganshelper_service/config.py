@@ -89,7 +89,22 @@ KEYS = {
     "obsidian_folder": "CORGANSHELPER_OBSIDIAN_FOLDER",
     "browser": "CORGANSHELPER_BROWSER",
     "token": "CORGANSHELPER_TOKEN",
+    # Asked for on 2026-09-10: where the outputs go, a look for the PDF,
+    # and four switches the popup offers per run (they travel as
+    # `options` of a job, the stored value is the default).
+    "download_dir": "CORGANSHELPER_DOWNLOAD_DIR",
+    "pdf_template": "CORGANSHELPER_PDF_TEMPLATE",
+    "cleanup": "CORGANSHELPER_CLEANUP",
+    "timestamps": "CORGANSHELPER_TIMESTAMPS",
+    "condensed": "CORGANSHELPER_CONDENSED",
+    "style": "CORGANSHELPER_STYLE",
 }
+
+# How the note is worded. `normal` is the plain prompt; the others add a
+# style instruction to analyze, and `all` writes one note per style.
+STYLES = ["normal", "caveman", "noslop", "engineer", "human", "all"]
+EXTRA_STYLES = [s for s in STYLES if s not in ("normal", "all")]
+SWITCH = ["on", "off"]
 DEFAULTS = {
     "llm": "claude",
     "model": "",
@@ -108,13 +123,40 @@ DEFAULTS = {
     "obsidian_folder": "Videos",
     # Chrome or Edge for the PDF; empty means the usual places are searched.
     "browser": "",
-    # What the extension sends with every request; `serve` makes one up
-    # when this is empty and prints it.
+    # What the extension sends with every request; optional, see serve.
     "token": "",
+    # Empty means the user's Downloads folder (default_download_dir).
+    "download_dir": "",
+    # An HTML file with a `{{content}}` placeholder, or a CSS file; empty
+    # means the built-in look of the PDF.
+    "pdf_template": "",
+    # Delete work/<id>/ once the outputs are written.
+    "cleanup": "off",
+    # Timestamp links into the video in the note.
+    "timestamps": "on",
+    # Boil the video down to its core message, a two-minute read.
+    "condensed": "off",
+    "style": "normal",
 }
 SECRETS = ("openai_api_key", "anthropic_api_key", "token")
 MASK = "*" * 8
-CHOICES = {"llm": LLM_BACKENDS, "stt": STT_ENGINES, "language": list(LANGUAGES)}
+CHOICES = {
+    "llm": LLM_BACKENDS,
+    "stt": STT_ENGINES,
+    "language": list(LANGUAGES),
+    "cleanup": SWITCH,
+    "timestamps": SWITCH,
+    "condensed": SWITCH,
+    "style": STYLES,
+}
+
+
+def default_download_dir() -> Path:
+    """The user's Downloads folder, where a browser puts what it fetches;
+    the data directory's `out/` when there is none."""
+    downloads = Path.home() / "Downloads"
+    return downloads if downloads.is_dir() else resolve_home(None) / "out"
+
 
 # The two buttons in the extension's popup. `fast` keeps every cached
 # result, takes YouTube's captions and the backend's default model.
@@ -157,7 +199,9 @@ class Settings:
 
     @property
     def out_dir(self) -> Path:
-        return self.home / "out"
+        """Where the rendered outputs go: `download_dir`, else Downloads."""
+        chosen = self.config.get("download_dir")
+        return Path(chosen).expanduser() if chosen else default_download_dir()
 
     @property
     def config_path(self) -> Path:

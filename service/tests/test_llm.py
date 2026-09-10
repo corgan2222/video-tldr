@@ -15,6 +15,74 @@ def settings_for(tmp_path, **config):
     return settings
 
 
+UNKNOWN = {"vision": None, "context": None, "detail": "no answer"}
+
+# What LM Studio answered on this machine on 2026-09-10, shortened to two
+# entries: the field names are the measured ones, and `capabilities` holds
+# `tool_use` even for the model that reads pictures.
+LMSTUDIO_LISTING = {
+    "object": "list",
+    "data": [
+        {
+            "id": "prism-ml/bonsai-27b",
+            "object": "model",
+            "type": "vlm",
+            "publisher": "prism-ml",
+            "arch": "qwen35",
+            "compatibility_type": "gguf",
+            "quantization": "Q1_0",
+            "state": "loaded",
+            "max_context_length": 262144,
+            "loaded_context_length": 32768,
+            "capabilities": ["tool_use"],
+        },
+        {
+            "id": "gemma-4-12b-coder",
+            "object": "model",
+            "type": "llm",
+            "state": "not-loaded",
+            "max_context_length": 262144,
+            "capabilities": ["tool_use"],
+        },
+    ],
+}
+
+# ollama's `/api/show`, as its API document describes it: no ollama server
+# ran on this machine on 2026-09-10 to answer for itself.
+OLLAMA_SHOW = {
+    "capabilities": ["completion", "vision", "tools"],
+    "model_info": {"qwen3.context_length": 4096, "qwen3.embedding_length": 2048},
+}
+
+
+def answering(body):
+    """A stand-in for `fetch_json` that answers every call with `body` and
+    keeps what it was asked."""
+    asked = []
+
+    def fetch(url, payload=None):
+        asked.append((url, payload))
+        return body
+
+    return fetch, asked
+
+
+def openai_that_raises(error):
+    """An openai client whose every request fails, counting the attempts."""
+    tries = []
+
+    class Client:
+        def __init__(self, **kwargs):
+            class Completions:
+                def create(self, **request):
+                    tries.append(request)
+                    raise error
+
+            self.chat = SimpleNamespace(completions=Completions())
+
+    return Client, tries
+
+
 def test_the_structured_answer_is_taken_from_the_envelope():
     out = json.dumps(
         {"type": "result", "is_error": False, "structured_output": {"kind": "a"}}
@@ -113,15 +181,40 @@ def test_what_a_run_cost_is_read_from_the_envelope_and_added_up():
                 },
                 "total_cost_usd": 0.25,
             }
-        )
+        ),
+        "",
+        3.5,
     )
-    assert last_cost == {"input": 17, "output": 7, "usd": 0.25}
+    assert last_cost == {
+        "input": 17,
+        "output": 7,
+        "usd": 0.25,
+        "seconds": 3.5,
+        "tokens_per_second": 2.0,
+    }
     assert totals([dict(last_cost), dict(last_cost)]) == {
         "requests": 2,
         "input": 34,
         "output": 14,
         "usd": 0.5,
     }
+
+
+def test_a_request_nobody_timed_reports_no_speed_instead_of_dividing_by_zero():
+    parse_result(json.dumps({"structured_output": {"kind": "a"}, "usage": {}}))
+    assert llm.last_cost["seconds"] == 0.0
+    assert llm.last_cost["tokens_per_second"] == 0
+
+
+def test_a_request_carries_the_seconds_it_took_and_its_speed(
+    monkeypatch, tmp_path, fake_openai
+):
+    clock = iter([100.0, 102.0])
+    monkeypatch.setattr(llm.time, "monotonic", lambda: next(clock))
+    llm.complete("i", "d", {}, settings_for(tmp_path, llm="lmstudio", model="q"))
+    # Three output tokens in two seconds.
+    assert llm.last_cost["seconds"] == 2.0
+    assert llm.last_cost["tokens_per_second"] == 1.5
 
 
 class FakeOpenAI:
@@ -184,7 +277,9 @@ def test_a_local_server_gets_the_schema_as_strict_response_format(
     assert request["messages"][1]["content"][-1]["text"] == "the data"
     assert request["response_format"]["json_schema"]["schema"] is schema
     assert request["response_format"]["json_schema"]["strict"] is True
-    assert llm.last_cost == {"input": 11, "output": 3, "usd": 0.0}
+    assert llm.last_cost["input"] == 11
+    assert llm.last_cost["output"] == 3
+    assert llm.last_cost["usd"] == 0.0
     assert llm.describe(settings) == "lmstudio:qwen3-8b"
 
 
@@ -244,6 +339,8 @@ def test_openai_without_a_key_and_a_local_server_without_a_model_are_named(
 
 def test_status_is_one_line_for_the_popup(tmp_path, fake_openai, monkeypatch):
     monkeypatch.setattr(llm, "claude_binary", lambda: "C:/bin/claude.exe")
+    monkeypatch.setattr(llm, "capabilities", lambda settings: UNKNOWN)
+    llm.last_cost.clear()
     assert llm.status(settings_for(tmp_path)) == {
         "ok": True,
         "detail": "claude CLI at C:/bin/claude.exe, model sonnet",
@@ -304,9 +401,197 @@ def test_the_anthropic_api_gets_the_schema_as_output_config(tmp_path, monkeypatc
         "type": "json_schema",
         "schema": schema,
     }
-    assert llm.last_cost == {"input": 6, "output": 2, "usd": 0.0}
+    assert llm.last_cost["input"] == 6
+    assert llm.last_cost["output"] == 2
+    assert llm.last_cost["usd"] == 0.0
 
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
     with pytest.raises(LlmError) as caught:
         llm.complete("i", "d", {}, settings_for(tmp_path, llm="anthropic"))
     assert "anthropic_api_key" in str(caught.value)
+
+
+def test_lm_studio_is_asked_which_model_is_loaded_and_how_big_its_context_is(
+    tmp_path, monkeypatch
+):
+    fetch, asked = answering(LMSTUDIO_LISTING)
+    monkeypatch.setattr(llm, "fetch_json", fetch)
+
+    seeing = llm.capabilities(
+        settings_for(tmp_path, llm="lmstudio", model="prism-ml/bonsai-27b")
+    )
+    assert asked == [("http://localhost:1234/api/v0/models", None)]
+    assert seeing["vision"] is True
+    assert seeing["context"] == 32768
+    assert seeing["detail"] == "prism-ml/bonsai-27b: vision, context 32768 tokens"
+
+    # A model that is not loaded has no loaded length; its maximum is what
+    # the server knows about it.
+    reading = llm.capabilities(
+        settings_for(tmp_path, llm="lmstudio", model="gemma-4-12b-coder")
+    )
+    assert reading["vision"] is False
+    assert reading["context"] == 262144
+
+    # Without a model name the loaded one answers for the server.
+    assert llm.capabilities(settings_for(tmp_path, llm="lmstudio"))["context"] == 32768
+
+    missing = llm.capabilities(settings_for(tmp_path, llm="lmstudio", model="nope"))
+    assert missing["vision"] is None
+    assert missing["context"] is None
+    assert "no model called nope" in missing["detail"]
+
+
+def test_ollama_is_asked_by_name_and_answers_vision_and_context(tmp_path, monkeypatch):
+    fetch, asked = answering(OLLAMA_SHOW)
+    monkeypatch.setattr(llm, "fetch_json", fetch)
+
+    able = llm.capabilities(settings_for(tmp_path, llm="ollama", model="qwen3"))
+
+    assert asked == [("http://localhost:11434/api/show", {"model": "qwen3"})]
+    assert able["vision"] is True
+    assert able["context"] == 4096
+
+
+def test_a_server_that_does_not_answer_leaves_the_capabilities_unknown(
+    tmp_path, monkeypatch
+):
+    def refused(url, payload=None):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(llm, "fetch_json", refused)
+    able = llm.capabilities(settings_for(tmp_path, llm="lmstudio", model="q"))
+    assert able["vision"] is None
+    assert able["context"] is None
+    assert "lms server start" in able["detail"]
+
+
+def test_the_vendor_apis_take_pictures_and_bring_their_own_context(tmp_path):
+    for name in ("claude", "anthropic", "openai"):
+        able = llm.capabilities(settings_for(tmp_path, llm=name))
+        assert able["vision"] is True
+        assert able["context"] is None
+
+
+def test_lm_studio_gets_the_switch_that_turns_the_thinking_off(tmp_path, fake_openai):
+    lmstudio = settings_for(tmp_path, llm="lmstudio", model="q")
+    assert llm.reasoning_hint(lmstudio) == {"reasoning_effort": "none"}
+    llm.complete("i", "d", {}, lmstudio)
+    assert fake_openai.made[0].requests[0]["extra_body"] == {"reasoning_effort": "none"}
+
+    # ollama was not measured, and openai's own models are not local.
+    ollama = settings_for(tmp_path, llm="ollama", model="q")
+    assert llm.reasoning_hint(ollama) == {}
+    llm.complete("i", "d", {}, ollama)
+    assert fake_openai.made[1].requests[0]["extra_body"] is None
+
+
+def test_a_model_without_eyes_is_named_as_such_and_not_asked_a_second_time(
+    tmp_path, monkeypatch
+):
+    import openai
+
+    refusal = openai.OpenAIError(
+        "Error code: 400 - The provided messages contain images, but "
+        "gemma-4-12b-coder does not support image inputs"
+    )
+    client, tries = openai_that_raises(refusal)
+    monkeypatch.setattr(openai, "OpenAI", client)
+    picture = tmp_path / "x.png"
+    picture.write_bytes(b"png")
+
+    with pytest.raises(llm.NoVisionError) as caught:
+        llm.complete(
+            "i",
+            "d",
+            {},
+            settings_for(tmp_path, llm="lmstudio", model="gemma-4-12b-coder"),
+            images=[picture],
+        )
+
+    assert "does not support image inputs" in str(caught.value)
+    assert len(tries) == 1
+
+
+def test_the_same_refusal_without_a_picture_stays_an_ordinary_error(
+    tmp_path, monkeypatch
+):
+    import openai
+
+    client, tries = openai_that_raises(openai.OpenAIError("does not support images"))
+    monkeypatch.setattr(openai, "OpenAI", client)
+
+    with pytest.raises(LlmError):
+        llm.complete("i", "d", {}, settings_for(tmp_path, llm="lmstudio", model="m"))
+    assert len(tries) == 2
+
+
+def test_a_dropped_connection_is_tried_three_times_with_a_pause_between(
+    tmp_path, monkeypatch
+):
+    import httpx
+    import openai
+
+    dropped = openai.APIConnectionError(
+        message="Server disconnected without sending a response.",
+        request=httpx.Request("POST", "http://localhost:1234/v1/chat/completions"),
+    )
+    client, tries = openai_that_raises(dropped)
+    monkeypatch.setattr(openai, "OpenAI", client)
+    pauses = []
+    monkeypatch.setattr(llm.time, "sleep", pauses.append)
+
+    with pytest.raises(LlmError) as caught:
+        llm.complete("i", "d", {}, settings_for(tmp_path, llm="lmstudio", model="m"))
+
+    assert len(tries) == 3
+    assert pauses == [llm.RETRY_PAUSE_SECONDS] * 2
+    assert "after 3 attempts" in str(caught.value)
+
+
+def test_a_local_context_too_small_for_the_thinking_is_not_ok(
+    tmp_path, fake_openai, monkeypatch
+):
+    llm.last_cost.clear()
+    monkeypatch.setattr(
+        llm,
+        "capabilities",
+        lambda settings: {"vision": True, "context": 4096, "detail": "m: vision"},
+    )
+
+    state = llm.status(settings_for(tmp_path, llm="lmstudio", model="m"))
+    assert state["ok"] is False
+    assert "context 4096 tokens is too small" in state["detail"]
+    assert "larger context in LM Studio" in state["detail"]
+    assert "32768 or more" in state["detail"]
+
+    state = llm.status(settings_for(tmp_path, llm="ollama", model="m"))
+    assert state["ok"] is False
+    assert "OLLAMA_CONTEXT_LENGTH" in state["detail"]
+
+
+def test_a_model_without_eyes_stays_ok_but_says_the_pictures_go_unlabelled(
+    tmp_path, fake_openai, monkeypatch
+):
+    llm.last_cost.clear()
+    monkeypatch.setattr(
+        llm,
+        "capabilities",
+        lambda settings: {"vision": False, "context": 65536, "detail": "m: text only"},
+    )
+
+    state = llm.status(settings_for(tmp_path, llm="lmstudio", model="m"))
+    assert state["ok"] is True
+    assert "context 65536 tokens" in state["detail"]
+    assert state["detail"].endswith("no image input: pictures stay unlabelled")
+
+
+def test_the_speed_of_the_last_request_travels_with_the_status(
+    tmp_path, fake_openai, monkeypatch
+):
+    monkeypatch.setattr(llm, "capabilities", lambda settings: UNKNOWN)
+    llm.last_cost.clear()
+    llm.last_cost.update(tokens_per_second=12.5)
+
+    state = llm.status(settings_for(tmp_path, llm="lmstudio", model="m"))
+    assert state["detail"].endswith("12.5 tokens/s last request")

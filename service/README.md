@@ -1,6 +1,6 @@
-# corganshelper service
+# The video-tldr service
 
-The local service the browser extension talks to. Every pipeline step is a
+The local service the video-tldr extension talks to; the package and the repository keep the name corganshelper. Every pipeline step is a
 command line entry point that runs the same code the HTTP service runs;
 `run` chains them, `serve` offers them to the extension.
 
@@ -56,14 +56,24 @@ until it is done. A click on the notification asks the service to open
 the result: the note in Obsidian when that format was written, else the
 first document among PDF, Word and Markdown.
 
-| Request                     | Answer                                                            |
-| --------------------------- | ----------------------------------------------------------------- |
-| `POST /jobs {"url": ...}`   | `202` and the job; `400` when the URL is no YouTube video         |
-| `GET /jobs/<id>`            | the job: `status` (queued, running, done, error), `step`, results |
-| `POST /jobs/<id>/open`      | `{"opened": ...}`; `409` until the job is done                    |
-| `GET /config`               | the settings (secrets masked) and the choices for each of them    |
-| `PUT /config {key: value}`  | writes the keys given to `config.json`, answers like `GET`        |
-| `GET /models?llm=<backend>` | the names that backend accepts as `model`; `400` with the reason  |
+| Request                                    | Answer                                                                       |
+| ------------------------------------------ | ---------------------------------------------------------------------------- |
+| `POST /jobs {"url", "profile", "options"}` | `202` and the job; `400` on a wrong URL, profile or option                   |
+| `GET /jobs/<id>`                           | the job: `status` (queued, running, done, error, cancelled), `step`, results |
+| `POST /jobs/<id>/cancel`                   | the job as cancelled; `409` once it has finished                             |
+| `POST /jobs/<id>/open {"what"}`            | `{"opened": ...}`; `what` is `obsidian`, `folder` or `auto`                  |
+| `POST /bench {"url", "models"}`            | a benchmark job; `GET /bench` returns every row measured so far              |
+| `GET /config`                              | the settings (secrets masked) and the choices for each of them               |
+| `PUT /config {key: value}`                 | writes the keys given to `config.json`, answers like `GET`                   |
+| `GET /models?llm=<backend>`                | the names that backend accepts as `model`; `400` with the reason             |
+| `GET /health`                              | four lights: service, language model, transcriber, model abilities           |
+| `GET /stats`                               | what earlier runs took, per step, model and transcriber                      |
+| `GET /log?lines=<n>`                       | the tail of `serve.log`                                                      |
+| `POST /pick {"kind"}`                      | a file or folder dialog on this desktop, for the options page                |
+
+`options` carries what the popup offers per run and overrides the stored
+settings for that job: `timestamps`, `condensed`, `cleanup` (each `on`
+or `off`) and `style`.
 
 Every request must carry a `Host` header of `127.0.0.1:<port>`; an
 `Origin` header is accepted only from `moz-extension://` and
@@ -78,7 +88,7 @@ What the service did is in `serve.log` next to the data (three files of
 a megabyte, the newest without a number): every request with its status,
 every job with its steps, every failure with its traceback. The
 extension's side is in the console of its background script:
-`about:debugging`, This Firefox, Inspect next to corganshelper.
+`about:debugging`, This Firefox, Inspect next to video-tldr.
 
 ## Choosing the model
 
@@ -98,11 +108,35 @@ environment; the file lives next to the data, outside the repository.
 | `obsidian_vault`, `obsidian_folder`             | a path, a folder inside it                                                                                                            | where the Obsidian note goes, pictures under `_bilder` in that folder; default folder `Videos`                                                                              |
 | `browser`                                       | path to `chrome.exe` or `msedge.exe`                                                                                                  | prints the PDF; empty searches the usual places                                                                                                                             |
 | `lmstudio_url`, `ollama_url`, `openai_base_url` | URLs                                                                                                                                  | where the OpenAI-protocol servers listen                                                                                                                                    |
-| `token`                                         | what the extension sends with every request                                                                                           | made up by `serve` when empty and printed once                                                                                                                              |
+| `token`                                         | what the extension sends with every request                                                                                           | optional; without one the Host and Origin checks alone guard the service                                                                                                    |
+| `download_dir`                                  | a folder                                                                                                                              | where the outputs go; empty means the user's Downloads folder                                                                                                               |
+| `pdf_template`                                  | an HTML file with `{{content}}`, or a CSS file                                                                                        | the look of the PDF; empty means the built-in one                                                                                                                           |
+| `style`                                         | `normal` (default), `caveman`, `noslop`, `engineer`, `human`, `all`                                                                   | how the note is worded; `all` writes one note per style, for comparing them                                                                                                 |
+| `timestamps`                                    | `on` (default), `off`                                                                                                                 | link every section, key point and picture to its moment in the video                                                                                                        |
+| `condensed`                                     | `on`, `off` (default)                                                                                                                 | boil the video down to a two-minute read                                                                                                                                    |
+| `cleanup`                                       | `on`, `off` (default)                                                                                                                 | delete `work/<id>/` after a run that wrote its outputs, `run.json` kept                                                                                                     |
 
-`probe` says what keeps the chosen backend from answering. A local model
-needs a context window that holds the transcript and its own thinking;
-load it with 32768 tokens or more.
+`probe` says what keeps the chosen backend from answering, and
+`GET /health` says it while the extension is open. A local model needs a
+context window that holds the transcript and its own thinking; load it
+with 32768 tokens or more. LM Studio's own API tells the service what a
+model can do before a run: `type` says whether it reads pictures (`vlm`),
+`loaded_context_length` how much it holds. A model that takes no images
+no longer fails the run, it leaves the pictures unlabelled. Requests to
+LM Studio carry `reasoning_effort: "none"`, because the thinking of a
+local model was 94 to 97 percent of what it generated for a one-line
+caption (measured 2026-09-10).
+
+`bench` compares models on the same video:
+
+```
+uv run video-tldr bench https://youtu.be/BT4ywlPr6Pk --models sonnet,opus --repeat 2
+```
+
+It analyses the video once per model and run, prints a Markdown table
+with seconds, tokens and tokens per second, and appends every row to
+`bench.json` next to the data. The extension's settings page offers the
+same over `POST /bench`.
 
 Data lives under `CORGANSHELPER_HOME` (default `D:/corganshelper`): `work/<id>/`
 holds the per-video results, `models/` the downloaded speech models, `out/`

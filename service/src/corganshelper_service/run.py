@@ -7,14 +7,19 @@ rendered once right after analyze, before the expensive steps, so a
 video that fails in frames still has a readable summary. What a run
 took and cost goes to `work/<id>/run.json`; `stats()` reads those back
 for the popup's time estimate and the options page's model table.
+
+`bench()` is the other way in: the same analyze step over several models,
+so the owner can see what a model costs before choosing it.
 """
 
 from __future__ import annotations
 
 import json
+import shutil
 import statistics
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 from . import llm
@@ -38,6 +43,10 @@ CACHED_SECONDS = 0.05
 Progress = Callable[..., None]
 
 
+class Cancelled(Exception):
+    """`should_stop` said so between two steps."""
+
+
 def run(
     url: str,
     settings: Settings,
@@ -45,12 +54,15 @@ def run(
     language: str | None = None,
     formats: list[str] | None = None,
     progress: Progress | None = None,
+    should_stop: Callable[[], bool] | None = None,
 ) -> dict:
     """Run every step for one video and return what happened: the seconds
     per step, the pictures kept, the tokens spent, the files written. A
     step that fails ends the run with `error` naming it; what the steps
     before it wrote stays in `written`. `progress` hears each step start
-    and end."""
+    and end. `should_stop` is asked before each step and ends the run with
+    `cancelled`; a step that has begun is never interrupted, because
+    killing yt-dlp or ffmpeg halfway leaves a broken file behind."""
     result: dict = {
         "id": None,
         "url": url,
@@ -75,6 +87,8 @@ def run(
 
     def step(name: str, call: Callable[[], dict], describe=None) -> dict:
         result["step"] = name
+        if should_stop and should_stop():
+            raise Cancelled("cancelled")
         tell(name)
         began = time.monotonic()
         value = call()
@@ -155,7 +169,7 @@ def run(
                 lambda w: ", " + ", ".join(w),
             )
         )
-    except (FetchError, LlmError) as error:
+    except (FetchError, LlmError, Cancelled) as error:
         result["error"] = {"step": result["step"] or "fetch", "message": str(error)}
         tell(result["error"]["step"], f"failed: {error}")
     result["seconds"] = round(time.monotonic() - started, 1)
@@ -165,7 +179,25 @@ def run(
         (folder / RESULT_NAME).write_text(
             json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
         )
+        if not result["error"] and settings.config.get("cleanup") == "on":
+            tell("cleanup", cleanup(folder))
     return result
+
+
+def cleanup(folder: Path) -> str:
+    """Empty `work/<id>/` but for run.json, which `stats` reads back. Only
+    after a run that wrote its outputs: what goes here is the transcript
+    and the video clips, and a failed run is worth resuming."""
+    removed = 0
+    for path in folder.iterdir():
+        if path.name == RESULT_NAME:
+            continue
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink()
+        removed += 1
+    return f"{removed} removed from {folder}, run.json kept"
 
 
 def paths(written: dict[str, Path]) -> dict[str, str]:
@@ -225,6 +257,106 @@ def stats(settings: Settings) -> dict:
         "models": summary("model", "analyze"),
         "stt": summary("stt", "transcribe"),
     }
+
+
+# The bench table, column heading to row key.
+BENCH_NAME = "bench.json"
+BENCH_COLUMNS = {
+    "model": "model",
+    "run": "run",
+    "seconds": "seconds",
+    "input": "input",
+    "output": "output",
+    "tokens/s": "tokens_per_second",
+    "sections": "sections",
+    "key points": "key_points",
+    "links": "links",
+}
+
+
+def bench(
+    url: str,
+    settings: Settings,
+    models: list[str],
+    repeat: int = 1,
+    progress: Progress | None = None,
+) -> list[dict]:
+    """What each model makes of one video: analyze again per name, `repeat`
+    times, one row per run. Only analyze, because that is the step the
+    model decides; the rows also land in `<home>/bench.json`, so a later
+    bench compares against this one."""
+    rows: list[dict] = []
+    for name in models:
+        for number in range(1, repeat + 1):
+            # The backend stays what it is; only the model name changes.
+            chosen = replace(settings, config={**settings.config, "model": name})
+            step = f"bench {name} {number}"
+            if progress:
+                progress(step)
+            began = time.monotonic()
+            result = analyze(url, chosen, force=True)
+            seconds = round(time.monotonic() - began, 1)
+            cost = result.get("cost") or {}
+            output = cost.get("output", 0)
+            rows.append(
+                {
+                    "model": name,
+                    "run": number,
+                    "seconds": seconds,
+                    "input": cost.get("input", 0),
+                    "output": output,
+                    # The backend counts this itself where it can; the
+                    # division is the fallback and counts the wait too.
+                    "tokens_per_second": round(
+                        llm.last_cost.get("tokens_per_second")
+                        or (output / seconds if seconds else 0.0),
+                        1,
+                    ),
+                    "sections": len(result.get("sections") or []),
+                    "key_points": len(result.get("key_points") or []),
+                    "links": len(result.get("links") or []),
+                }
+            )
+            if progress:
+                progress(step, f"{seconds}s, {output} tokens")
+    store_bench(settings, rows)
+    return rows
+
+
+def bench_path(settings: Settings) -> Path:
+    return settings.home / BENCH_NAME
+
+
+def read_bench(settings: Settings) -> list[dict]:
+    """Every row an earlier bench wrote; empty until one ran."""
+    try:
+        stored = json.loads(bench_path(settings).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return stored if isinstance(stored, list) else []
+
+
+def store_bench(settings: Settings, rows: list[dict]) -> Path:
+    """Append the rows; a bench is worth comparing against the last one."""
+    path = bench_path(settings)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(read_bench(settings) + rows, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return path
+
+
+def bench_table(rows: list[dict]) -> str:
+    """The rows as Markdown, heading included."""
+    lines = [
+        "| " + " | ".join(BENCH_COLUMNS) + " |",
+        "|" + "---|" * len(BENCH_COLUMNS),
+    ]
+    for entry in rows:
+        cells = [str(entry.get(key, "")) for key in BENCH_COLUMNS.values()]
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
 
 
 def urls_in(path: Path) -> list[str]:

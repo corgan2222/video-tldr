@@ -70,8 +70,91 @@ def test_the_note_opens_with_the_thumbnail_and_links_every_timestamp():
     )
     assert "## Installation" in lines
     assert "### [a/b](https://github.com/a/b)" in lines
-    assert "1. `pip install b`" in lines and "1. Run it." in lines
+    # The command goes into a block to copy from, the sentence stays prose.
+    assert "```bash\npip install b\n```" in note
+    assert "1. Run it." in lines
     assert "- <https://github.com/a/b> (repository)" in lines
+
+
+def test_a_step_is_a_command_when_it_reads_like_one():
+    note = render_markdown(
+        FETCHED,
+        ANALYSIS,
+        repositories=[
+            {
+                "repo": "a/b",
+                "url": "https://github.com/a/b",
+                "install": [
+                    "`git clone https://github.com/a/b`",
+                    "cd b",
+                    "Open the file. Then edit it.",
+                    "$ docker compose up",
+                ],
+            }
+        ],
+    )
+
+    # Two neighbouring commands share one block; the sentence splits them.
+    assert "```bash\ngit clone https://github.com/a/b\ncd b\n```" in note
+    assert "1. Open the file. Then edit it." in note
+    assert "```bash\n$ docker compose up\n```" in note
+
+
+def test_the_commands_read_off_a_picture_follow_its_caption():
+    note = render_markdown(
+        FETCHED,
+        ANALYSIS,
+        images=[
+            {
+                "file": "a.png",
+                "time": 130,
+                "caption": "Ein Bild",
+                "commands": ["uv sync", "uv run x"],
+            },
+            {"file": "b.png", "time": 140, "caption": "Ohne"},
+        ],
+    )
+
+    assert (
+        "*[2:10](https://youtu.be/Zvc5QkrWgAU?t=130) Ein Bild*\n\n"
+        "```bash\nuv sync\nuv run x\n```" in note
+    )
+    # A frame without the key, as every frames.json written before it had.
+    assert note.count("```bash") == 1
+
+
+def test_the_obsidian_note_ends_with_the_player_and_the_others_do_not():
+    with_player = render_markdown(FETCHED, ANALYSIS, player=True)
+    without = render_markdown(FETCHED, ANALYSIS)
+
+    assert with_player.rstrip().endswith(
+        "## Video\n\n"
+        '<iframe width="560" height="315" '
+        'src="https://www.youtube.com/embed/Zvc5QkrWgAU" '
+        'title="YouTube video player" frameborder="0" allowfullscreen></iframe>'
+    )
+    assert "<iframe" not in without
+    # The link in the head is what every format carries.
+    assert "[Video](https://youtu.be/Zvc5QkrWgAU)" in without
+    assert "## Video" in render_markdown(
+        FETCHED, {**ANALYSIS, "language": "en"}, player=True
+    )
+
+
+def test_without_timestamps_the_note_carries_the_text_alone():
+    note = render_markdown(
+        FETCHED,
+        ANALYSIS,
+        images=[{"file": "a.png", "time": 130, "caption": "Ein Bild"}],
+        timestamps=False,
+    )
+
+    assert "### Rootless" in note.splitlines()
+    assert "- Beide bauen Container." in note.splitlines()
+    assert "*Ein Bild*" in note.splitlines()
+    assert "?t=" not in note
+    # The video itself keeps its link, it is no timestamp.
+    assert "[Video](https://youtu.be/Zvc5QkrWgAU)" in note
 
 
 def test_english_labels_follow_the_language():
@@ -98,6 +181,9 @@ def test_the_file_name_carries_the_day_and_nothing_windows_refuses():
 
 def prepare(tmp_path):
     settings = Settings(home=tmp_path)
+    # Without this the outputs land in the machine's own Downloads folder,
+    # which is where a run of these tests would leave its litter.
+    settings.config["download_dir"] = str(tmp_path / "out")
     folder = settings.work_dir / "Zvc5QkrWgAU"
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(json.dumps(FETCHED), encoding="utf-8")
@@ -141,7 +227,7 @@ def test_render_places_what_frames_and_enrich_wrote(tmp_path, monkeypatch):
     note = written["summary"].read_text(encoding="utf-8")
     assert written["summary"] == folder / "summary.md"
     assert "![Bild](Zvc5QkrWgAU-1.png)" in note and "weg" not in note
-    assert "### [a/b](https://github.com/a/b)" in note and "1. `x`" in note
+    assert "### [a/b](https://github.com/a/b)" in note and "```bash\nx\n```" in note
     # The drawn diagram follows the summary, its source below it.
     summary_at = note.index("## Kurzfassung")
     diagram_at = note.index("![Gezeichnet](Zvc5QkrWgAU-diagram.png)\n\n*Gezeichnet*")
@@ -219,6 +305,62 @@ def test_the_copy_under_out_and_the_obsidian_note_carry_their_own_pictures(
     )
 
 
+def test_every_style_analyze_left_behind_becomes_its_own_note(tmp_path, monkeypatch):
+    monkeypatch.setattr(llm, "complete", lambda *a, **k: pytest.fail("no request"))
+    settings, folder = prepare(tmp_path)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    settings.config.update(obsidian_vault=str(vault), obsidian_folder="Videos")
+    (folder / "analysis-caveman.json").write_text(
+        json.dumps({**ANALYSIS, "summary": "Zwei Ding, ein Ziel."}), encoding="utf-8"
+    )
+    today = date(2026, 9, 10)
+
+    written = render(
+        "https://youtu.be/Zvc5QkrWgAU",
+        settings,
+        formats=["md", "obsidian"],
+        today=today,
+    )
+
+    assert written["md:caveman"] == (
+        settings.out_dir / "2026_09_10_Docker vs Podman - caveman.md"
+    )
+    assert "Zwei Ding, ein Ziel." in written["md:caveman"].read_text(encoding="utf-8")
+    assert written["obsidian:caveman"] == (
+        vault / "Videos" / "2026_09_10_Docker vs Podman - caveman.md"
+    )
+    assert "Zwei Werkzeuge, ein Ziel." in written["md"].read_text(encoding="utf-8")
+    # Only the styles whose analysis is there.
+    assert not [key for key in written if key.endswith(":noslop")]
+    # The player belongs to Obsidian, which renders the iframe.
+    assert "<iframe" in written["obsidian"].read_text(encoding="utf-8")
+    assert "<iframe" in written["obsidian:caveman"].read_text(encoding="utf-8")
+    assert "<iframe" not in written["md"].read_text(encoding="utf-8")
+
+
+def test_a_download_folder_that_is_not_there_yet_is_created(tmp_path, monkeypatch):
+    monkeypatch.setattr(llm, "complete", lambda *a, **k: pytest.fail("no request"))
+    settings, _ = prepare(tmp_path)
+    settings.config["download_dir"] = str(tmp_path / "neu" / "unten")
+    assert not settings.out_dir.exists()
+
+    written = render("https://youtu.be/Zvc5QkrWgAU", settings, formats=["md"])
+
+    assert settings.out_dir.is_dir() and written["md"].exists()
+
+
+def test_timestamps_off_reaches_the_written_note(tmp_path, monkeypatch):
+    monkeypatch.setattr(llm, "complete", lambda *a, **k: pytest.fail("no request"))
+    settings, _ = prepare(tmp_path)
+    settings.config["timestamps"] = "off"
+
+    written = render("https://youtu.be/Zvc5QkrWgAU", settings, formats=["md"])
+
+    assert "?t=" not in written["md"].read_text(encoding="utf-8")
+    assert "?t=" not in written["summary"].read_text(encoding="utf-8")
+
+
 def test_obsidian_without_a_vault_or_with_a_mistyped_one_names_it(
     tmp_path, monkeypatch
 ):
@@ -249,10 +391,23 @@ def test_the_word_file_gets_a_thumbnail_python_docx_accepts(tmp_path, monkeypatc
 
     assert written["docx"] == settings.out_dir / f"{written['docx'].name}"
     assert (folder / "Zvc5QkrWgAU.jpg").read_bytes()[6:10] == b"JFIF"
-    _fetched, _analysis, placed, repositories, labels, source, target, diagram = calls[
-        0
-    ]
+    (
+        _fetched,
+        _analysis,
+        placed,
+        repositories,
+        labels,
+        source,
+        target,
+        diagram,
+        timestamps,
+    ) = calls[0]
     assert source == folder and target.suffix == ".docx"
     assert [i["file"] for i in placed[1]] == ["Zvc5QkrWgAU-1.png"]
     assert repositories[0]["repo"] == "a/b" and labels["summary"] == "Kurzfassung"
     assert diagram["file"] == "Zvc5QkrWgAU-diagram.png"
+    assert timestamps is True
+
+    settings.config["timestamps"] = "off"
+    render("https://youtu.be/Zvc5QkrWgAU", settings, formats=["docx"])
+    assert calls[1][-1] is False

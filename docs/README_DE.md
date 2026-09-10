@@ -14,20 +14,31 @@ Namen, corganshelper.
 ## Was es kann
 
 - **Video-Zusammenfassung.** Das Symbol in der Werkzeugleiste öffnet ein
-  kleines Fenster mit zwei Knöpfen. „Fast" und „Thorough" übergeben das
-  Video an einen lokalen Dienst. Der holt Titel, Beschreibung, Kapitel
-  und Untertitel, transkribiert den Ton, wenn Untertitel fehlen, lässt
-  ein Sprachmodell den Inhalt einordnen und zusammenfassen, zieht
-  Standbilder an den sehenswerten Stellen, liest die
-  Installationsschritte aus verlinkten GitHub-Repositories und schreibt
-  das Ergebnis als Markdown, als Notiz in einen Obsidian-Vault, als PDF
-  und als Word-Datei. Das Fenster zeigt jeden Schritt mit seinen
-  Sekunden, eine Schätzung der Restzeit aus Ihren früheren Läufen, das
-  Dienst-Log und einen Knopf, der das Ergebnis öffnet. Das Sprachmodell
-  läuft über die Claude-Code-CLI, die API von Anthropic oder OpenAI, LM
-  Studio oder Ollama; die Transkription über Whisper, Parakeet, Canary
-  oder OpenAI. Die Wahl steht in den Einstellungen der Erweiterung, die
-  auch zeigen, was jedes Modell auf Ihrem Rechner gebraucht hat.
+  kleines Fenster mit zwei Knöpfen. „Schnell" und „Gründlich" übergeben
+  das Video an einen lokalen Dienst. Der holt Titel, Beschreibung,
+  Kapitel und Untertitel, transkribiert den Ton, wenn Untertitel fehlen,
+  lässt ein Sprachmodell den Inhalt einordnen und zusammenfassen, zieht
+  Standbilder an den sehenswerten Stellen, liest die Kommandos von diesen
+  Bildern und die Installationsschritte aus verlinkten
+  GitHub-Repositories und schreibt das Ergebnis als Markdown, als Notiz
+  in einen Obsidian-Vault mit eingebettetem Video, als PDF und als
+  Word-Datei.
+- **Was das Fenster zeigt.** Jeden Schritt mit seinen Sekunden, einen
+  Fortschrittsbalken und die Restzeit aus früheren Läufen, Modell und
+  Transkribierer, das Dienst-Log und Knöpfe, die die Notiz in Obsidian
+  oder den Download-Ordner öffnen. Ein zweites Video stellt sich hinten
+  an, ein Lauf lässt sich abbrechen. Drei Lampen sagen vor dem Klick, ob
+  Dienst, Modell und Transkribierer bereit sind.
+- **Schalter je Lauf.** Zeitstempel ins Video, die Kernbotschaft als
+  Zwei-Minuten-Lesestück, und die Arbeitsdateien danach löschen. Wie die
+  Notiz formuliert ist, ist eine eigene Wahl: normal, knapp, ohne
+  Werbewörter, technisch, im Plauderton, oder alle auf einmal zum
+  Vergleichen.
+- **Wo es läuft.** Das Sprachmodell über die Claude-Code-CLI, die API von
+  Anthropic oder OpenAI, LM Studio oder Ollama; die Transkription über
+  Whisper, Parakeet, Canary oder OpenAI. Die Einstellungen zeigen, was
+  jedes Modell auf deinem Rechner gebraucht hat, und lassen mehrere am
+  selben Video gegeneinander antreten.
 - **Open all links.** Text markieren, im Kontextmenü „Open all links"
   wählen, und jeder Link in der Markierung öffnet sich als Tab in einem
   neuen Fenster: YouTube-Weiterleitungen ausgepackt, Sponsor- und

@@ -17,15 +17,24 @@ The repository keeps its old name, corganshelper.
   fetches title, description, chapters and captions, transcribes the
   audio when there are no captions, has a language model sort and
   summarise the content, pulls still frames at the moments worth seeing,
-  reads the installation steps out of linked GitHub repositories and
-  writes the result as Markdown, as a note in an Obsidian vault, as PDF
-  and as a Word file. The window shows each step with the seconds it
-  took, an estimate of what is left from your earlier runs, the service
-  log, and a button to open the result. The language model runs through
-  the Claude Code CLI, the Anthropic or OpenAI API, LM Studio or Ollama;
-  the transcriber is Whisper, Parakeet, Canary or OpenAI. The choice is
-  made in the extension's settings, which also show what each model took
-  on your machine.
+  reads the commands off those pictures and the installation steps out of
+  linked GitHub repositories, and writes the result as Markdown, as a note
+  in an Obsidian vault with the video embedded, as PDF and as a Word file.
+- **What the window shows.** Every step with the seconds it took, a
+  progress bar and an estimate from your earlier runs, the model and the
+  transcriber, the service log, and buttons that open the note in
+  Obsidian or the download folder. A second video queues behind the
+  first, and a run can be cancelled. Three lights say whether the
+  service, the model and the transcriber are ready before you click.
+- **Switches per run.** Timestamps into the video, the core message as a
+  two-minute read, and deleting the work files afterwards. The wording
+  of the note is a choice of its own: plain, terse, no marketing words,
+  technical, conversational, or all of them at once for comparing.
+- **Where it runs.** The language model runs through the Claude Code CLI,
+  the Anthropic or OpenAI API, LM Studio or Ollama; the transcriber is
+  Whisper, Parakeet, Canary or OpenAI. The settings show what each model
+  took on your machine and let you benchmark several against the same
+  video.
 - **Open all links.** Select text, pick "Open all links" from the context
   menu, and every link inside the selection opens as a tab in a new
   window: YouTube redirects unwrapped, sponsor and affiliate hosts

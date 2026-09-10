@@ -8,9 +8,11 @@ import pytest
 from corganshelper_service import documents
 from corganshelper_service.documents import (
     browser,
+    command_runs,
     content_box,
     docx,
     html,
+    is_command,
     mermaid_page,
     mermaid_png,
     pdf,
@@ -42,6 +44,47 @@ def test_the_page_carries_the_title_and_the_pictures_as_file_urls():
     assert "<title>A &lt;b&gt; title</title>" in page
     assert '<img alt="alt" src="file:///D:/x/a.png"' in page
     assert "<h1>Head</h1>" in page and "<li>one</li>" in page
+
+
+def test_a_command_block_becomes_a_pre_the_style_sets_apart():
+    page = html("t", "```bash\npip install b\n```\n")
+    assert "<pre><code" in page and "pip install b" in page
+    assert "pre {" in documents.STYLE and "monospace" in documents.STYLE
+
+
+def test_a_template_replaces_the_page_and_a_stylesheet_follows_the_style(tmp_path):
+    template = tmp_path / "page.html"
+    template.write_text(
+        "<html><head><title>{{title}}</title></head><body>{{content}}</body></html>",
+        encoding="utf-8",
+    )
+    page = html("A <b> title", "# Head\n", str(template))
+    assert page.startswith("<html><head><title>A &lt;b&gt; title</title>")
+    assert "<h1>Head</h1>" in page and "Segoe UI" not in page
+
+    sheet = tmp_path / "look.css"
+    sheet.write_text("body { color: red; }\n", encoding="utf-8")
+    page = html("t", "# Head\n", str(sheet))
+    assert "<h1>Head</h1>" in page
+    # The built-in look first, the file after it, so its rules win.
+    assert page.index("Segoe UI") < page.index("color: red")
+
+    with pytest.raises(FetchError) as caught:
+        html("t", "# Head\n", str(tmp_path / "typo.css"))
+    assert "typo.css" in str(caught.value)
+
+
+def test_a_step_is_a_command_only_when_no_sentence_is_in_it():
+    assert is_command("`pip install b`") and is_command("$ docker compose up")
+    assert is_command("cd b") and is_command("> npm ci")
+    assert not is_command("Run it.") and not is_command("")
+    assert not is_command("pip install b. Then start it.")
+    # Neighbours of the same kind share a run, and the order holds.
+    assert command_runs(["`a`", "Do this. Then that.", "`b`"]) == [
+        (True, ["a"]),
+        (False, ["Do this. Then that."]),
+        (True, ["b"]),
+    ]
 
 
 def test_the_configured_browser_wins_and_none_at_all_is_named(tmp_path, monkeypatch):
@@ -225,3 +268,55 @@ def test_the_word_file_carries_every_chosen_picture_and_the_steps(tmp_path):
     assert "Docker vs Podman" in document and "Installation" in document
     assert "[2:10] Eins" in document and "Fehlt" not in document
     assert ">x<" in document and "`" not in document
+
+
+def test_the_word_file_shades_every_command_and_drops_the_stamps(tmp_path):
+    folder = tmp_path / "work"
+    folder.mkdir()
+    (folder / "v-1.png").write_bytes(png(40))
+    fetched = {
+        "id": "v",
+        "title": "Docker vs Podman",
+        "channel": "Kanal",
+        "upload_date": "20260901",
+        "duration": 300,
+    }
+    analysis = {
+        "language": "de",
+        "kind": "explainer",
+        "summary": "Zwei Werkzeuge.",
+        "sections": [{"title": "Intro", "start": 0, "end": 60, "summary": "Worum."}],
+        "key_points": [{"time": 12, "text": "Beide bauen Container."}],
+    }
+    images = [
+        {"file": "v-1.png", "time": 30, "caption": "Eins", "commands": ["uv sync"]}
+    ]
+    repositories = [
+        {
+            "repo": "a/b",
+            "url": "https://github.com/a/b",
+            "install": ["`pip install b`", "Read the docs. Then start it."],
+        }
+    ]
+
+    target = docx(
+        fetched,
+        analysis,
+        by_section(analysis["sections"], images),
+        repositories,
+        LABELS["de"],
+        folder,
+        tmp_path / "out" / "note.docx",
+        None,
+        False,
+    )
+
+    with zipfile.ZipFile(target) as archive:
+        document = archive.read("word/document.xml").decode("utf-8")
+    assert 'w:fill="F2F2F2"' in document and "Consolas" in document
+    assert ">uv sync<" in document and ">pip install b<" in document
+    # A step that reads like a sentence stays a numbered paragraph.
+    assert ">Read the docs. Then start it.<" in document
+    # Without the timestamps the heading, the point and the caption are bare.
+    assert "[0:30]" not in document and "[0:12]" not in document
+    assert ">Eins<" in document and ">Intro<" in document

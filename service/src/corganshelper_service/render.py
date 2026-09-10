@@ -18,7 +18,8 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from .analyze import analyze, stamp
-from .config import STYLES, Settings, split_formats
+from .config import EXTRA_STYLES as config_styles
+from .config import Settings, split_formats
 from .documents import command_runs
 from .documents import docx as write_docx
 from .documents import html as to_html
@@ -30,8 +31,9 @@ from .frames import chosen_images, diagram_of
 RESULT_NAME = "summary.md"
 PICTURES_FOLDER = "_bilder"
 # The styles `style=all` writes a second analysis for, next to the one
-# analysis.json holds; each one becomes its own note.
-EXTRA_STYLES = [s for s in STYLES if s not in ("normal", "all")]
+# analysis.json holds; each one becomes its own note. The same names as
+# `style` in config.json takes, minus `normal` and `all` themselves.
+EXTRA_STYLES = list(config_styles)
 # What Windows refuses in a file name, plus control characters.
 FORBIDDEN = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 TITLE_LENGTH = 80

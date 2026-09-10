@@ -309,8 +309,8 @@ def analyze(
 
     segments = transcript["segments"]
     duration = fetched.get("duration") or (segments[-1]["end"] if segments else 0)
-    condensed = settings.config["condensed"] == "on"
-    wanted = settings.config["style"]
+    condensed = settings.config.get("condensed") == "on"
+    wanted = settings.config.get("style") or "normal"
     styles = list(STYLE_INSTRUCTIONS) if wanted == "all" else [wanted]
 
     spend: list[dict] = []

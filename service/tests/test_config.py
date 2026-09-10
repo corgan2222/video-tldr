@@ -128,6 +128,37 @@ def test_language_is_a_choice_and_the_file_is_replaced_not_truncated(
     assert [p.name for p in tmp_path.iterdir()] == ["config.json"]
 
 
+def test_outputs_go_to_downloads_unless_a_folder_is_set(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from corganshelper_service.config import default_download_dir
+
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    settings = Settings(home=tmp_path / "data")
+    assert settings.out_dir == default_download_dir()
+    (tmp_path / "Downloads").mkdir()
+    assert settings.out_dir == tmp_path / "Downloads"
+
+    settings.config["download_dir"] = str(tmp_path / "elsewhere")
+    assert settings.out_dir == Path(tmp_path / "elsewhere")
+
+
+def test_the_run_switches_are_on_or_off_and_style_is_a_choice(
+    tmp_path, monkeypatch, capsys
+):
+    clean_env(monkeypatch)
+    home = str(tmp_path)
+    assert main(["--home", home, "config", "--set", "timestamps=off"]) == 0
+    assert main(["--home", home, "config", "--set", "style=caveman"]) == 0
+    assert main(["--home", home, "config", "--set", "condensed=maybe"]) == 1
+    assert "condensed must be one of on, off" in capsys.readouterr().err
+    assert main(["--home", home, "config", "--set", "style=shakespeare"]) == 1
+    assert "style must be one of normal, caveman" in capsys.readouterr().err
+    stored = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+    assert (stored["timestamps"], stored["style"]) == ("off", "caveman")
+
+
 def test_profiles_change_the_transcriber_and_the_model_on_top_of_the_file():
     from corganshelper_service.config import DEFAULTS, ConfigError, profile_overrides
 

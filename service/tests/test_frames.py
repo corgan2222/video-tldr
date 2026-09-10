@@ -1,4 +1,7 @@
 import json
+import struct
+import zlib
+from pathlib import Path
 
 import pytest
 
@@ -8,15 +11,40 @@ from corganshelper_service.config import Settings
 from corganshelper_service.frames import (
     LABEL_SCHEMA,
     LIMIT,
+    NO_VISION,
     PROBE_HEIGHT,
     PROBE_WIDTH,
+    SEND_WIDTH,
     choose,
     frames,
     moments,
+    png_width,
     sharpest_second,
+    shrink,
 )
 
 VID = "jFHu6wx_TMQ"
+PNG_SIGNATURE = bytes.fromhex("89504e470d0a1a0a")
+
+
+def png(width: int, height: int = 2) -> bytes:
+    """A real grey PNG of that size: signature, IHDR, IDAT, IEND."""
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(body))
+            + kind
+            + body
+            + struct.pack(">I", zlib.crc32(kind + body))
+        )
+
+    rows = b"".join(bytes([0]) + bytes([128]) * width for _ in range(height))
+    return (
+        PNG_SIGNATURE
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IEND", b"")
+    )
 
 
 def prepare(tmp_path, candidates, kind="review"):
@@ -119,7 +147,11 @@ def test_frames_end_to_end_keeps_the_chosen_pictures_only(tmp_path, monkeypatch)
         index = int(images[0].stem.rsplit("-", 1)[1])
         label = {1: "speaker", 4: "speaker", 3: "diagram"}.get(index, "code")
         llm.last_cost.update(input=100, output=10, usd=0.01)
-        return {"label": label, "caption": f"c{index - 1}"}
+        return {
+            "label": label,
+            "caption": f"c{index - 1}",
+            "commands": ["docker ps"] if index == 2 else [],
+        }
 
     monkeypatch.setattr(frames_module, "download_clips", fake_download)
     monkeypatch.setattr(frames_module, "ffmpeg", fake_ffmpeg)
@@ -140,6 +172,8 @@ def test_frames_end_to_end_keeps_the_chosen_pictures_only(tmp_path, monkeypatch)
     assert len(chosen) == LIMIT
     assert all(f["label"] != "speaker" for f in chosen)
     assert chosen[0]["caption"] == "c1" and chosen[0]["time"] == 40.0
+    # The commands on screen travel with the picture that shows them.
+    assert chosen[0]["commands"] == ["docker ps"] and chosen[1]["commands"] == []
     assert sorted(p.name for p in folder.glob("*.png")) == sorted(
         f["file"] for f in chosen
     )
@@ -262,6 +296,149 @@ def test_a_clip_ffmpeg_cannot_read_is_skipped_with_a_warning(tmp_path, monkeypat
         "no picture at 0:40, clip of 0 bytes: ffmpeg failed: does not contain any stream"
     ]
     assert not list(folder.glob("*-clip-*"))
+
+
+def test_the_label_schema_asks_for_the_commands_on_screen():
+    assert LABEL_SCHEMA["properties"]["commands"] == {
+        "type": "array",
+        "items": {"type": "string"},
+    }
+    assert "commands" in LABEL_SCHEMA["required"]
+    assert LABEL_SCHEMA["additionalProperties"] is False
+    assert "commands:" in frames_module.instruction("de", Path(f"{VID}-1.png"))
+
+
+def test_a_picture_wider_than_the_send_width_travels_as_a_jpeg(tmp_path, monkeypatch):
+    wide = tmp_path / f"{VID}-1.png"
+    wide.write_bytes(png(1920))
+    small = tmp_path / f"{VID}-2.png"
+    small.write_bytes(png(640))
+    converted = []
+
+    def fake_ffmpeg(*args):
+        converted.append(args)
+        Path(args[-1]).write_bytes(b"jpeg")
+        return b""
+
+    monkeypatch.setattr(frames_module, "ffmpeg", fake_ffmpeg)
+    assert png_width(wide) == 1920 and png_width(small) == 640
+    # A file ffmpeg wrote as something else is sent as it is.
+    other = tmp_path / f"{VID}-3.png"
+    other.write_bytes(b"not a picture at all, but on disk")
+    assert png_width(other) == 0 and shrink(other) == other
+
+    # A picture that is no wider goes as it is, without a conversion.
+    assert shrink(small) == small and converted == []
+    sent = shrink(wide)
+    assert sent == tmp_path / f"{VID}-1.jpg" and sent.exists()
+    assert f"scale={SEND_WIDTH}:-2" in converted[0]
+
+    requests = []
+
+    def fake_complete(instruction, data, schema, settings, images=None, max_turns=1):
+        requests.append((instruction, images))
+        assert images[0].exists()
+        return {"label": "code", "caption": "c", "commands": []}
+
+    monkeypatch.setattr(llm, "complete", fake_complete)
+    labeled = frames_module.label(
+        [wide],
+        [{"time": 5.0, "kind": "code", "why": "w"}],
+        Settings(home=tmp_path),
+        "de",
+        [],
+    )
+    # The model reads the JPEG, the result names the PNG the outputs keep.
+    assert requests[0][1] == [tmp_path / f"{VID}-1.jpg"]
+    assert f"{VID}-1.jpg" in requests[0][0]
+    assert labeled[0]["file"] == f"{VID}-1.png" and wide.exists()
+    assert not (tmp_path / f"{VID}-1.jpg").exists()
+
+
+def test_a_model_without_eyes_keeps_the_pictures_unlabelled(tmp_path, monkeypatch):
+    candidates = [
+        {"time": 20.0 * i, "kind": "ui", "why": f"w{i}"} for i in range(1, 11)
+    ]
+    settings, folder = prepare(tmp_path, candidates)
+
+    def fake_download(url, folder, vid, times, settings):
+        clips = {}
+        for t in times:
+            clip = frames_module.clip_path(folder, vid, max(0.0, t - 8))
+            clip.write_bytes(b"clip")
+            clips[t] = clip
+        return clips
+
+    def fake_ffmpeg(*args):
+        if args[0] == "-y":
+            tmp_path.joinpath(args[-1]).write_bytes(b"png")
+            return b""
+        return bytes(PROBE_WIDTH * PROBE_HEIGHT)
+
+    def blind(instruction, data, schema, settings, images=None, max_turns=1):
+        raise llm.NoVisionError("this model takes no images")
+
+    monkeypatch.setattr(frames_module, "download_clips", fake_download)
+    monkeypatch.setattr(frames_module, "ffmpeg", fake_ffmpeg)
+    monkeypatch.setattr(llm, "complete", blind)
+
+    result = frames(f"https://youtu.be/{VID}", settings)
+
+    # The run goes through, and the warning says what the note is missing.
+    assert result["warnings"] == [NO_VISION]
+    chosen = [f for f in result["frames"] if f["chosen"]]
+    assert len(chosen) == LIMIT
+    assert [f["time"] for f in chosen] == [20.0 * i for i in range(1, LIMIT + 1)]
+    assert all(f["label"] == "unknown" for f in chosen)
+    # An empty caption, because render places it as text next to the picture.
+    assert all(f["caption"] == "" and f["commands"] == [] for f in chosen)
+    assert result["diagram"] is None
+    assert sorted(p.name for p in folder.glob("*.png")) == sorted(
+        f["file"] for f in chosen
+    )
+
+
+def test_a_failed_clip_download_is_tried_once_more(tmp_path, monkeypatch):
+    import yt_dlp
+
+    tries = []
+    slept = []
+
+    class Flaky:
+        def __init__(self, options):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def download(self, urls):
+            tries.append(urls)
+            if len(tries) == 1:
+                raise yt_dlp.utils.DownloadError("ffmpeg exited with code 3436169992")
+
+    monkeypatch.setattr(yt_dlp, "YoutubeDL", Flaky)
+    monkeypatch.setattr(frames_module.time, "sleep", slept.append)
+    clips = frames_module.download_clips(
+        "https://youtu.be/x", tmp_path, "x", [40.0], Settings(home=tmp_path)
+    )
+    assert len(tries) == 2 and slept == [frames_module.RETRY_PAUSE]
+    assert [c.name for c in clips.values()] == ["x-clip-32.mp4"]
+
+    # Twice failed is failed, with the message the step always carried.
+    class Broken(Flaky):
+        def download(self, urls):
+            tries.append(urls)
+            raise yt_dlp.utils.DownloadError("no video formats found")
+
+    monkeypatch.setattr(yt_dlp, "YoutubeDL", Broken)
+    with pytest.raises(frames_module.FetchError, match="clip download failed"):
+        frames_module.download_clips(
+            "https://youtu.be/x", tmp_path, "x", [40.0], Settings(home=tmp_path)
+        )
+    assert len(tries) == 4
 
 
 def test_without_candidates_nothing_is_fetched(tmp_path, monkeypatch):

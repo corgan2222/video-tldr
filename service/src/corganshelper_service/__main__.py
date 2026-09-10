@@ -26,7 +26,7 @@ from .fetch import FetchError, fetch
 from .frames import frames
 from .llm import LlmError
 from .render import render
-from .run import header, row, run, urls_in
+from .run import bench, bench_table, header, row, run, urls_in
 from .serve import PORT, serve
 from .transcribe import transcribe
 
@@ -148,6 +148,16 @@ def build_parser() -> argparse.ArgumentParser:
         choices=FORMATS,
         help="an output besides summary.md; repeatable; default from config",
     )
+    bench_cmd = commands.add_parser(
+        "bench", help="analyze one video with several models and compare them"
+    )
+    bench_cmd.add_argument("url")
+    bench_cmd.add_argument(
+        "--models", required=True, metavar="A,B,C", help="model names, comma separated"
+    )
+    bench_cmd.add_argument(
+        "--repeat", type=int, default=1, help="runs per model; default 1"
+    )
     serve_cmd = commands.add_parser(
         "serve", help="listen on 127.0.0.1 for the extension until Ctrl+C"
     )
@@ -210,6 +220,26 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print(json.dumps(result, indent=2, ensure_ascii=False))
         return 1 if failed else 0
+
+    if args.command == "bench":
+        names = [name.strip() for name in args.models.split(",") if name.strip()]
+        if not names:
+            parser.error("bench needs --models with at least one name")
+        try:
+            rows = bench(
+                args.url,
+                settings,
+                names,
+                args.repeat,
+                progress=lambda step, detail="": print(
+                    f"  {step} {detail}".rstrip(), file=sys.stderr
+                ),
+            )
+        except (FetchError, LlmError) as error:
+            print(f"bench failed: {error}", file=sys.stderr)
+            return 1
+        print(bench_table(rows))
+        return 0
 
     if args.command == "probe":
         problems = probe(settings)

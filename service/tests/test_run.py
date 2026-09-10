@@ -4,9 +4,19 @@ from pathlib import Path
 import pytest
 
 from corganshelper_service import run as module
-from corganshelper_service.config import Settings
+from corganshelper_service.config import DEFAULTS, Settings
 from corganshelper_service.fetch import FetchError
-from corganshelper_service.run import STEPS, header, row, run, stats, urls_in
+from corganshelper_service.run import (
+    STEPS,
+    bench,
+    bench_table,
+    header,
+    read_bench,
+    row,
+    run,
+    stats,
+    urls_in,
+)
 
 URL = "https://youtu.be/x_x_x_x_x_x"
 
@@ -139,6 +149,128 @@ def test_the_table_has_one_cell_per_column(steps, tmp_path):
 
     head = header().splitlines()
     assert head[0].count("|") == head[1].count("|") == row(result).count("|")
+
+
+def test_a_cancel_between_two_steps_ends_the_run_and_names_the_next_one(
+    steps, tmp_path
+):
+    # The flag goes up while transcribe runs; analyze is the step that
+    # never starts.
+    result = run(URL, Settings(home=tmp_path), should_stop=lambda: len(steps) >= 2)
+
+    assert result["error"] == {"step": "analyze", "message": "cancelled"}
+    assert [c[0] for c in steps] == ["fetch", "transcribe"]
+    assert list(result["steps"]) == ["fetch", "transcribe"]
+
+
+def test_cleanup_empties_the_work_folder_but_for_run_json(steps, tmp_path):
+    folder = tmp_path / "work" / "x_x_x_x_x_x"
+    (folder / "clips").mkdir(parents=True)
+    (folder / "clips" / "a.mp4").write_text("clip", "utf-8")
+    (folder / "transcript.json").write_text("{}", "utf-8")
+    heard = []
+
+    result = run(
+        URL,
+        Settings(home=tmp_path, config={**DEFAULTS, "cleanup": "on"}),
+        progress=lambda *event: heard.append(event),
+    )
+
+    assert result["error"] is None
+    assert [path.name for path in folder.iterdir()] == ["run.json"]
+    assert heard[-1][0] == "cleanup"
+    assert "run.json kept" in heard[-1][1]
+
+
+def test_cleanup_leaves_a_failed_run_alone_to_resume(steps, monkeypatch, tmp_path):
+    def broken(url, settings, force=False, language=None):
+        raise FetchError("ffmpeg failed")
+
+    monkeypatch.setattr(module, "frames", broken)
+    folder = tmp_path / "work" / "x_x_x_x_x_x"
+    folder.mkdir(parents=True)
+    (folder / "transcript.json").write_text("{}", "utf-8")
+
+    run(URL, Settings(home=tmp_path, config={**DEFAULTS, "cleanup": "on"}))
+
+    assert (folder / "transcript.json").exists()
+
+
+def test_bench_runs_analyze_per_model_and_writes_a_row_each(monkeypatch, tmp_path):
+    seen = []
+
+    def fake_analyze(url, settings, force=False, language=None):
+        seen.append((settings.config["model"], settings.config["llm"], force))
+        return {
+            "cost": {"input": 100, "output": 40},
+            "sections": [{}, {}],
+            "key_points": [{}],
+            "links": [{}, {}, {}],
+        }
+
+    monkeypatch.setattr(module, "analyze", fake_analyze)
+    module.llm.last_cost.clear()
+    settings = Settings(home=tmp_path)
+
+    rows = bench(URL, settings, ["qwen", "gemma"], repeat=2)
+
+    # Every model, every repeat, and the backend untouched.
+    assert seen == [("qwen", "claude", True)] * 2 + [("gemma", "claude", True)] * 2
+    assert [(r["model"], r["run"]) for r in rows] == [
+        ("qwen", 1),
+        ("qwen", 2),
+        ("gemma", 1),
+        ("gemma", 2),
+    ]
+    assert rows[0]["input"] == 100
+    assert rows[0]["output"] == 40
+    assert (rows[0]["sections"], rows[0]["key_points"], rows[0]["links"]) == (2, 1, 3)
+    # No count from the backend: the tokens divided by the seconds.
+    assert rows[0]["tokens_per_second"] >= 0
+    assert read_bench(settings) == rows
+
+    # A second bench is appended, not written over.
+    bench(URL, settings, ["qwen"], repeat=1)
+    assert len(read_bench(settings)) == 5
+
+
+def test_bench_takes_the_speed_the_backend_counted(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        module,
+        "analyze",
+        lambda url, settings, force=False, language=None: {
+            "cost": {"input": 10, "output": 20}
+        },
+    )
+    module.llm.last_cost.clear()
+    module.llm.last_cost.update(tokens_per_second=42.5)
+
+    rows = bench(URL, Settings(home=tmp_path), ["qwen"])
+    module.llm.last_cost.clear()
+
+    assert rows[0]["tokens_per_second"] == 42.5
+
+
+def test_the_bench_table_has_one_cell_per_column():
+    rows = bench_table(
+        [
+            {
+                "model": "qwen",
+                "run": 1,
+                "seconds": 12.0,
+                "input": 100,
+                "output": 40,
+                "tokens_per_second": 3.3,
+                "sections": 2,
+                "key_points": 1,
+                "links": 3,
+            }
+        ]
+    ).splitlines()
+
+    assert "tokens/s" in rows[0] and "key points" in rows[0]
+    assert rows[0].count("|") == rows[1].count("|") == rows[2].count("|")
+    assert "| qwen | 1 | 12.0 | 100 | 40 | 3.3 | 2 | 1 | 3 |" == rows[2]
 
 
 def test_stats_take_the_median_over_runs_and_skip_cached_steps(tmp_path):

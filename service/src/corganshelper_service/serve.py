@@ -3,24 +3,33 @@ job at a time, the same `run` the command line calls.
 
 The contract, every answer JSON:
 
-    POST /jobs {"url", "profile"}   202 the job; 400 when the URL is no video
-                                    or the profile unknown (fast, thorough)
+    POST /jobs {"url", "profile",   202 the job; 400 when the URL is no video,
+                "options"}               the profile is not fast or thorough,
+                                         or an option names a wrong key
     GET  /jobs/<id>                 200 the job; 404
-    POST /jobs/<id>/open            200 {"opened": ...}; 409 until it is done
+    POST /jobs/<id>/open {"what"}   200 {"opened": ...}; 409 until it is done.
+                                    what: obsidian, folder, or auto (default)
+    POST /jobs/<id>/cancel          200 the job; 404; 409 once it is finished
+    POST /bench {"url", "models",   202 a job with kind bench, whose `bench`
+                 "repeat"}               holds the rows once it is done
+    GET  /bench                     200 {"rows": [...]} of every bench so far
     GET  /config                    200 {"settings", "choices", "stt_models",
                                          "profiles", "home", "log", "version"}
     PUT  /config {key: value}       200 {"settings", ...}; 400 on a wrong key
     GET  /models?llm=<backend>      200 {"models": [...]}; 400 with the reason
     GET  /log?lines=<n>             200 {"lines": [...]}, the tail of serve.log
     GET  /stats                     200 what earlier runs took, see run.stats
-    GET  /health                    200 {"service", "llm", "stt"}: {"ok", "detail"}
+    GET  /health                    200 {"service", "llm", "stt",
+                                         "capabilities"}
     POST /pick {"kind", "start"}    200 {"path"}: a file or folder dialog on
                                     this desktop, empty when cancelled
 
-A job carries `id` (the video id), `url`, `profile`, `status` (queued,
-running, done, error), `step` and `step_started` (the running or last
-step) and, once it ran, what `run` returned: `title`, `model`, `stt`,
-`steps` with seconds, `images`, `usd`, `written`, `error`.
+A job carries `id` (the video id), `url`, `profile`, `options` (what the
+popup set for this run), `status` (queued, running, done, error,
+cancelled), `position` while it waits or runs, `step` and `step_started`
+(the running or last step) and, once it ran, what `run` returned:
+`title`, `model`, `stt`, `steps` with seconds, `images`, `usd`,
+`written`, `error`.
 
 Who gets in, after decision 0001: the Host header must read
 127.0.0.1:<port>, an Origin header must be absent (curl, the command
@@ -67,11 +76,12 @@ from .config import (
     Settings,
     profile_overrides,
     store,
+    validate,
 )
 from .documents import browser as find_browser
 from .fetch import FetchError, video_id
 from .llm import LlmError
-from .run import run, stats
+from .run import bench, read_bench, run, stats
 from .transcribe import stt_status
 
 PORT = 8765
@@ -85,6 +95,8 @@ LOG_LINES_MAX = 500
 EXTENSION_ORIGINS = ("moz-extension://", "chrome-extension://")
 # What `open` starts, the first that the job wrote.
 OPEN_ORDER = ["obsidian", "pdf", "docx", "md", "summary"]
+# What the popup's buttons ask for: the note, the folder, or that order.
+OPEN_WHAT = ["auto", "obsidian", "folder"]
 Runner = Callable[..., dict]
 
 
@@ -151,18 +163,27 @@ class Service:
         self.jobs: dict[str, dict] = {}
         self.lock = threading.Lock()
         self.queue: queue.Queue[str] = queue.Queue()
+        # The ids whose cancel arrived while they were running; the worker
+        # asks this between two steps.
+        self.cancelling: set[str] = set()
         self.token = self.ensure_token()
         self.log_path = self.settings().home / LOG_NAME
         self.log = self.open_log()
         threading.Thread(target=self.work, daemon=True, name="jobs").start()
 
-    def settings(self, profile: str | None = None) -> Settings:
+    def settings(
+        self, profile: str | None = None, options: dict | None = None
+    ) -> Settings:
         # Loaded per use, not once: PUT /config changes the file underneath.
-        # A profile sits on top of the file and under the command line.
+        # A profile sits on top of the file and under the command line; the
+        # options of the one job win over both, they are what the popup
+        # switched for this run.
         base = Settings.load(self.home, self.overrides)
-        if not profile:
+        if not profile and not options:
             return base
-        overrides = {**profile_overrides(profile, base.config), **self.overrides}
+        overrides = {**self.overrides, **(options or {})}
+        if profile:
+            overrides = {**profile_overrides(profile, base.config), **overrides}
         return Settings.load(self.home, overrides)
 
     def open_log(self) -> logging.Logger:
@@ -219,9 +240,16 @@ class Service:
         }
 
     def health(self) -> dict:
-        """Three lights for the popup and the options page: the service
-        itself, the language model, the transcriber."""
+        """Four lights for the popup and the options page: the service
+        itself, the language model, the transcriber, and what the model can
+        do, so the popup warns about a model without vision before the run
+        instead of after the frames step."""
         settings = self.settings()
+        capabilities = getattr(
+            llm,
+            "capabilities",
+            lambda _: {"vision": None, "context": None, "detail": "not checked"},
+        )
         return {
             "service": {
                 "ok": True,
@@ -229,6 +257,7 @@ class Service:
             },
             "llm": llm.status(settings),
             "stt": stt_status(settings),
+            "capabilities": capabilities(settings),
         }
 
     def models(self, backend: str | None = None) -> list[str]:
@@ -253,17 +282,36 @@ class Service:
         )
         return self.config()
 
-    def submit(self, url: str, profile: str = "fast") -> dict:
+    def submit(
+        self, url: str, profile: str = "fast", options: dict | None = None
+    ) -> dict:
         vid = video_id(url)
         profile_overrides(profile, self.settings().config)  # names a wrong one
+        # The switches of the popup travel per job. Checked here and not in
+        # the worker: a wrong one is a 400 the popup can show, not a job
+        # that fails a minute later.
+        options = validate(dict(options or {}))
+        return self.enqueue(vid, {"url": url, "profile": profile, "options": options})
+
+    def submit_bench(self, url: str, models: list[str], repeat: int = 1) -> dict:
+        """A bench of its own id, so it neither replaces nor joins the run
+        of the same video."""
+        if not models:
+            raise ValueError("models must name at least one model")
+        return self.enqueue(
+            f"bench:{video_id(url)}",
+            {"kind": "bench", "url": url, "models": models, "repeat": max(1, repeat)},
+        )
+
+    def enqueue(self, vid: str, fields: dict) -> dict:
+        """Put a job in the queue, or hand back the one already there."""
         with self.lock:
             job = self.jobs.get(vid)
             if job and job["status"] in ("queued", "running"):
                 return dict(job)
             job = {
                 "id": vid,
-                "url": url,
-                "profile": profile,
+                **fields,
                 "status": "queued",
                 "step": None,
                 "step_started": None,
@@ -273,9 +321,42 @@ class Service:
         self.queue.put(vid)
         return dict(job)
 
+    def waiting(self) -> list[str]:
+        """The ids in the queue, in order; the deque behind it, read under
+        its own lock."""
+        with self.queue.mutex:
+            return list(self.queue.queue)
+
     def job(self, vid: str) -> dict | None:
         with self.lock:
-            return dict(self.jobs[vid]) if vid in self.jobs else None
+            job = dict(self.jobs[vid]) if vid in self.jobs else None
+        if job is None:
+            return None
+        if job["status"] == "running":
+            job["position"] = 0
+        elif job["status"] == "queued":
+            # Between the worker's get and its first update the job is
+            # queued but out of the queue: it is the next one, hence 0.
+            waiting = self.waiting()
+            job["position"] = waiting.index(vid) if vid in waiting else 0
+        return job
+
+    def cancel(self, vid: str) -> dict:
+        """Out of the queue, or a flag the worker sees between two steps."""
+        job = self.job(vid)
+        if job is None:
+            raise KeyError(vid)
+        if job["status"] == "queued":
+            with self.queue.mutex:
+                if vid in self.queue.queue:
+                    self.queue.queue.remove(vid)
+            self.update(vid, status="cancelled", finished=now())
+        elif job["status"] == "running":
+            self.cancelling.add(vid)
+        else:
+            raise NotReady(f"job {vid} is {job['status']}")
+        self.log.info("job %s: cancelled while %s", vid, job["status"])
+        return self.job(vid)
 
     def update(self, vid: str, **fields: object) -> None:
         with self.lock:
@@ -294,10 +375,25 @@ class Service:
         while True:
             vid = self.queue.get()
             job = self.job(vid)
-            profile = job["profile"]
+            profile = job.get("profile")
             self.update(vid, status="running", started=now())
+
+            def tell(step: str, detail: str | None = None, vid: str = vid) -> None:
+                self.step(vid, step, detail)
+
             try:
-                settings = self.settings(profile)
+                if job.get("kind") == "bench":
+                    rows = bench(
+                        job["url"],
+                        self.settings(),
+                        job["models"],
+                        job["repeat"],
+                        progress=tell,
+                    )
+                    self.log.info("job %s: bench wrote %s rows", vid, len(rows))
+                    self.update(vid, bench=rows, status="done", finished=now())
+                    continue
+                settings = self.settings(profile, job.get("options"))
                 self.log.info(
                     "job %s: running %s, profile %s, %s, stt %s",
                     vid,
@@ -310,13 +406,13 @@ class Service:
                     job["url"],
                     settings,
                     force=profile == "thorough",
-                    progress=lambda step, detail=None, vid=vid: self.step(
-                        vid, step, detail
-                    ),
+                    progress=tell,
+                    should_stop=lambda vid=vid: vid in self.cancelling,
                 )
             # Blind on purpose: a bug in a step must not leave the job on
             # "running" for the extension to poll forever.
             except Exception as error:
+                self.cancelling.discard(vid)
                 self.log.exception("job %s: crashed in %s", vid, self.job(vid)["step"])
                 self.update(
                     vid,
@@ -328,13 +424,20 @@ class Service:
                     finished=now(),
                 )
                 continue
-            status = "error" if result["error"] else "done"
+            self.cancelling.discard(vid)
+            # run stops between two steps when the cancel flag is up and
+            # says so in the error; the job then reads cancelled, not failed.
+            status = "done"
             if result["error"]:
+                cancelled = result["error"]["message"] == "cancelled"
+                status = "cancelled" if cancelled else "error"
                 self.log.error(
-                    "job %s: %s failed: %s",
+                    "job %s: %s %s",
                     vid,
                     result["error"]["step"],
-                    result["error"]["message"],
+                    "cancelled"
+                    if cancelled
+                    else f"failed: {result['error']['message']}",
                 )
             else:
                 self.log.info(
@@ -348,21 +451,29 @@ class Service:
                 )
             self.update(vid, **result, status=status, finished=now())
 
-    def open(self, vid: str) -> str:
-        """Start the best file the job wrote and return what was started."""
+    def open(self, vid: str, what: str = "auto") -> str:
+        """Start what the job wrote and return what was started: the note in
+        Obsidian, the folder the outputs went to, or the best file there is."""
+        if what not in OPEN_WHAT:
+            raise ValueError(f"what must be one of {', '.join(OPEN_WHAT)}")
         job = self.job(vid)
         if job is None:
             raise KeyError(vid)
+        if what == "folder":
+            # The folder is there whatever the job did, so no wait for it.
+            folder = str(self.settings(job.get("profile"), job.get("options")).out_dir)
+            start(folder)
+            return folder
         if job["status"] != "done":
             raise NotReady(f"job {vid} is {job['status']}")
-        for kind in OPEN_ORDER:
+        for kind in ["obsidian"] if what == "obsidian" else OPEN_ORDER:
             if kind in job["written"]:
                 target = job["written"][kind]
                 if kind == "obsidian":
                     target = f"obsidian://open?path={quote(target)}"
                 start(target)
                 return target
-        raise NotReady(f"job {vid} wrote nothing to open")
+        raise NotReady(f"job {vid} wrote no {what if what != 'auto' else 'output'}")
 
 
 class Server(ThreadingHTTPServer):
@@ -445,16 +556,46 @@ class Handler(BaseHTTPRequestHandler):
                 profile = body.get("profile") or "fast"
                 if not isinstance(profile, str):
                     raise TypeError("profile must be a string")
-                return self.reply(HTTPStatus.ACCEPTED, service.submit(url, profile))
+                options = body.get("options") or {}
+                if not isinstance(options, dict):
+                    raise TypeError("options must be one JSON object")
+                return self.reply(
+                    HTTPStatus.ACCEPTED, service.submit(url, profile, options)
+                )
             if method == "GET" and len(parts) == 2 and parts[0] == "jobs":
                 job = service.job(parts[1])
                 if job is None:
                     raise KeyError(parts[1])
                 return self.reply(HTTPStatus.OK, job)
             if method == "POST" and len(parts) == 3 and parts[0] == "jobs":
+                if parts[2] == "cancel":
+                    return self.reply(HTTPStatus.OK, service.cancel(parts[1]))
                 if parts[2] != "open":
                     raise KeyError(parts[2])
-                return self.reply(HTTPStatus.OK, {"opened": service.open(parts[1])})
+                what = self.body().get("what") or "auto"
+                if not isinstance(what, str):
+                    raise TypeError("what must be a string")
+                return self.reply(
+                    HTTPStatus.OK, {"opened": service.open(parts[1], what)}
+                )
+            if method == "POST" and parts == ["bench"]:
+                body = self.body()
+                models = body.get("models")
+                if not isinstance(models, list) or not all(
+                    isinstance(name, str) for name in models
+                ):
+                    raise TypeError("models must be a list of model names")
+                repeat = body.get("repeat") or 1
+                if not isinstance(repeat, int):
+                    raise TypeError("repeat must be a number")
+                return self.reply(
+                    HTTPStatus.ACCEPTED,
+                    service.submit_bench(str(body.get("url") or ""), models, repeat),
+                )
+            if method == "GET" and parts == ["bench"]:
+                return self.reply(
+                    HTTPStatus.OK, {"rows": read_bench(service.settings())}
+                )
             if method == "GET" and parts == ["config"]:
                 return self.reply(HTTPStatus.OK, service.config())
             if method == "PUT" and parts == ["config"]:

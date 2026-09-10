@@ -540,6 +540,7 @@ def complete_anthropic(
     client = anthropic_client(settings)
     content = [image_part(p, "anthropic") for p in images or []]
     content.append({"type": "text", "text": data})
+    started = time.monotonic()
     try:
         response = client.messages.create(
             model=model_name(settings),
@@ -549,15 +550,18 @@ def complete_anthropic(
             output_config={"format": {"type": "json_schema", "schema": schema}},
         )
     except anthropic.AnthropicError as error:
+        if images and no_vision(error):
+            raise NoVisionError(str(error)) from error
         raise LlmError(f"anthropic: {error}") from error
     usage = response.usage
-    last_cost.update(
-        input=usage.input_tokens
+    record_cost(
+        usage.input_tokens
         + (getattr(usage, "cache_creation_input_tokens", 0) or 0)
         + (getattr(usage, "cache_read_input_tokens", 0) or 0),
-        output=usage.output_tokens,
+        usage.output_tokens,
         # The API does not price the answer; the tokens are what is known.
-        usd=0.0,
+        0.0,
+        time.monotonic() - started,
     )
     text = next((b.text for b in response.content if b.type == "text"), "")
     return loads(text, "anthropic")
@@ -581,6 +585,7 @@ def complete_openai(
     client = openai.OpenAI(api_key=key, base_url=url, timeout=TIMEOUT_SECONDS)
     content: list[dict] = [image_part(p, "openai") for p in images or []]
     content.append({"type": "text", "text": data})
+    started = time.monotonic()
     try:
         response = client.chat.completions.create(
             model=model,
@@ -592,17 +597,21 @@ def complete_openai(
                 "type": "json_schema",
                 "json_schema": {"name": "result", "schema": schema, "strict": True},
             },
+            extra_body=reasoning_hint(settings) or None,
         )
     except openai.OpenAIError as error:
+        if images and no_vision(error):
+            raise NoVisionError(str(error)) from error
         raise LlmError(reachable_message(name, error)) from error
     choice = response.choices[0]
     if getattr(choice.message, "refusal", None):
         raise LlmError(f"{name} refused: {choice.message.refusal}")
     usage = response.usage
-    last_cost.update(
-        input=usage.prompt_tokens if usage else 0,
-        output=usage.completion_tokens if usage else 0,
-        usd=0.0,
+    record_cost(
+        usage.prompt_tokens if usage else 0,
+        usage.completion_tokens if usage else 0,
+        0.0,
+        time.monotonic() - started,
     )
     if not (choice.message.content or "").strip():
         # LM Studio answered with nothing when the prompt was longer than
@@ -613,7 +622,7 @@ def complete_openai(
             f"{name} returned an empty answer (finish_reason "
             f"{choice.finish_reason}, {last_cost['input']} prompt tokens); "
             "a local model needs a context window that holds the prompt "
-            "and its thinking, load it with 32768 tokens or more"
+            f"and its thinking, load it with {MIN_CONTEXT} tokens or more"
         )
     return loads(choice.message.content, name)
 

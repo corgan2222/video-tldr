@@ -11,6 +11,8 @@ from corganshelper_service.config import Settings, store
 from corganshelper_service.serve import Server, Service
 
 URL = "https://youtu.be/x_x_x_x_x_x"
+SECOND_URL = "https://youtu.be/aaaaaaaaaaa"
+THIRD_URL = "https://youtu.be/bbbbbbbbbbb"
 
 
 class Runner:
@@ -22,16 +24,30 @@ class Runner:
         self.calls = 0
         self.fail = None
         self.seen: list[tuple] = []
+        self.configs: list[dict] = []
+        self.written = {"summary": "C:/w/summary.md", "obsidian": "C:/v/n.md"}
 
-    def __call__(self, url, settings, progress=None, force=False, **kwargs):
+    def __call__(
+        self, url, settings, progress=None, force=False, should_stop=None, **kwargs
+    ):
         self.calls += 1
         self.seen.append((settings.config["stt"], settings.config["model"], force))
+        self.configs.append(dict(settings.config))
         if progress:
             progress("fetch")
             progress("fetch", "0.1s, A video, 1 caption tracks")
         self.gate.wait(timeout=5)
         if self.fail:
             raise self.fail
+        if should_stop and should_stop():
+            # What run does when the flag went up between two steps.
+            return {
+                **self.result(url, settings),
+                "error": {"step": "analyze", "message": "cancelled"},
+            }
+        return self.result(url, settings)
+
+    def result(self, url, settings):
         return {
             "id": "x_x_x_x_x_x",
             "url": url,
@@ -45,7 +61,7 @@ class Runner:
             "input": 0,
             "output": 0,
             "usd": 0.0,
-            "written": {"summary": "C:/w/summary.md", "obsidian": "C:/v/n.md"},
+            "written": dict(self.written),
             "error": None,
         }
 
@@ -192,6 +208,158 @@ def test_open_starts_the_note_in_obsidian_first(server, runner, monkeypatch):
     assert started == [answer["opened"]]
 
 
+def test_the_options_of_one_job_beat_the_profile_and_a_wrong_one_is_a_400(
+    server, runner
+):
+    options = {"style": "caveman", "timestamps": "off", "cleanup": "on"}
+
+    code, job = call(server, "POST", "/jobs", {"url": URL, "options": options})
+
+    assert code == 202
+    assert job["options"] == options
+    wait_for(server, job["id"], "done")
+    assert runner.configs[0]["style"] == "caveman"
+    assert runner.configs[0]["timestamps"] == "off"
+    assert runner.configs[0]["cleanup"] == "on"
+    # Left out: the run keeps what config.json says.
+    assert runner.configs[0]["condensed"] == "off"
+
+    body = {"url": URL, "options": {"colour": "blue"}}
+    code, answer = call(server, "POST", "/jobs", body)
+    assert code == 400
+    assert "unknown setting colour" in answer["error"]
+    body = {"url": URL, "options": {"style": "pirate"}}
+    code, answer = call(server, "POST", "/jobs", body)
+    assert code == 400
+    assert "style must be one of" in answer["error"]
+    assert call(server, "POST", "/jobs", {"url": URL, "options": "caveman"})[0] == 400
+
+
+def test_a_waiting_job_says_how_many_are_ahead_of_it(server, runner):
+    runner.gate.clear()
+    first = call(server, "POST", "/jobs", {"url": URL})[1]["id"]
+    wait_for(server, first, "running")
+    second = call(server, "POST", "/jobs", {"url": SECOND_URL})[1]["id"]
+    third = call(server, "POST", "/jobs", {"url": THIRD_URL})[1]["id"]
+
+    assert call(server, "GET", f"/jobs/{first}")[1]["position"] == 0
+    assert call(server, "GET", f"/jobs/{second}")[1]["position"] == 0
+    assert call(server, "GET", f"/jobs/{third}")[1]["position"] == 1
+
+    runner.gate.set()
+    done = wait_for(server, first, "done")
+    assert "position" not in done
+
+
+def test_a_queued_job_leaves_the_queue_when_it_is_cancelled(server, runner):
+    runner.gate.clear()
+    first = call(server, "POST", "/jobs", {"url": URL})[1]["id"]
+    wait_for(server, first, "running")
+    waiting = call(server, "POST", "/jobs", {"url": SECOND_URL})[1]["id"]
+
+    code, job = call(server, "POST", f"/jobs/{waiting}/cancel")
+
+    assert (code, job["status"]) == (200, "cancelled")
+    runner.gate.set()
+    wait_for(server, first, "done")
+    assert runner.calls == 1
+    assert call(server, "GET", f"/jobs/{waiting}")[1]["status"] == "cancelled"
+    # Nothing to cancel, and nothing to cancel any more.
+    assert call(server, "POST", "/jobs/nope/cancel")[0] == 404
+    code, answer = call(server, "POST", f"/jobs/{first}/cancel")
+    assert code == 409
+    assert "is done" in answer["error"]
+
+
+def test_a_running_job_stops_between_two_steps(server, runner):
+    runner.gate.clear()
+    _, job = call(server, "POST", "/jobs", {"url": URL})
+    wait_for(server, job["id"], "running")
+
+    code, answer = call(server, "POST", f"/jobs/{job['id']}/cancel")
+    assert (code, answer["status"]) == (200, "running")
+    runner.gate.set()
+
+    job = wait_for(server, job["id"], "cancelled")
+    assert job["error"] == {"step": "analyze", "message": "cancelled"}
+
+
+def test_open_takes_the_note_the_folder_or_what_there_is(
+    server, runner, monkeypatch, tmp_path
+):
+    started = []
+    monkeypatch.setattr(module, "start", started.append)
+    _, job = call(server, "POST", "/jobs", {"url": URL})
+    wait_for(server, job["id"], "done")
+
+    code, answer = call(server, "POST", f"/jobs/{job['id']}/open", {"what": "obsidian"})
+    assert (code, answer["opened"]) == (200, "obsidian://open?path=C%3A/v/n.md")
+
+    code, answer = call(server, "POST", f"/jobs/{job['id']}/open", {"what": "folder"})
+    assert code == 200
+    assert answer["opened"] == str(Settings.load(tmp_path).out_dir)
+    assert started[-1] == answer["opened"]
+
+    assert call(server, "POST", f"/jobs/{job['id']}/open", {"what": "email"})[0] == 400
+
+
+def test_open_obsidian_says_so_when_the_job_wrote_no_note(server, runner, monkeypatch):
+    monkeypatch.setattr(module, "start", lambda target: None)
+    runner.written = {"summary": "C:/w/summary.md"}
+    _, job = call(server, "POST", "/jobs", {"url": URL})
+    wait_for(server, job["id"], "done")
+
+    code, answer = call(server, "POST", f"/jobs/{job['id']}/open", {"what": "obsidian"})
+
+    assert code == 409
+    assert "wrote no obsidian" in answer["error"]
+    # Without a wish the summary is opened instead.
+    assert call(server, "POST", f"/jobs/{job['id']}/open")[0] == 200
+
+
+def test_a_bench_runs_through_the_same_queue_and_keeps_its_rows(
+    server, monkeypatch, tmp_path
+):
+    rows = [{"model": "qwen", "run": 1, "seconds": 12.0, "output": 40}]
+    seen = []
+
+    def fake_bench(url, settings, models, repeat, progress=None):
+        seen.append((url, models, repeat))
+        if progress:
+            progress("bench qwen 1")
+        return rows
+
+    monkeypatch.setattr(module, "bench", fake_bench)
+
+    code, job = call(
+        server, "POST", "/bench", {"url": URL, "models": ["qwen"], "repeat": 2}
+    )
+
+    assert code == 202
+    assert (job["id"], job["kind"], job["status"]) == (
+        "bench:x_x_x_x_x_x",
+        "bench",
+        "queued",
+    )
+    job = wait_for(server, job["id"], "done")
+    assert job["bench"] == rows
+    assert seen == [(URL, ["qwen"], 2)]
+    assert call(server, "POST", "/bench", {"url": URL, "models": []})[0] == 400
+    assert call(server, "POST", "/bench", {"url": URL, "models": "qwen"})[0] == 400
+    assert call(server, "POST", "/bench", {"url": "https://example.org"})[0] == 400
+
+
+def test_bench_hands_back_every_row_measured_so_far(server, tmp_path):
+    assert call(server, "GET", "/bench")[1] == {"rows": []}
+    (tmp_path / "bench.json").write_text(
+        json.dumps([{"model": "qwen", "run": 1}]), "utf-8"
+    )
+
+    code, answer = call(server, "GET", "/bench")
+
+    assert (code, answer) == (200, {"rows": [{"model": "qwen", "run": 1}]})
+
+
 def test_a_bad_url_and_an_unknown_job_are_errors_with_a_reason(server):
     code, answer = call(server, "POST", "/jobs", {"url": "https://example.org"})
     assert code == 400
@@ -319,12 +487,18 @@ def test_the_log_names_every_request_and_what_a_job_did(server, runner, tmp_path
     assert any("RuntimeError: boom" in line for line in answer["lines"])
 
 
-def test_health_shows_three_lights_and_config_the_defaults(server, monkeypatch):
+def test_health_shows_four_lights_and_config_the_defaults(server, monkeypatch):
     monkeypatch.setattr(
         module.llm, "status", lambda settings: {"ok": True, "detail": "claude CLI"}
     )
     monkeypatch.setattr(
         module, "stt_status", lambda settings: {"ok": False, "detail": "no GPU"}
+    )
+    monkeypatch.setattr(
+        module.llm,
+        "capabilities",
+        lambda settings: {"vision": True, "context": 200000, "detail": "sonnet"},
+        raising=False,
     )
 
     code, answer = call(server, "GET", "/health")
@@ -334,9 +508,25 @@ def test_health_shows_three_lights_and_config_the_defaults(server, monkeypatch):
     assert "video-tldr service" in answer["service"]["detail"]
     assert answer["llm"] == {"ok": True, "detail": "claude CLI"}
     assert answer["stt"] == {"ok": False, "detail": "no GPU"}
+    assert answer["capabilities"]["vision"] is True
     _, config = call(server, "GET", "/config")
     assert config["default_models"]["claude"] == "sonnet"
     assert isinstance(config["browser_found"], str)
+
+
+def test_health_says_not_checked_while_the_backend_cannot_tell(server, monkeypatch):
+    # `capabilities` is younger than the rest of llm; a service that runs
+    # against an older module must still answer the popup.
+    monkeypatch.delattr(module.llm, "capabilities", raising=False)
+
+    code, answer = call(server, "GET", "/health")
+
+    assert code == 200
+    assert answer["capabilities"] == {
+        "vision": None,
+        "context": None,
+        "detail": "not checked",
+    }
 
 
 def test_pick_opens_a_dialog_on_this_desktop_and_returns_the_path(server, monkeypatch):
