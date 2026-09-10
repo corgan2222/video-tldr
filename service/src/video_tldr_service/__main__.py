@@ -28,7 +28,7 @@ from .frames import frames
 from .llm import LlmError
 from .render import render
 from .run import bench, bench_table, header, row, run, urls_in
-from .serve import PORT, serve
+from .serve import PORT, serve, stop
 from .transcribe import transcribe
 
 # What `--help` and every error message call the command.
@@ -167,6 +167,10 @@ def build_parser() -> argparse.ArgumentParser:
         "serve", help="listen on 127.0.0.1 for the extension until Ctrl+C"
     )
     serve_cmd.add_argument("--port", type=int, default=PORT, help=f"default {PORT}")
+    stop_cmd = commands.add_parser(
+        "stop", help="ask a running service to end, so an update can replace it"
+    )
+    stop_cmd.add_argument("--port", type=int, default=PORT, help=f"default {PORT}")
     return parser
 
 
@@ -201,6 +205,12 @@ def main(argv: list[str] | None = None) -> int:
         except OSError as error:
             print(f"serve failed: {error}", file=sys.stderr)
             return 1
+
+    if args.command == "stop":
+        # Zero either way: an installer runs this before every update, and
+        # a machine without a running service is the ordinary case.
+        print(stop(settings.config["token"], args.port))
+        return 0
 
     if args.command == "run":
         urls = urls_in(args.batch) if args.batch else [args.url]

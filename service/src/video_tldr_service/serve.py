@@ -25,6 +25,8 @@ The contract, every answer JSON:
                                     this desktop, empty when cancelled
     POST /restart                   200 {"restarting": true}, then this
                                     process hands the port to a fresh one
+    POST /shutdown                  200 {"stopping": true}, then this
+                                    process ends and frees the port
 
 A job carries `id` (the video id), `url`, `profile`, `options` (what the
 popup set for this run), `status` (queued, running, done, error,
@@ -63,7 +65,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from urllib.error import URLError
 from urllib.parse import parse_qs, quote
+from urllib.request import Request, urlopen
 
 from . import __version__, llm
 from .config import (
@@ -95,6 +99,9 @@ LOG_LINES = 50
 LOG_LINES_MAX = 500
 # Long enough for the answer to reach the page before the socket closes.
 RESTART_DELAY_SECONDS = 0.4
+# The answer comes before the shutdown, so this waits for a reply, not for
+# the process to be gone.
+STOP_TIMEOUT_SECONDS = 5
 EXTENSION_ORIGINS = ("moz-extension://", "chrome-extension://")
 # What `open` starts, the first that the job wrote.
 OPEN_ORDER = ["obsidian", "pdf", "docx", "md", "summary"]
@@ -537,6 +544,9 @@ def relaunch(home: Path | None, port: int, overrides: dict) -> None:
     )
 
 
+Relauncher = Callable[[Path | None, int, dict], None]
+
+
 class Server(ThreadingHTTPServer):
     # HTTPServer sets SO_REUSEADDR, and on Windows that lets a second
     # `serve` bind a port that is already listening: it prints a token
@@ -547,7 +557,7 @@ class Server(ThreadingHTTPServer):
         self,
         service: Service,
         port: int = PORT,
-        relauncher: Callable[[Path | None, int, dict], None] = relaunch,
+        relauncher: Relauncher = relaunch,
     ) -> None:
         super().__init__(("127.0.0.1", port), Handler)
         self.service = service
@@ -558,17 +568,25 @@ class Server(ThreadingHTTPServer):
         process is what it takes: a CUDA start that failed once stays
         failed for the life of this one, and the DLL search path only
         grows (2026-09-10)."""
+        self.end(self.relauncher)
 
+    def stop(self) -> None:
+        """Answer first, then end. An update cannot replace the installed
+        script while Windows holds it open, so it asks for this first."""
+        self.end(None)
+
+    def end(self, relauncher: Relauncher | None) -> None:
         def swap() -> None:
             time.sleep(RESTART_DELAY_SECONDS)  # let the answer reach the page
             self.shutdown()
             self.server_close()
-            self.relauncher(
-                self.service.home, self.server_address[1], self.service.overrides
-            )
+            if relauncher:
+                relauncher(
+                    self.service.home, self.server_address[1], self.service.overrides
+                )
             os._exit(0)
 
-        threading.Thread(target=swap, daemon=True, name="restart").start()
+        threading.Thread(target=swap, daemon=True, name="end").start()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -699,6 +717,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply(HTTPStatus.OK, {"restarting": True})
                 service.log.info("restart asked for")
                 return self.server.restart()
+            if method == "POST" and parts == ["shutdown"]:
+                self.reply(HTTPStatus.OK, {"stopping": True})
+                service.log.info("shutdown asked for")
+                return self.server.stop()
             if method == "POST" and parts == ["pick"]:
                 body = self.body()
                 kind = body.get("kind")
@@ -725,6 +747,28 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+
+def stop(token: str, port: int = PORT) -> str:
+    """Ask a running service to end, and say what happened. An installer
+    calls this before it replaces the script: Windows will not let it be
+    overwritten while the process that runs it is alive."""
+    request = Request(
+        f"http://127.0.0.1:{port}/shutdown",
+        data=b"{}",
+        method="POST",
+        headers={"Host": f"127.0.0.1:{port}", "Content-Type": "application/json"},
+    )
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urlopen(request, timeout=STOP_TIMEOUT_SECONDS) as answer:
+            answer.read()
+    except URLError as error:
+        # Nothing listening is the normal case for an installer on a fresh
+        # machine, and for a second `stop`. Not an error to report.
+        return f"no service on port {port} ({error.reason})"
+    return f"service on port {port} is stopping"
 
 
 def serve(home: Path | None, overrides: dict | None = None, port: int = PORT) -> int:
