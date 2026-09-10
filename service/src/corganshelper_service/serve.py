@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import logging
 import os
 import queue
 import secrets
@@ -40,6 +41,7 @@ from collections.abc import Callable
 from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from urllib.parse import parse_qs, quote
 
@@ -61,6 +63,11 @@ from .llm import LlmError
 from .run import run
 
 PORT = 8765
+# Every request, every job step and every traceback, next to the data:
+# the console scrolls away, this stays. Three files of a megabyte each.
+LOG_NAME = "serve.log"
+LOG_BYTES = 1_000_000
+LOG_FILES = 3
 EXTENSION_ORIGINS = ("moz-extension://", "chrome-extension://")
 # What `open` starts, the first that the job wrote.
 OPEN_ORDER = ["obsidian", "pdf", "docx", "md", "summary"]
@@ -96,11 +103,29 @@ class Service:
         self.lock = threading.Lock()
         self.queue: queue.Queue[str] = queue.Queue()
         self.token = self.ensure_token()
+        self.log_path = self.settings().home / LOG_NAME
+        self.log = self.open_log()
         threading.Thread(target=self.work, daemon=True, name="jobs").start()
 
     def settings(self) -> Settings:
         # Loaded per use, not once: PUT /config changes the file underneath.
         return Settings.load(self.home, self.overrides)
+
+    def open_log(self) -> logging.Logger:
+        log = logging.getLogger(f"corganshelper.serve.{id(self)}")
+        log.setLevel(logging.INFO)
+        log.propagate = False
+        log.handlers.clear()
+        line = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+        to_file = RotatingFileHandler(
+            self.log_path, maxBytes=LOG_BYTES, backupCount=LOG_FILES, encoding="utf-8"
+        )
+        to_file.setFormatter(line)
+        to_console = logging.StreamHandler(sys.stderr)
+        to_console.setFormatter(line)
+        log.addHandler(to_file)
+        log.addHandler(to_console)
+        return log
 
     def ensure_token(self) -> str:
         token = self.settings().config["token"]
@@ -123,6 +148,7 @@ class Service:
             # the options page to label the choice with.
             "stt_models": STT_MODELS,
             "home": str(settings.home),
+            "log": str(self.log_path),
             "version": __version__,
         }
 
@@ -173,20 +199,26 @@ class Service:
         with self.lock:
             self.jobs[vid].update(fields)
 
+    def step(self, vid: str, name: str) -> None:
+        self.log.info("job %s: %s", vid, name)
+        self.update(vid, step=name)
+
     def work(self) -> None:
         while True:
             vid = self.queue.get()
             url = self.job(vid)["url"]
+            self.log.info("job %s: running, %s", vid, url)
             self.update(vid, status="running", started=now())
             try:
                 result = self.runner(
                     url,
                     self.settings(),
-                    progress=lambda step, vid=vid: self.update(vid, step=step),
+                    progress=lambda step, vid=vid: self.step(vid, step),
                 )
             # Blind on purpose: a bug in a step must not leave the job on
             # "running" for the extension to poll forever.
-            except Exception as error:  # noqa: BLE001
+            except Exception as error:
+                self.log.exception("job %s: crashed in %s", vid, self.job(vid)["step"])
                 self.update(
                     vid,
                     status="error",
@@ -198,6 +230,20 @@ class Service:
                 )
                 continue
             status = "error" if result["error"] else "done"
+            if result["error"]:
+                self.log.error(
+                    "job %s: %s failed: %s",
+                    vid,
+                    result["error"]["step"],
+                    result["error"]["message"],
+                )
+            else:
+                self.log.info(
+                    "job %s: done in %ss, wrote %s",
+                    vid,
+                    result["seconds"],
+                    ", ".join(result["written"]),
+                )
             self.update(vid, **result, status=status, finished=now())
 
     def open(self, vid: str) -> str:
@@ -242,6 +288,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_PUT(self) -> None:
         self.route("PUT")
+
+    def log_message(self, format: str, *args: object) -> None:
+        # http.server's own line ("GET /config HTTP/1.1" 200), into the file
+        # too; the signature is the base class's.
+        self.server.service.log.info(format, *args)
 
     def guard(self) -> str | None:
         """Why this request is turned away, or None."""
@@ -332,13 +383,14 @@ def serve(home: Path | None, overrides: dict | None = None, port: int = PORT) ->
     # lines would otherwise sit in the buffer until the service stops.
     print(
         f"corganshelper {__version__} listening on http://127.0.0.1:{port}, "
-        f"data under {service.settings().home}",
+        f"data under {service.settings().home}, log in {service.log_path}",
         flush=True,
     )
     print(
         f"token: {service.token}  (paste it into the extension's options)",
         flush=True,
     )
+    service.log.info("corganshelper %s listening on port %s", __version__, port)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

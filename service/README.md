@@ -72,6 +72,12 @@ header of `127.0.0.1:<port>`; an `Origin` header is accepted only from
 headers, so a web page cannot reach it. The token lives in `config.json`
 as `token`; delete it there to have `serve` make a new one.
 
+What the service did is in `serve.log` next to the data (three files of
+a megabyte, the newest without a number): every request with its status,
+every job with its steps, every failure with its traceback. The
+extension's side is in the console of its background script:
+`about:debugging`, This Firefox, Inspect next to corganshelper.
+
 ## Choosing the model
 
 `corganshelper config` shows the settings, `corganshelper config --set

@@ -1,7 +1,9 @@
 import { api } from './api.js';
 import { DEFAULT_BLOCKLIST } from './links.js';
 import {
+  DEFAULT_CHOICES,
   DEFAULT_CONNECTION,
+  DEFAULT_SETTINGS,
   request,
   type Config,
   type Connection,
@@ -19,7 +21,6 @@ const status = pick<HTMLElement>('#status');
 const serviceUrlBox = pick<HTMLInputElement>('#service-url');
 const tokenBox = pick<HTMLInputElement>('#token');
 const serviceStatus = pick<HTMLElement>('#service-status');
-const serviceSettings = pick<HTMLFieldSetElement>('#service-settings');
 const formatsBox = pick<HTMLElement>('#formats');
 const modelList = pick<HTMLDataListElement>('#models');
 const modelHint = pick<HTMLElement>('#model-hint');
@@ -41,6 +42,9 @@ const FIELDS: Record<string, string> = {
   ollama_url: '#ollama-url',
   stt: '#stt',
 };
+
+// True once GET /config answered; only then does Save reach the service.
+let connected = false;
 
 function field(key: string): HTMLInputElement | HTMLSelectElement {
   return pick<HTMLInputElement | HTMLSelectElement>(FIELDS[key]);
@@ -69,8 +73,8 @@ function fillSelect(
 
 // The choice between fast and accurate, as `corganshelper models stt`
 // prints it: speed class, leaderboard word error rate, languages.
-function sttLabel(config: Config, name: string): string {
-  const spec = config.stt_models[name];
+function sttLabel(config: Config | undefined, name: string): string {
+  const spec = config?.stt_models[name];
   if (!spec) {
     if (name === 'auto') return 'auto (caption track when there is one)';
     if (name === 'subtitles') return 'subtitles (caption track only)';
@@ -90,10 +94,43 @@ function checkbox(name: string, checked: boolean): HTMLLabelElement {
   return label;
 }
 
+// Fill the fields from the service's answer, or from the copy of its
+// defaults when there is none yet.
+function show(config?: Config): void {
+  const settings = config?.settings ?? DEFAULT_SETTINGS;
+  const choices = config?.choices ?? DEFAULT_CHOICES;
+  for (const key of Object.keys(FIELDS)) {
+    const element = field(key);
+    const value = settings[key] ?? '';
+    if (element instanceof HTMLSelectElement) {
+      fillSelect(
+        element,
+        choices[key] ?? [],
+        value,
+        key === 'stt' ? (c) => sttLabel(config, c) : undefined,
+      );
+    } else {
+      // Without a connection the placeholder shows the default; a value
+      // typed here goes nowhere until Connect, and Save says so.
+      element.value = config ? value : '';
+    }
+  }
+  const chosen = new Set(
+    (settings.formats ?? '').split(',').map((f) => f.trim()),
+  );
+  formatsBox.replaceChildren(
+    ...(choices.formats ?? []).map((f) => checkbox(f, chosen.has(f))),
+  );
+}
+
 // What the chosen backend accepts as `model`, for the field's list; a
 // backend that needs a key or a running server says so in the hint.
 async function loadModels(): Promise<void> {
   const backend = field('llm').value;
+  if (!connected) {
+    modelHint.textContent = 'Connect to list the models of this backend.';
+    return;
+  }
   try {
     const { models } = await request<{ models: string[] }>(
       connection(),
@@ -111,33 +148,15 @@ async function loadModels(): Promise<void> {
 async function loadService(): Promise<void> {
   try {
     const config = await request<Config>(connection(), 'GET', '/config');
-    for (const key of Object.keys(FIELDS)) {
-      const element = field(key);
-      const value = config.settings[key] ?? '';
-      if (element instanceof HTMLSelectElement) {
-        fillSelect(
-          element,
-          config.choices[key] ?? [],
-          value,
-          key === 'stt' ? (c) => sttLabel(config, c) : undefined,
-        );
-      } else {
-        element.value = value;
-      }
-    }
-    const chosen = new Set(
-      (config.settings.formats ?? '').split(',').map((f) => f.trim()),
-    );
-    formatsBox.replaceChildren(
-      ...(config.choices.formats ?? []).map((f) => checkbox(f, chosen.has(f))),
-    );
-    serviceStatus.textContent = `Connected to corganshelper ${config.version}, data under ${config.home}.`;
-    serviceSettings.disabled = false;
-    await loadModels();
+    connected = true;
+    show(config);
+    serviceStatus.textContent = `Connected to corganshelper ${config.version}, data under ${config.home}, log in ${config.log}.`;
   } catch (error) {
-    serviceStatus.textContent = message(error);
-    serviceSettings.disabled = true;
+    connected = false;
+    show();
+    serviceStatus.textContent = `Not connected: ${message(error)}`;
   }
+  await loadModels();
 }
 
 // Every field goes back as it stands. A key the service showed as stars
@@ -157,7 +176,7 @@ function say(text: string): void {
   status.textContent = text;
   setTimeout(() => {
     status.textContent = '';
-  }, 4000);
+  }, 6000);
 }
 
 async function load(): Promise<void> {
@@ -172,7 +191,14 @@ async function load(): Promise<void> {
   seenCount.textContent = `${seen.length} links`;
   serviceUrlBox.value = stored.serviceUrl as string;
   tokenBox.value = stored.token as string;
-  if (tokenBox.value) await loadService();
+  if (tokenBox.value) {
+    await loadService();
+  } else {
+    show();
+    serviceStatus.textContent =
+      'Not connected: paste the token from `corganshelper serve` and press Connect.';
+    await loadModels();
+  }
 }
 
 pick('#connect').addEventListener('click', async () => {
@@ -190,13 +216,17 @@ pick('#save').addEventListener('click', async () => {
     .map((line) => line.trim().toLowerCase())
     .filter((line) => line.length > 0);
   await api.storage.local.set({ blocklist, ...connection() });
-  if (!serviceSettings.disabled) {
-    try {
-      await saveService();
-    } catch (error) {
-      say(message(error));
-      return;
-    }
+  if (!connected) {
+    say(
+      'Saved the blocklist and the connection; press Connect to save the rest.',
+    );
+    return;
+  }
+  try {
+    await saveService();
+  } catch (error) {
+    say(message(error));
+    return;
   }
   say('Saved.');
 });

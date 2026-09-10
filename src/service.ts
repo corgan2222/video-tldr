@@ -28,6 +28,37 @@ export interface Job {
   written?: Record<string, string>;
 }
 
+// What the options page shows before the service has answered: the
+// choices and defaults of the service's config.py, mirrored here so the
+// page makes sense without a connection. tests/choices.test.ts compares
+// them with config.py; the service's own answer replaces them once it
+// is connected.
+export const DEFAULT_CHOICES: Record<string, string[]> = {
+  llm: ['claude', 'anthropic', 'openai', 'lmstudio', 'ollama'],
+  stt: [
+    'auto',
+    'subtitles',
+    'whisper',
+    'whisper-large',
+    'parakeet',
+    'canary',
+    'openai',
+  ],
+  formats: ['md', 'obsidian', 'pdf', 'docx'],
+  language: ['de', 'en'],
+};
+
+export const DEFAULT_SETTINGS: Record<string, string> = {
+  llm: 'claude',
+  model: '',
+  stt: 'auto',
+  language: 'de',
+  formats: 'md',
+  obsidian_folder: 'Videos',
+  lmstudio_url: 'http://localhost:1234/v1',
+  ollama_url: 'http://localhost:11434/v1',
+};
+
 export interface SttModel {
   engine: string;
   model: string;
@@ -41,6 +72,7 @@ export interface Config {
   choices: Record<string, string[]>;
   stt_models: Record<string, SttModel>;
   home: string;
+  log: string;
   version: string;
 }
 

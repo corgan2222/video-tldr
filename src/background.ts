@@ -9,6 +9,10 @@
 // the manifest), because tsc emits modules. Firefox does that since 112 and
 // reads `data_collection_permissions` since 140 (Android: 142), which is
 // where the manifest pins `strict_min_version`.
+//
+// What happens goes to the console of this worker: about:debugging, This
+// Firefox, Inspect next to corganshelper (chrome://extensions, service
+// worker link, in Chrome).
 import { api } from './api.js';
 import { DEFAULT_BLOCKLIST, planOpen, type Selection } from './links.js';
 import {
@@ -23,6 +27,7 @@ import {
 } from './service.js';
 
 const MENU_ID = 'open-all-links';
+const SETTINGS_MENU_ID = 'settings';
 const POLL_ALARM = 'poll-job';
 // Chrome's floor for a repeating alarm; a job takes minutes anyway.
 const POLL_MINUTES = 0.5;
@@ -32,6 +37,13 @@ api.runtime.onInstalled.addListener(() => {
     id: MENU_ID,
     title: 'Open all links',
     contexts: ['selection'],
+  });
+  // A right click on the toolbar icon, for the day the token is set and
+  // the left click goes straight to the service.
+  api.contextMenus.create({
+    id: SETTINGS_MENU_ID,
+    title: 'Settings',
+    contexts: ['action'],
   });
 });
 
@@ -71,10 +83,16 @@ api.action.onClicked.addListener(async (tab) => {
     await showBadge(failureBadge('no permission to reach 127.0.0.1'));
     return;
   }
+  const to = await connection();
+  if (!to.token) {
+    // Nothing to talk to yet: the click is the way to the settings.
+    console.info('corganshelper: no token stored, opening the options');
+    await api.runtime.openOptionsPage();
+    return;
+  }
   try {
-    const job = await request<Job>(await connection(), 'POST', '/jobs', {
-      url: tab.url,
-    });
+    const job = await request<Job>(to, 'POST', '/jobs', { url: tab.url });
+    console.info('corganshelper: job', job.id, job.status, tab.url);
     const jobs = await trackedJobs();
     await api.storage.local.set({
       jobs: [...jobs.filter((id) => id !== job.id), job.id],
@@ -82,8 +100,13 @@ api.action.onClicked.addListener(async (tab) => {
     await showBadge(badgeFor(job));
     await api.alarms.create(POLL_ALARM, { periodInMinutes: POLL_MINUTES });
   } catch (error) {
+    console.warn('corganshelper: POST /jobs failed:', message(error));
     await showBadge(failureBadge(message(error)));
   }
+});
+
+api.contextMenus.onClicked.addListener((info) => {
+  if (info.menuItemId === SETTINGS_MENU_ID) void api.runtime.openOptionsPage();
 });
 
 async function notify(job: Job): Promise<void> {
@@ -119,9 +142,11 @@ async function poll(): Promise<void> {
     try {
       job = await request<Job>(to, 'GET', `/jobs/${id}`);
     } catch (error) {
+      console.warn('corganshelper: GET /jobs failed:', id, message(error));
       badge = failureBadge(message(error));
       continue;
     }
+    console.info('corganshelper: job', job.id, job.status, job.step);
     if (job.status === 'done' || job.status === 'error') {
       await notify(job);
       badge ??= badgeFor(job);
@@ -149,6 +174,7 @@ api.notifications.onClicked.addListener(async (id) => {
   try {
     await request(await connection(), 'POST', `/jobs/${jobId}/open`);
   } catch (error) {
+    console.warn('corganshelper: open failed:', jobId, message(error));
     await showBadge(failureBadge(message(error)));
   }
 });

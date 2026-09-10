@@ -4,17 +4,24 @@
     <meta charset="utf-8" />
     <title>corganshelper options</title>
     <style>
+      /* The browser's own scheme: about:addons embeds this page, and a
+         white box inside a dark browser is what the owner saw first. */
+      :root {
+        color-scheme: light dark;
+      }
       body {
         font: 13px sans-serif;
         margin: 0;
         padding: 12px;
         min-width: 420px;
+        background: Canvas;
+        color: CanvasText;
       }
       h2 {
         font-size: 14px;
         margin: 18px 0 4px;
         padding-bottom: 2px;
-        border-bottom: 1px solid #ccc;
+        border-bottom: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
       }
       h3 {
         font-size: 13px;
@@ -24,9 +31,6 @@
         border: 0;
         padding: 0;
         margin: 0;
-      }
-      fieldset:disabled {
-        opacity: 0.5;
       }
       label {
         display: block;
@@ -54,7 +58,7 @@
         margin-right: 12px;
       }
       .note {
-        color: #555;
+        opacity: 0.75;
       }
     </style>
   </head>
@@ -63,55 +67,93 @@
     <p class="note">
       The toolbar icon hands the active YouTube tab to the local service,
       <code>corganshelper serve</code>, which prints its token when it starts.
-      The settings below live in the service's <code>config.json</code>.
+      The settings below live in the service's <code>config.json</code>; grey
+      text shows the default.
     </p>
     <label for="service-url">Service URL</label>
     <input id="service-url" type="url" placeholder="http://127.0.0.1:8765" />
     <label for="token">Token</label>
-    <input id="token" type="password" autocomplete="off" />
+    <input
+      id="token"
+      type="password"
+      autocomplete="off"
+      placeholder="printed by corganshelper serve"
+    />
     <div class="row">
       <button id="connect">Connect</button>
       <span id="service-status" class="note">Not connected.</span>
     </div>
 
-    <fieldset id="service-settings" disabled>
+    <fieldset id="service-settings">
       <h3>Note</h3>
       <label for="language">Language of the note</label>
       <select id="language"></select>
       <label>Outputs besides the summary (none chosen falls back to md)</label>
       <div id="formats"></div>
       <label for="obsidian-vault">Obsidian vault (path)</label>
-      <input id="obsidian-vault" type="text" />
+      <input
+        id="obsidian-vault"
+        type="text"
+        placeholder="D:\Vaults\Notes; empty means no Obsidian note"
+      />
       <label for="obsidian-folder">Folder in the vault for the notes</label>
-      <input id="obsidian-folder" type="text" />
-      <label for="browser"
-        >Chrome or Edge for the PDF (path, empty searches)</label
-      >
-      <input id="browser" type="text" />
+      <input id="obsidian-folder" type="text" placeholder="Videos" />
+      <label for="browser">Chrome or Edge for the PDF</label>
+      <input
+        id="browser"
+        type="text"
+        placeholder="path to chrome.exe; empty searches the usual places"
+      />
 
       <h3>Language model</h3>
       <label for="llm">Backend</label>
       <select id="llm"></select>
-      <label for="model">Model (empty means the backend's default)</label>
-      <input id="model" type="text" list="models" autocomplete="off" />
+      <label for="model">Model</label>
+      <input
+        id="model"
+        type="text"
+        list="models"
+        autocomplete="off"
+        placeholder="empty means the backend's default"
+      />
       <datalist id="models"></datalist>
       <span id="model-hint" class="note"></span>
       <label for="anthropic-api-key">Anthropic API key</label>
-      <input id="anthropic-api-key" type="password" autocomplete="off" />
+      <input
+        id="anthropic-api-key"
+        type="password"
+        autocomplete="off"
+        placeholder="only for the anthropic backend"
+      />
       <label for="openai-api-key">OpenAI API key</label>
-      <input id="openai-api-key" type="password" autocomplete="off" />
+      <input
+        id="openai-api-key"
+        type="password"
+        autocomplete="off"
+        placeholder="only for the openai backend, or openai speech to text"
+      />
       <p class="note">
         Stars stand for a stored key; leave them to keep it, clear the field to
         remove it.
       </p>
-      <label for="openai-base-url"
-        >OpenAI base URL (empty for api.openai.com)</label
-      >
-      <input id="openai-base-url" type="text" />
+      <label for="openai-base-url">OpenAI base URL</label>
+      <input
+        id="openai-base-url"
+        type="text"
+        placeholder="empty for api.openai.com"
+      />
       <label for="lmstudio-url">LM Studio URL</label>
-      <input id="lmstudio-url" type="text" />
+      <input
+        id="lmstudio-url"
+        type="text"
+        placeholder="http://localhost:1234/v1"
+      />
       <label for="ollama-url">Ollama URL</label>
-      <input id="ollama-url" type="text" />
+      <input
+        id="ollama-url"
+        type="text"
+        placeholder="http://localhost:11434/v1"
+      />
 
       <h3>Speech to text</h3>
       <label for="stt"

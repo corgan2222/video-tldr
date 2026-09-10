@@ -253,3 +253,20 @@ def test_models_lists_what_a_backend_offers_and_says_why_not(server, monkeypatch
     # The options page labels the transcribers with this table.
     _, config = call(server, "GET", "/config")
     assert config["stt_models"]["parakeet"]["speed"] == "fast"
+
+
+def test_the_log_file_names_every_request_and_what_a_job_did(server, runner, tmp_path):
+    _, config = call(server, "GET", "/config")
+    assert config["log"] == str(tmp_path.resolve() / "serve.log")
+    _, job = call(server, "POST", "/jobs", {"url": URL})
+    wait_for(server, job["id"], "done")
+    runner.fail = RuntimeError("boom")
+    _, job = call(server, "POST", "/jobs", {"url": URL})
+    wait_for(server, job["id"], "error")
+
+    log = (tmp_path / "serve.log").read_text(encoding="utf-8")
+
+    assert '"GET /config HTTP/1.1" 200' in log
+    assert "job x_x_x_x_x_x: fetch" in log
+    assert "job x_x_x_x_x_x: done in 0.1s, wrote summary, obsidian" in log
+    assert "crashed in fetch" in log and "RuntimeError: boom" in log
