@@ -146,6 +146,33 @@
   "grantAccess": {
     "message": "Allow access"
   },
+  "welcomeIntro": {
+    "message": "One half is installed. The other is a small service that runs on this machine and does the work — fetching the video, transcribing it, asking a language model. Pick whichever way suits you; they end up at the same program."
+  },
+  "welcomeWingetTitle": {
+    "message": "With winget"
+  },
+  "welcomeWingetHelp": {
+    "message": "Windows brings the package manager, so this needs nothing else — from the first release on, once the package is in the winget repository."
+  },
+  "welcomeScriptTitle": {
+    "message": "With the install script"
+  },
+  "welcomeScriptHelp": {
+    "message": "Picks the CUDA libraries when the machine has an NVIDIA card, and the smaller ONNX runtime when it has none. Read it first if you would rather see what a script does before running it."
+  },
+  "welcomeUvTitle": {
+    "message": "With uv, if you already have it"
+  },
+  "welcomeUvHelp": {
+    "message": "The shortest way for anyone with uv on the machine already."
+  },
+  "welcomeThen": {
+    "message": "Afterwards, `video-tldr serve` starts the service, and `video-tldr autostart on` has it start at every logon instead. Then open a YouTube video and click the toolbar icon."
+  },
+  "welcomeSettings": {
+    "message": "Open the settings"
+  },
   "noServiceCommand": {
     "message": "video-tldr serve"
   },
