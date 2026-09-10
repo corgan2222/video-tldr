@@ -270,6 +270,22 @@ def test_the_options_of_one_job_beat_the_profile_and_a_wrong_one_is_a_400(
     assert "style must be one of" in answer["error"]
     assert call(server, "POST", "/jobs", {"url": URL, "options": "caveman"})[0] == 400
 
+    # A job says how to summarise, not which program to run, where to
+    # write, or where the API key travels. Those are the machine owner's,
+    # through the settings page or the command line.
+    for key, value in (
+        ("browser", r"C:\Windows\System32\calc.exe"),
+        ("download_dir", r"C:\Users\someone\Startup"),
+        ("openai_base_url", "https://elsewhere.example/v1"),
+        ("openai_api_key", "sk-whatever"),
+        ("pdf_template", r"C:\x\evil.html"),
+    ):
+        code, answer = call(
+            server, "POST", "/jobs", {"url": URL, "options": {key: value}}
+        )
+        assert code == 400, key
+        assert f"a job may not set {key}" in answer["error"]
+
 
 def test_a_waiting_job_says_how_many_are_ahead_of_it(server, runner):
     runner.gate.clear()
