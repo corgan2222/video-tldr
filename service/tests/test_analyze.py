@@ -149,7 +149,12 @@ def test_a_style_and_condensed_reach_the_prompt_and_the_result(tmp_path, monkeyp
     monkeypatch.setattr(llm, "complete", fake)
     result = analyze("https://youtu.be/Zvc5QkrWgAU", settings)
 
-    assert STYLE_INSTRUCTIONS["caveman"] in prompts[0]
+    # The voice leads the prompt and stands again at its end, and it
+    # writes the lengths of the fields rather than trailing behind them.
+    assert prompts[0].startswith(STYLE_INSTRUCTIONS["caveman"]["voice"])
+    assert prompts[0].rstrip().endswith(STYLE_INSTRUCTIONS["caveman"]["voice"])
+    assert STYLE_INSTRUCTIONS["caveman"]["section"] in prompts[0]
+    assert "two- to four-sentence" not in prompts[0]
     assert "two-minute read" in prompts[0] and "under 120 words" in prompts[0]
     assert result["style"] == "caveman" and result["condensed"] is True
     # One wording, one file, and it keeps the name every other step reads.
@@ -168,7 +173,10 @@ def test_the_plain_wording_adds_nothing_to_the_prompt(tmp_path, monkeypatch):
     monkeypatch.setattr(llm, "complete", fake)
     result = analyze("https://youtu.be/Zvc5QkrWgAU", settings)
 
+    # No wording, so nothing leads or follows the plain instruction.
     assert prompts[0].endswith("with its role.")
+    assert prompts[0].startswith("You summarise")
+    assert "two- to four-sentence summary" in prompts[0]
     assert result["style"] == "normal" and result["condensed"] is False
 
 
@@ -186,7 +194,7 @@ def test_style_all_writes_one_note_per_wording_and_one_bill(tmp_path, monkeypatc
     result = analyze("https://youtu.be/Zvc5QkrWgAU", settings)
 
     assert len(prompts) == 5
-    assert STYLE_INSTRUCTIONS["human"] in prompts[-1]
+    assert prompts[-1].startswith(STYLE_INSTRUCTIONS["human"]["voice"])
     assert sorted(p.name for p in folder.glob("analysis*.json")) == [
         "analysis-caveman.json",
         "analysis-engineer.json",

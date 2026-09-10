@@ -16,6 +16,7 @@ from .config import (
     STT_DEFAULT,
     STT_ENGINES,
     STT_MODELS,
+    STYLES,
     ConfigError,
     Settings,
     parse_assignments,
@@ -74,6 +75,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", help="model name at that backend")
     parser.add_argument(
         "--stt", choices=STT_ENGINES, help="speech-to-text engine for this run"
+    )
+    parser.add_argument(
+        "--style", choices=STYLES, help="wording of the note for this run"
     )
     commands = parser.add_subparsers(dest="command")
     commands.add_parser(
@@ -178,7 +182,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "run" and not (args.url or args.batch):
         parser.error("run needs a URL or --batch FILE")
-    overrides = {"llm": args.llm, "model": args.model, "stt": args.stt}
+    overrides = {
+        "llm": args.llm,
+        "model": args.model,
+        "stt": args.stt,
+        "style": args.style,
+    }
     try:
         if args.command == "config" and args.set:
             # Written first, then loaded like any other run reads it.
