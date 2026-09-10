@@ -1,9 +1,10 @@
 """Step 4 and 7: Markdown, the format every other output is made from,
 and the outputs made from it.
 
-`work/<id>/summary.md` is always written. `formats` in config.json, or
-`--format` on the command line, adds a copy under `out/`, a note in the
-Obsidian vault, a PDF and a Word file. The Markdown is rendered once per
+`<video>/tmp/summary.md` is always written, where `<video>` is the
+video's own folder under `video-tldr` in the download folder. `formats`
+in config.json, or `--format` on the command line, adds a copy in that
+folder, a note in the Obsidian vault, a PDF and a Word file. The Markdown is rendered once per
 target because each one embeds a picture differently: by file name next
 to the note, as a wikilink into the vault, as a file URL for the browser.
 """
@@ -11,7 +12,6 @@ to the note, as a wikilink into the vault, as a file URL for the browser.
 from __future__ import annotations
 
 import json
-import re
 import shutil
 from collections.abc import Callable
 from datetime import UTC, date, datetime
@@ -25,7 +25,14 @@ from .documents import docx as write_docx
 from .documents import html as to_html
 from .documents import pdf as write_pdf
 from .enrich import installations
-from .fetch import FetchError, convert_thumbnail, fetch, work_folder
+from .fetch import (
+    FetchError,
+    clean_title,
+    convert_thumbnail,
+    fetch,
+    video_folder,
+    work_folder,
+)
 from .frames import chosen_images, diagram_of
 
 RESULT_NAME = "summary.md"
@@ -34,9 +41,6 @@ PICTURES_FOLDER = "_bilder"
 # analysis.json holds; each one becomes its own note. The same names as
 # `style` in config.json takes, minus `normal` and `all` themselves.
 EXTRA_STYLES = list(config_styles)
-# What Windows refuses in a file name, plus control characters.
-FORBIDDEN = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
-TITLE_LENGTH = 80
 
 LABELS = {
     "de": {
@@ -86,11 +90,10 @@ def at(vid: str, seconds: float) -> str:
 
 
 def note_name(fetched: dict, today: date) -> str:
-    """`YYYY_MM_DD_Title`: the day of processing, then the title without
-    what Windows refuses, cut to TITLE_LENGTH."""
-    title = FORBIDDEN.sub("", fetched.get("title") or "").strip(" .")
-    title = title[:TITLE_LENGTH].rstrip(" .") or fetched["id"]
-    return f"{today:%Y_%m_%d}_{title}"
+    """`YYYY_MM_DD_Title`: the day of processing, then the title. The
+    same name the video's folder carries, so the note inside it repeats
+    what the folder says and stays recognisable once moved out."""
+    return f"{today:%Y_%m_%d}_{clean_title(fetched.get('title'), fetched['id'])}"
 
 
 def by_section(sections: list[dict], images: list[dict]) -> list[list[dict]]:
@@ -310,7 +313,7 @@ def render(
     wanted = (
         formats if formats is not None else split_formats(settings.config["formats"])
     )
-    out = settings.out_dir
+    out = video_folder(settings, vid)
     # Downloads is always there, a configured download_dir need not be.
     if set(wanted) - {"obsidian"}:
         out.mkdir(parents=True, exist_ok=True)

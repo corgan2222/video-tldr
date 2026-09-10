@@ -5,7 +5,7 @@ import pytest
 
 from corganshelper_service import run as module
 from corganshelper_service.config import DEFAULTS, Settings
-from corganshelper_service.fetch import FetchError
+from corganshelper_service.fetch import FetchError, work_folder
 from corganshelper_service.run import (
     STEPS,
     bench,
@@ -92,7 +92,11 @@ def test_run_walks_every_step_in_order_and_adds_up_the_costs(steps, tmp_path):
     assert (result["input"], result["output"], result["usd"]) == (350, 35, 0.3)
     assert result["written"]["pdf"] == str(tmp_path / "a")
     assert result["step"] == "render"
-    stored = json.loads((tmp_path / "work/x_x_x_x_x_x/run.json").read_text("utf-8"))
+    stored = json.loads(
+        (work_folder(Settings(home=tmp_path), "x_x_x_x_x_x") / "run.json").read_text(
+            "utf-8"
+        )
+    )
     assert stored == result
 
 
@@ -192,7 +196,7 @@ def test_a_cancel_between_two_steps_ends_the_run_and_names_the_next_one(
 
 
 def test_cleanup_empties_the_work_folder_but_for_run_json(steps, tmp_path):
-    folder = tmp_path / "work" / "x_x_x_x_x_x"
+    folder = work_folder(Settings(home=tmp_path), "x_x_x_x_x_x")
     (folder / "clips").mkdir(parents=True)
     (folder / "clips" / "a.mp4").write_text("clip", "utf-8")
     (folder / "transcript.json").write_text("{}", "utf-8")
@@ -215,7 +219,7 @@ def test_cleanup_leaves_a_failed_run_alone_to_resume(steps, monkeypatch, tmp_pat
         raise FetchError("ffmpeg failed")
 
     monkeypatch.setattr(module, "frames", broken)
-    folder = tmp_path / "work" / "x_x_x_x_x_x"
+    folder = work_folder(Settings(home=tmp_path), "x_x_x_x_x_x")
     folder.mkdir(parents=True)
     (folder / "transcript.json").write_text("{}", "utf-8")
 
@@ -330,11 +334,12 @@ def test_stats_take_the_median_over_runs_and_skip_cached_steps(tmp_path):
         },
     }
     for vid, done in runs.items():
-        folder = tmp_path / "work" / vid
+        folder = work_folder(Settings(home=tmp_path), vid)
         folder.mkdir(parents=True)
         (folder / "run.json").write_text(json.dumps(done), "utf-8")
-    (tmp_path / "work" / "broken").mkdir()
-    (tmp_path / "work" / "broken" / "run.json").write_text("{", "utf-8")
+    broken = work_folder(Settings(home=tmp_path), "brokenvideo")
+    broken.mkdir(parents=True)
+    (broken / "run.json").write_text("{", "utf-8")
 
     result = stats(settings)
 
@@ -351,12 +356,11 @@ def test_stats_take_the_median_over_runs_and_skip_cached_steps(tmp_path):
     # Only the run that transcribed says something about the transcriber.
     assert list(result["stt"]) == ["whisper"]
     assert result["stt"]["whisper"]["seconds"] == 17.0
-    assert stats(Settings(home=tmp_path / "empty")) == {
-        "runs": 0,
-        "steps": {},
-        "models": {},
-        "stt": {},
-    }
+    # A library nobody has filled yet answers with nothing, not an error.
+    empty = Settings(
+        home=tmp_path, config={**DEFAULTS, "download_dir": str(tmp_path / "empty")}
+    )
+    assert stats(empty) == {"runs": 0, "steps": {}, "models": {}, "stt": {}}
 
 
 def test_urls_in_skips_blank_lines_and_comments(tmp_path):

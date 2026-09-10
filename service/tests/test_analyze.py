@@ -14,6 +14,7 @@ from corganshelper_service.analyze import (
     transcript_lines,
 )
 from corganshelper_service.config import Settings
+from corganshelper_service.fetch import work_folder
 
 FAKE_ANALYSIS = {
     "kind": "explainer",
@@ -29,7 +30,7 @@ FAKE_ANALYSIS = {
 
 def prepare(tmp_path, text_size=100):
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / "Zvc5QkrWgAU"
+    folder = work_folder(settings, "Zvc5QkrWgAU")
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(
         json.dumps(

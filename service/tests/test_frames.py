@@ -8,6 +8,7 @@ import pytest
 from corganshelper_service import frames as frames_module
 from corganshelper_service import llm
 from corganshelper_service.config import Settings
+from corganshelper_service.fetch import work_folder
 from corganshelper_service.frames import (
     LABEL_SCHEMA,
     LIMIT,
@@ -49,7 +50,7 @@ def png(width: int, height: int = 2) -> bytes:
 
 def prepare(tmp_path, candidates, kind="review"):
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / VID
+    folder = work_folder(settings, VID)
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(
         json.dumps({"id": VID, "title": "t", "duration": 828}), encoding="utf-8"

@@ -2,7 +2,7 @@ import pytest
 import yt_dlp
 
 from corganshelper_service.config import Settings
-from corganshelper_service.fetch import FetchError, fetch
+from corganshelper_service.fetch import FetchError, fetch, work_folder
 
 
 class Refusing:
@@ -31,4 +31,4 @@ def test_the_bot_check_becomes_a_message_that_names_the_way_out(tmp_path, monkey
         fetch("https://youtu.be/BT4ywlPr6Pk", settings)
 
     assert "CORGANSHELPER_COOKIES" in str(caught.value)
-    assert not (settings.work_dir / "BT4ywlPr6Pk" / "fetch.json").exists()
+    assert not (work_folder(settings, "BT4ywlPr6Pk") / "fetch.json").exists()

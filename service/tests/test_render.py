@@ -6,7 +6,7 @@ import pytest
 from corganshelper_service import llm
 from corganshelper_service import render as render_module
 from corganshelper_service.config import Settings
-from corganshelper_service.fetch import FetchError
+from corganshelper_service.fetch import FetchError, video_folder, work_folder
 from corganshelper_service.render import (
     by_section,
     frontmatter,
@@ -179,12 +179,12 @@ def test_the_file_name_carries_the_day_and_nothing_windows_refuses():
     assert len(note_name({"id": "v", "title": "x" * 200}, date(2026, 9, 10))) == 91
 
 
-def prepare(tmp_path):
+def prepare(tmp_path, download_dir="out"):
     settings = Settings(home=tmp_path)
     # Without this the outputs land in the machine's own Downloads folder,
     # which is where a run of these tests would leave its litter.
-    settings.config["download_dir"] = str(tmp_path / "out")
-    folder = settings.work_dir / "Zvc5QkrWgAU"
+    settings.config["download_dir"] = str(tmp_path / download_dir)
+    folder = work_folder(settings, "Zvc5QkrWgAU")
     folder.mkdir(parents=True)
     (folder / "fetch.json").write_text(json.dumps(FETCHED), encoding="utf-8")
     (folder / "analysis.json").write_text(json.dumps(ANALYSIS), encoding="utf-8")
@@ -269,16 +269,24 @@ def test_the_copy_under_out_and_the_obsidian_note_carry_their_own_pictures(
     )
 
     copy = written["md"]
-    assert copy == settings.out_dir / "2026_09_10_Docker vs Podman.md"
+    assert (
+        copy == video_folder(settings, "Zvc5QkrWgAU") / "2026_09_10_Docker vs Podman.md"
+    )
     text = copy.read_text(encoding="utf-8")
     assert "![Bild](2026_09_10_Zvc5QkrWgAU-1.png)" in text
     assert "![Gezeichnet](2026_09_10_Zvc5QkrWgAU-diagram.png)" in text
-    assert (settings.out_dir / "2026_09_10_Zvc5QkrWgAU-diagram.png").exists()
     assert (
-        settings.out_dir / "2026_09_10_Zvc5QkrWgAU-1.png"
+        video_folder(settings, "Zvc5QkrWgAU") / "2026_09_10_Zvc5QkrWgAU-diagram.png"
+    ).exists()
+    assert (
+        video_folder(settings, "Zvc5QkrWgAU") / "2026_09_10_Zvc5QkrWgAU-1.png"
     ).read_bytes() == b"picture"
-    assert (settings.out_dir / "2026_09_10_Zvc5QkrWgAU.jpg").exists()
-    assert not (settings.out_dir / "2026_09_10_Zvc5QkrWgAU-2.png").exists()
+    assert (
+        video_folder(settings, "Zvc5QkrWgAU") / "2026_09_10_Zvc5QkrWgAU.jpg"
+    ).exists()
+    assert not (
+        video_folder(settings, "Zvc5QkrWgAU") / "2026_09_10_Zvc5QkrWgAU-2.png"
+    ).exists()
 
     note = written["obsidian"]
     assert note == vault / "Videos" / "Neu" / "2026_09_10_Docker vs Podman.md"
@@ -324,7 +332,8 @@ def test_every_style_analyze_left_behind_becomes_its_own_note(tmp_path, monkeypa
     )
 
     assert written["md:caveman"] == (
-        settings.out_dir / "2026_09_10_Docker vs Podman - caveman.md"
+        video_folder(settings, "Zvc5QkrWgAU")
+        / "2026_09_10_Docker vs Podman - caveman.md"
     )
     assert "Zwei Ding, ein Ziel." in written["md:caveman"].read_text(encoding="utf-8")
     assert written["obsidian:caveman"] == (
@@ -341,13 +350,15 @@ def test_every_style_analyze_left_behind_becomes_its_own_note(tmp_path, monkeypa
 
 def test_a_download_folder_that_is_not_there_yet_is_created(tmp_path, monkeypatch):
     monkeypatch.setattr(llm, "complete", lambda *a, **k: pytest.fail("no request"))
-    settings, _ = prepare(tmp_path)
-    settings.config["download_dir"] = str(tmp_path / "neu" / "unten")
-    assert not settings.out_dir.exists()
+    # A folder deep under one the owner named, which nobody has made yet:
+    # `prepare` writes the run's files into it, the outputs follow.
+    settings, work = prepare(tmp_path, download_dir="neu/unten")
+    assert work.parent.parent == settings.library
 
     written = render("https://youtu.be/Zvc5QkrWgAU", settings, formats=["md"])
 
-    assert settings.out_dir.is_dir() and written["md"].exists()
+    assert written["md"].parent == video_folder(settings, "Zvc5QkrWgAU")
+    assert written["md"].exists()
 
 
 def test_timestamps_off_reaches_the_written_note(tmp_path, monkeypatch):
@@ -389,7 +400,10 @@ def test_the_word_file_gets_a_thumbnail_python_docx_accepts(tmp_path, monkeypatc
 
     written = render("https://youtu.be/Zvc5QkrWgAU", settings, formats=["docx"])
 
-    assert written["docx"] == settings.out_dir / f"{written['docx'].name}"
+    assert (
+        written["docx"]
+        == video_folder(settings, "Zvc5QkrWgAU") / f"{written['docx'].name}"
+    )
     assert (folder / "Zvc5QkrWgAU.jpg").read_bytes()[6:10] == b"JFIF"
     (
         _fetched,

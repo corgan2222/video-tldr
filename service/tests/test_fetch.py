@@ -11,6 +11,7 @@ from corganshelper_service.fetch import (
     subtitle_languages,
     summarise,
     video_id,
+    work_folder,
 )
 
 
@@ -64,7 +65,7 @@ def test_anything_that_is_not_a_youtube_video_is_refused(url):
 
 def test_a_stored_result_is_returned_without_touching_the_network(tmp_path):
     settings = Settings(home=tmp_path)
-    folder = settings.work_dir / "BT4ywlPr6Pk"
+    folder = work_folder(settings, "BT4ywlPr6Pk")
     folder.mkdir(parents=True)
     stored = {"id": "BT4ywlPr6Pk", "title": "stored"}
     (folder / "fetch.json").write_text(json.dumps(stored), encoding="utf-8")

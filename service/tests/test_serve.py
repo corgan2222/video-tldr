@@ -8,6 +8,7 @@ import pytest
 
 from corganshelper_service import serve as module
 from corganshelper_service.config import Settings, store
+from corganshelper_service.fetch import video_folder, work_folder
 from corganshelper_service.serve import Server, Service
 
 URL = "https://youtu.be/x_x_x_x_x_x"
@@ -295,9 +296,15 @@ def test_open_takes_the_note_the_folder_or_what_there_is(
     code, answer = call(server, "POST", f"/jobs/{job['id']}/open", {"what": "obsidian"})
     assert (code, answer["opened"]) == (200, "obsidian://open?path=C%3A/v/n.md")
 
+    settings = Settings.load(tmp_path)
+    # This run left no folder behind, so the library above it opens.
     code, answer = call(server, "POST", f"/jobs/{job['id']}/open", {"what": "folder"})
-    assert code == 200
-    assert answer["opened"] == str(Settings.load(tmp_path).out_dir)
+    assert (code, answer["opened"]) == (200, str(settings.library))
+
+    # With the video's own folder there, that one opens.
+    work_folder(settings, "x_x_x_x_x_x").mkdir(parents=True)
+    _, answer = call(server, "POST", f"/jobs/{job['id']}/open", {"what": "folder"})
+    assert answer["opened"] == str(video_folder(settings, "x_x_x_x_x_x"))
     assert started[-1] == answer["opened"]
 
     assert call(server, "POST", f"/jobs/{job['id']}/open", {"what": "email"})[0] == 400
@@ -569,7 +576,7 @@ def test_stats_come_from_the_runs_in_the_work_folder(server, tmp_path):
     code, answer = call(server, "GET", "/stats")
     assert (code, answer["runs"]) == (200, 0)
 
-    folder = tmp_path / "work" / "v"
+    folder = work_folder(Settings.load(tmp_path), "v_v_v_v_v_v")
     folder.mkdir(parents=True)
     (folder / "run.json").write_text(
         json.dumps(
