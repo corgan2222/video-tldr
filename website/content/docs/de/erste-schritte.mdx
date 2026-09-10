@@ -1,0 +1,83 @@
+---
+title: Erste Schritte
+description: Dienst und Erweiterung installieren, dann das erste Video zusammenfassen.
+---
+
+_[English version](/docs/getting-started)_
+
+video-tldr besteht aus zwei Teilen. Ein lokaler Dienst macht die Arbeit —
+Video holen, transkribieren, zusammenfassen — und eine Browser-Erweiterung
+spricht mit ihm über `127.0.0.1`. Nichts verlässt den Rechner außer dem,
+was das von dir gewählte Sprachmodell bekommt.
+
+## Den Dienst installieren
+
+Der Dienst kommt aus einem Release und braucht
+[uv](https://docs.astral.sh/uv/), das sein Python selbst mitbringt. Drei
+Wege, nimm den, der dir passt:
+
+```powershell
+irm https://raw.githubusercontent.com/corgan2222/video-tldr/main/install.ps1 | iex
+```
+
+Das Skript wählt die CUDA-Bibliotheken, wenn eine NVIDIA-Karte da ist, und
+sonst allein die kleinere ONNX-Laufzeit, und legt `video-tldr` auf den
+PATH. Die Sprachmodelle kommen beim ersten Lauf dazu, mehrere Gigabyte.
+
+```powershell
+uv tool install video-tldr-service
+```
+
+Der kürzeste Weg, wenn uv schon auf dem Rechner liegt — sobald das Paket
+auf PyPI steht.
+
+```bash
+git clone https://github.com/corgan2222/video-tldr.git
+```
+
+Geht heute, ohne jedes Release. Danach `uv sync --project service --extra
+gpu` für den Dienst.
+
+`-Root D:\video-tldr` legt Programm, Umgebung und Daten unter ein
+Verzeichnis statt an drei übliche Orte.
+
+## Die Erweiterung installieren
+
+Die Erweiterung ist die `.zip` desselben Releases. In Firefox als
+temporäres Add-on über `about:debugging` laden („Dieser Firefox"), in
+Chrome entpacken und den Ordner über `chrome://extensions` mit
+eingeschaltetem Entwicklermodus laden.
+
+Aus dem Quelltext: `npm ci && npm run build`, dann `dist/` laden.
+
+## Starten
+
+Der Installer trägt keinen Autostart ein. Den Dienst startest du selbst:
+
+```powershell
+video-tldr serve
+```
+
+Wenn du nicht mehr daran denken willst, übernimmt das eine Aufgabe bei der
+Anmeldung:
+
+```powershell
+video-tldr autostart on
+```
+
+`video-tldr autostart off` nimmt es zurück, `status` sagt, was gerade
+gilt, und `install.ps1 -Autostart` richtet es gleich bei der Installation
+ein.
+
+Dann auf das Symbol klicken, „Einstellungen" öffnen, „Verbinden" drücken
+und Sprache, Ausgaben und Modell wählen. Ein YouTube-Video öffnen, auf das
+Symbol klicken, „Schnell" oder „Gründlich" drücken.
+
+Beim ersten Klick fragt der Browser einmal nach dem Zugriff auf
+127.0.0.1. Ohne diese Erlaubnis erreicht die Erweiterung den Dienst nicht;
+sie fragt danach und erklärt, wofür.
+
+Antwortet der Dienst nicht, sagt die Erweiterung das und zeigt den Befehl
+mit einer Schaltfläche, die ihn kopiert.
+
+Ohne Browser macht `video-tldr run <url>` dasselbe von der Kommandozeile.
