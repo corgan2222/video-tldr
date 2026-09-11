@@ -290,6 +290,9 @@
   "statsConnect": {
     "message": "Verbinden, um die eigenen Zahlen zu sehen."
   },
+  "modelsConnect": {
+    "message": "Verbinden, um die Modelle dieses Backends zu sehen."
+  },
   "colStep": {
     "message": "Schritt"
   },
