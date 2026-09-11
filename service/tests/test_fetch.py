@@ -151,14 +151,20 @@ def test_the_thumbnail_conversion_goes_through_the_helper_with_a_time_limit(
     assert command.count("-loglevel") == 1
 
 
-def test_settings_default_to_the_place_windows_keeps_machine_data(monkeypatch):
+def test_settings_default_to_the_place_windows_keeps_machine_data(
+    tmp_path, monkeypatch
+):
     """Not APPDATA: that roams, and ten gigabytes of speech models would
-    follow the user to every machine they sign in to."""
+    follow the user to every machine they sign in to.
+
+    The directory comes from tmp_path rather than a written-out
+    `C:/Users/...`: on the Linux runner that string is a relative path,
+    and the assertion compared the checkout directory with it."""
     monkeypatch.delenv("VIDEO_TLDR_HOME", raising=False)
     monkeypatch.delenv("VIDEO_TLDR_COOKIES", raising=False)
-    monkeypatch.setenv("LOCALAPPDATA", str(Path("C:/Users/someone/AppData/Local")))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     settings = Settings.load()
-    assert settings.work_dir == Path("C:/Users/someone/AppData/Local/video-tldr/work")
+    assert settings.work_dir == tmp_path / "video-tldr" / "work"
     assert settings.cookies_file is None
 
 
