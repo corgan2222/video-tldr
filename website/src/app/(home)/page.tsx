@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { appName, basePath, gitConfig, storeLinks } from "@/lib/shared";
 
@@ -29,9 +30,12 @@ export default function HomePage() {
     <main className="hero-wash flex flex-1 flex-col items-center px-4 py-20">
       {/* The banner carries the name and the tagline, so the page does
           not say them again — see docs/design-system.md. */}
-      <img
+      <Image
         src={`${basePath}/banner.png`}
         alt={`${appName} — Watch it. Vault it.`}
+        width={2560}
+        height={640}
+        priority
         className="w-full max-w-3xl rounded-xl border border-fd-border"
       />
       <p className="mt-6 max-w-2xl text-balance text-center text-lg text-fd-muted-foreground">
@@ -65,21 +69,23 @@ export default function HomePage() {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
           {storeLinks.firefox && (
             <a href={storeLinks.firefox}>
-              <img
+              <Image
                 src={`${basePath}/badges/firefox-get-the-addon.png`}
                 alt="Get the add-on for Firefox"
                 width={172}
                 height={60}
+                unoptimized
               />
             </a>
           )}
           {storeLinks.chrome && (
             <a href={storeLinks.chrome}>
-              <img
+              <Image
                 src={`${basePath}/badges/chrome-web-store.png`}
                 alt="Available in the Chrome Web Store"
                 width={170}
                 height={48}
+                unoptimized
               />
             </a>
           )}
