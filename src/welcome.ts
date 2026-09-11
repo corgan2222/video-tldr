@@ -34,9 +34,35 @@ for (const [id, command] of Object.entries(COMMANDS)) {
   const box = document.querySelector<HTMLElement>(`#${id}`);
   if (box) box.textContent = command;
 }
+// Two overlapping sheets, the sign every editor uses for copy. Drawn
+// here rather than three times in the HTML, and with a label, because an
+// icon on its own says nothing to a screen reader.
+function copyIcon(): SVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  const back = document.createElementNS(ns, 'rect');
+  back.setAttribute('x', '9');
+  back.setAttribute('y', '9');
+  back.setAttribute('width', '11');
+  back.setAttribute('height', '11');
+  back.setAttribute('rx', '2');
+  const front = document.createElementNS(ns, 'path');
+  front.setAttribute(
+    'd',
+    'M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1',
+  );
+  svg.append(back, front);
+  return svg;
+}
+
 document
   .querySelectorAll<HTMLButtonElement>('[data-copy]')
   .forEach((button) => {
+    button.append(copyIcon());
+    button.title = t('copyCommand');
+    button.setAttribute('aria-label', t('copyCommand'));
     button.addEventListener('click', async () => {
       const id = button.dataset.copy;
       if (!id) return;
