@@ -132,8 +132,10 @@ DEFAULTS = {
     "token": "",
     # Empty means the user's Downloads folder (default_download_dir).
     "download_dir": "",
-    # An HTML file with a `{{content}}` placeholder, or a CSS file; empty
-    # means the built-in look of the PDF.
+    # `dark`, `paper` or `compact` for a look that ships in
+    # `assets/pdf/`, or a file of your own: CSS, which follows the
+    # built-in rules, or HTML with a `{{content}}` placeholder, which
+    # replaces the page. Empty means the built-in look.
     "pdf_template": "",
     # Delete work/<id>/ once the outputs are written.
     "cleanup": "off",

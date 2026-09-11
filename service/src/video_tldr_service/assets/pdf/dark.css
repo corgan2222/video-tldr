@@ -1,0 +1,230 @@
+/* video-tldr, printed the way the rest of it looks.
+ *
+ * Point pdf_template at this file and the PDF comes out in the palette of
+ * docs/design-system.md instead of the built-in black on white. The file
+ * is read as CSS, so it lands after the built-in rules and overrides
+ * them; anything not named here keeps working.
+ *
+ *     video-tldr config --set pdf_template=docs/pdf/dark.css
+ *
+ * For one video only, without changing the settings:
+ *
+ *     VIDEO_TLDR_PDF_TEMPLATE=docs/pdf/dark.css video-tldr run <url>
+ *
+ * Written for what render_markdown writes: a thumbnail, an h1, one line
+ * of metadata, h2 per section, h3 per moment, pictures with an italic
+ * caption, fenced commands, lists, links.
+ */
+
+:root {
+  --ground: #0f0f16;
+  --surface: #16161f;
+  --surface-2: #1e1e2a;
+  --ink: #ededf2;
+  --ink-2: #a8a8b8;
+  --ink-3: #6e6e80;
+  --line: #2a2a38;
+  --violet: #7c5cff;
+  --violet-soft: #9b85ff;
+  --violet-bg: #1a1630;
+  --mono: Cascadia Mono, Consolas, SF Mono, monospace;
+}
+
+/* Chrome drops every background when it prints, so a dark page arrives
+ * white with unreadable text. This is the one rule the whole file stands
+ * on. The margin goes to zero and the padding to the body instead:
+ * @page margin is outside the body, and the ground would stop there and
+ * leave a white frame around every page. */
+@page {
+  margin: 0;
+  size: A4;
+}
+
+html {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+  background: var(--ground);
+}
+
+body {
+  max-width: none;
+  margin: 0;
+  padding: 16mm 18mm;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: Segoe UI, Helvetica, Arial, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.55;
+}
+
+/* The thumbnail opens the note. It is a picture of the video, not an
+ * illustration in it, so it gets the banner's frame. */
+body > p:first-child img {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+h1 {
+  margin: 14px 0 6px;
+  font-size: 21pt;
+  line-height: 1.15;
+  letter-spacing: -0.022em;
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+/* Channel, date, length, link, kind: the one line under the title. It is
+ * metadata, so it reads like a label rather than like a sentence. */
+h1 + p {
+  margin: 0 0 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 8pt;
+  letter-spacing: 0.04em;
+}
+
+/* A section heading is a bar of its own, the same one the settings and
+ * the welcome page carry. */
+h2 {
+  margin: 26px 0 14px;
+  padding: 7px 11px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--violet);
+  border-radius: 6px;
+  color: var(--violet-soft);
+  font-family: var(--mono);
+  font-size: 9pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  page-break-after: avoid;
+}
+
+/* A moment in the video: the timestamp is the link, so the line stays
+ * quiet and lets the stamp carry the colour. */
+h3 {
+  margin: 20px 0 6px;
+  font-size: 12pt;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  page-break-after: avoid;
+}
+
+a {
+  color: var(--violet-soft);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(155, 133, 255, 0.35);
+}
+
+h1 + p a,
+h3 a {
+  border-bottom: 0;
+}
+
+img {
+  border-radius: 6px;
+  page-break-inside: avoid;
+}
+
+/* The caption under a picture: what it shows and when it happens. */
+img + em,
+p > em:only-child {
+  display: block;
+  margin-top: -4px;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 8pt;
+  font-style: normal;
+  letter-spacing: 0.03em;
+}
+
+/* Commands, on the ground rather than on paper white. */
+pre {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--violet);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--ink);
+  page-break-inside: avoid;
+}
+
+pre code {
+  font-family: var(--mono);
+  font-size: 8.5pt;
+  line-height: 1.5;
+  color: var(--ink);
+  /* A command that runs off the page is lost: paper does not scroll. */
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* A name, a path or a port inside a sentence. */
+:not(pre) > code {
+  padding: 1px 5px;
+  background: var(--violet-bg);
+  border: 1px solid #2c2450;
+  border-radius: 4px;
+  color: var(--violet-soft);
+  font-family: var(--mono);
+  font-size: 0.88em;
+}
+
+ul,
+ol {
+  padding-left: 1.25em;
+}
+
+li {
+  margin: 3px 0;
+}
+
+li::marker {
+  color: var(--violet);
+}
+
+blockquote {
+  margin: 14px 0;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--line);
+  color: var(--ink-2);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+  page-break-inside: avoid;
+}
+
+th {
+  border-bottom: 1px solid var(--line);
+  padding: 4px 10px 4px 0;
+  color: var(--ink-2);
+  font-weight: 600;
+  text-align: left;
+}
+
+td {
+  border-bottom: 1px solid #22222e;
+  padding: 4px 10px 4px 0;
+}
+
+hr {
+  height: 0;
+  margin: 24px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+/* A heading at the foot of a page, with its text overleaf, reads as if
+ * the section were empty. */
+h2 + p,
+h3 + p,
+h2 + ul,
+h3 + ul {
+  page-break-before: avoid;
+}
