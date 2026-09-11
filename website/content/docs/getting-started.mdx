@@ -5,10 +5,10 @@ description: Install the service and the extension, then summarise your first vi
 
 _[Deutsche Fassung](/docs/de/erste-schritte)_
 
-video-tldr is two parts. A local service does the work — fetching,
-transcribing, summarising — and a browser extension talks to it over
-`127.0.0.1`. Nothing leaves the machine except what your chosen language
-model backend sends.
+video-tldr is two parts. A local service fetches the video, transcribes it
+when there are no captions, and writes the summary. A browser extension
+talks to that service over `127.0.0.1`. Nothing leaves the machine except
+what your chosen language model backend sends.
 
 ## Install the service
 
