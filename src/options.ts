@@ -228,9 +228,12 @@ function table(head: string[], rows: string[][]): HTMLTableElement {
 // Three small tables from GET /stats: the steps, the language models,
 // the transcribers, each with what it took on this machine.
 function showStats(stats: Stats): void {
+  // The sentence above the tables says what they are; what is missing
+  // goes where the tables would be. Swapping the two left a lone "connect
+  // first" standing under a rule, with nothing saying what for.
   if (stats.runs === 0) {
-    statsBox.replaceChildren();
-    statsNote.textContent = t('statsEmpty');
+    statsBox.replaceChildren(hint(t('statsEmpty')));
+    statsNote.textContent = t('historyHelp');
     return;
   }
   statsNote.textContent = `${stats.runs} · ${t('historyHelp')}`;
@@ -276,8 +279,12 @@ function showStats(stats: Stats): void {
 // benchmark's checkboxes.
 async function loadModels(): Promise<void> {
   const backend = field('llm').value;
+  // Nothing is known about the models until the service answers. Both
+  // places that would list them say so, rather than leaving a label
+  // standing over an empty space.
   if (!connected) {
-    modelHint.textContent = t('statsConnect');
+    modelHint.textContent = t('modelsConnect');
+    benchModels.replaceChildren(hint(t('modelsConnect')));
     return;
   }
   try {
@@ -293,7 +300,7 @@ async function loadModels(): Promise<void> {
     );
   } catch (error) {
     showModelChoice([]);
-    benchModels.replaceChildren(hint(t('statsConnect')));
+    benchModels.replaceChildren(hint(t('modelsConnect')));
     modelHint.textContent = message(error);
   }
 }
@@ -381,7 +388,8 @@ async function loadService(): Promise<void> {
     noService.hidden = !(error instanceof NoServiceError);
     serviceStatus.textContent = `${t('notConnected')} ${message(error)}`;
     serviceStatus.className = 'status bad';
-    statsNote.textContent = t('statsConnect');
+    statsNote.textContent = t('historyHelp');
+    statsBox.replaceChildren(hint(t('statsConnect')));
   }
   await Promise.all([loadModels(), loadHealth()]);
 }
