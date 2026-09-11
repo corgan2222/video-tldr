@@ -359,21 +359,21 @@ details {
   margin-top: var(--gap-l);
 }
 
-/* Everything a first run leaves empty. Shut, it is one line; open, it is
-   a section like any other. The summary reads as a switch rather than as
-   a heading: sentence case, and the triangle carries the colour. */
-#advanced {
-  border-top: 0;
+/* A section that starts shut: the advanced fields, the history, the
+   benchmark, the link list. Shut, each is one line; open, it is a section
+   like any other. The summary reads as a switch rather than as a heading:
+   sentence case, and the triangle carries the colour. */
+.fold {
   margin: 32px 0 0;
   padding-top: 24px;
   border-top: 1px solid var(--line);
 }
 
-#advanced > summary {
+.fold > summary {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 9px 12px;
+  gap: 10px;
+  padding: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -385,29 +385,50 @@ details {
   list-style: none;
 }
 
-/* The default marker sits outside the box and cannot be styled; this one
-   is text, so it takes the accent. */
-#advanced > summary::-webkit-details-marker {
+/* The browser's own marker sits outside the box and cannot be styled, so
+   it goes and this one takes its place. Drawn with borders rather than
+   written as a character: a triangle glyph is a different size in every
+   font, and this one has to be seen to be understood. */
+.fold > summary::-webkit-details-marker {
   display: none;
 }
 
-#advanced > summary::before {
-  content: '▸';
-  color: var(--violet);
-  font-size: 11px;
+.fold > summary::before {
+  content: '';
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 7px solid var(--violet);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  transition: transform 0.15s ease;
 }
 
-#advanced[open] > summary::before {
-  content: '▾';
+.fold[open] > summary::before {
+  transform: rotate(90deg);
 }
 
-#advanced[open] > summary {
+.fold[open] > summary {
   margin-bottom: 20px;
 }
 
-#advanced > summary:hover {
+.fold > summary:hover {
   border-color: var(--violet);
   color: var(--ink);
+}
+
+/* Shut folds stack: a rule between two closed lids separates nothing.
+   The moment one above stands open, the break is worth drawing again. */
+.fold + .fold {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.fold[open] + .fold {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
 }
 
 summary {

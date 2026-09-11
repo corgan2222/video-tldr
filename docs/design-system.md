@@ -101,12 +101,24 @@ loses its own section heading, it takes over what that heading said:
 **Callout.** Surface with a 3px left border in the tone. For the one
 thing that follows from everything above it.
 
-**Advanced lid.** A `details` whose summary is one line on a surface, a
-violet triangle in front, sentence case — a switch, not a heading. What
-goes behind it is every field a fresh install leaves empty: none of them
-is needed for a first run, and a page of empty fields reads as a page of
-work. **It opens itself whenever one of those fields carries a value.** A
-setting nobody can find again is worse than a field nobody needs.
+**Fold.** A `details` whose summary is one line on a surface, a violet
+triangle in front, sentence case — a switch, not a heading. The triangle
+is drawn with borders rather than written as `▸`: a glyph is a different
+size in every font, and this one has to be noticed to be understood. It
+turns 90° when the fold opens.
+
+The summary says what is inside, so nobody has to open it to find out:
+"Benchmark: the same video through several models", not "Benchmark".
+
+What goes behind a fold is everything past the first run: the fields a
+fresh install leaves empty, the history, the benchmark, the link list.
+**The advanced fold opens itself whenever one of its fields carries a
+value** — a setting nobody can find again is worse than a field nobody
+needs.
+
+**Shut folds stack.** A rule between two closed lids separates nothing,
+so they sit 8px apart with no line; the moment one above stands open, the
+break is worth drawing again.
 
 **Primary button.** Violet fill, white text, 8px radius, an arrow after
 the label. At most one per screen: it is the way onward, and a second one
