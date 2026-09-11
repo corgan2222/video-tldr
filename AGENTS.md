@@ -17,7 +17,7 @@ Written in TypeScript, tsc, vitest, prettier.
 | -------------- | --------------------------------------------------------------------- |
 | `.github/`     | CI workflows, issue and pull request templates                        |
 | `docs/`        | Documentation and the German user guide                               |
-| `scripts/`     | The version bump                                                      |
+| `scripts/`     | The version bump and the packer, one zip per store                    |
 | `tests/`       | vitest tests                                                          |
 | `src/`         | The extension                                                         |
 | `service/`     | The local Python service the extension talks to                       |
@@ -54,18 +54,26 @@ Walk this ladder from the top. Stop at the first step that fits.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the setup, the git hooks and what
 each check is for. This table is the short reference.
 
-| Purpose       | Command                  |
-| ------------- | ------------------------ |
-| Format check  | `npx prettier --check .` |
-| Lint          | `npm run lint`           |
-| Test          | `npm test`               |
-| Release build | `npm run build`          |
+| Purpose       | Command                     |
+| ------------- | --------------------------- |
+| Format check  | `npx prettier --check .`    |
+| Lint          | `npm run lint`              |
+| Test          | `npm test`                  |
+| Release build | `npm run build`             |
+| Store zips    | `python scripts/package.py` |
 
 End every finished item with a release build: `npm run build` compiles
 `src/*.ts` and copies everything else under `src/` (manifest, popup, icons)
 into `dist/`, the directory the browser loads. `npx web-ext lint
 --source-dir dist` then checks the result the way a store reviewer does.
 A build that passed the tests but not the lint is not a shipped one.
+
+`dist/` serves every browser at once and therefore carries both background
+forms, which costs one `BACKGROUND_SERVICE_WORKER_IGNORED` warning on every
+lint. What a store actually receives is one zip per store:
+`python scripts/package.py` writes them to `packages/`, each with the
+manifest that store reads. The Firefox package lints without a warning, and
+that is the lint CI judges by.
 
 Versions follow semantic versioning. The number lives in `package.json`,
 and `scripts/bump_version.py` writes the same number into
@@ -91,10 +99,12 @@ finding out whether something works in the first place.
 
 ## Browser extension conventions
 
-One manifest serves both browsers. Firefox has read Manifest V3 since
-version 109, so there is no separate Firefox build, only the
-`browser_specific_settings.gecko` block the shared manifest already
-carries.
+One manifest serves both browsers, and one source tree serves every store.
+Firefox has read Manifest V3 since version 109, so there is no separate
+Firefox build; `scripts/package.py` only strips each store's zip of the
+keys that store does not read, `background.service_worker` for Firefox and
+the `gecko` block for Chromium. Nothing else differs, and nothing is
+maintained twice.
 
 - Call the `browser.*` namespace, not `chrome.*` directly. Load the
   `webextension-polyfill` shim, or check `typeof browser !== 'undefined'`
