@@ -24,6 +24,11 @@ const config = {
   // workflow: a path that is right in CI and wrong locally is a path nobody
   // tests. `npm run dev` therefore also runs under the same prefix.
   basePath: "/video-tldr",
+  // next dev writes AGENTS.md and CLAUDE.md into this folder on every
+  // start, with its own instructions in them. The repository already
+  // carries both files at the root, and a second pair one directory down
+  // is either noise in the tree or advice that contradicts them.
+  agentRules: false,
   // Without this the export writes docs.html and no docs/index.html, so a
   // typed or shared /docs/ answers 404 while /docs answers 200. Static hosts
   // resolve a directory to its index, and GitHub Pages redirects the form
