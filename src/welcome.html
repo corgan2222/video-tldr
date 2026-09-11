@@ -277,13 +277,32 @@
         font-size: 0.93rem;
         max-width: 68ch;
       }
-      .after code {
+      /* Commands and addresses inside running text. The violet ties them
+         to the banner and separates them from prose at a glance. */
+      .lead code,
+      .way p code,
+      .after p code {
         font-family: var(--mono);
-        font-size: 0.86em;
-        background: var(--surface-2);
-        border-radius: 3px;
-        padding: 1px 5px;
+        font-size: 0.85em;
+        color: var(--violet-soft);
+        background: var(--violet-bg);
+        border: 1px solid #2c2450;
+        border-radius: 4px;
+        padding: 1px 6px;
+        white-space: nowrap;
+      }
+      /* The two commands in the closing box are the point of it, so they
+         carry more weight than an inline mention. */
+      .after p code {
+        font-size: 0.88em;
         color: var(--ink);
+        background: var(--surface-2);
+        border-color: var(--line);
+        padding: 2px 8px;
+      }
+      .after p code:first-child {
+        color: var(--violet-soft);
+        border-color: var(--violet);
       }
 
       .foot {
