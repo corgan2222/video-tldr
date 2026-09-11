@@ -1,10 +1,10 @@
 # Getting into the stores
 
-Everything a submission needs, in the order it is needed. One package
-serves all three stores: Firefox reads `background.scripts` and the
-`gecko` block, Chromium reads `background.service_worker`, and each
-ignores the other. Brave, Opera and Vivaldi install from the Chrome Web
-Store and need no submission of their own.
+Everything a submission needs, in the order it is needed. One source tree
+serves all three stores, and only the manifest differs: Firefox reads
+`background.scripts` and the `gecko` block, Chromium reads
+`background.service_worker`. Brave, Opera and Vivaldi install from the
+Chrome Web Store and need no submission of their own.
 
 ## Before the first submission
 
@@ -20,9 +20,21 @@ rejection costs nothing.
 
 ## What to upload
 
-`npm run build` writes `dist/`, and the release workflow zips it as
-`video-tldr-<version>.zip`. That zip is what every store takes. The
-manifest must sit at the root of the zip, which it does.
+`npm run build` writes `dist/`, and `python scripts/package.py` turns it
+into one zip per store under `packages/`. The release attaches all three:
+
+| Store   | File                               |
+| ------- | ---------------------------------- |
+| Firefox | `video-tldr-<version>-firefox.zip` |
+| Chrome  | `video-tldr-<version>-chrome.zip`  |
+| Edge    | `video-tldr-<version>-edge.zip`    |
+
+The Edge package is the Chrome one under its own name: Partner Center
+wants a file of its own, and the name is what tells two uploads apart.
+The manifest sits at the root of each zip, which is where a store looks.
+
+Uploading the wrong one is not fatal but starts the review with a
+warning, about a background key the store does not read.
 
 Never upload a zip built by hand from a working tree: it carries whatever
 was lying around. Take the one attached to the release.
@@ -125,15 +137,18 @@ before submitting there, by clicking the icon and watching the POST to
 transpiled, and TypeScript counts. Attach the repository at the tag being
 submitted, and give these instructions:
 
-> Requirements: Node 22 and npm.
+> Requirements: Node 22, npm and Python 3.11 or newer.
 >
 >     npm ci
 >     npm run build
+>     python scripts/package.py firefox
 >
-> The result is `dist/`, which is what the uploaded zip contains. The
-> build runs `tsc` over `src/*.ts` and copies everything else in `src/`
-> unchanged. No bundler, no minifier, no obfuscation. Every dependency
-> comes from npm and is pinned in `package-lock.json`.
+> The result is `packages/video-tldr-<version>-firefox.zip`, the uploaded
+> file. The build runs `tsc` over `src/*.ts` and copies everything else in
+> `src/` unchanged; the packer zips that up and removes one manifest key,
+> `background.service_worker`, which Firefox ignores and Chromium reads.
+> No bundler, no minifier, no obfuscation. Every dependency comes from npm
+> and is pinned in `package-lock.json`.
 
 ## PyPI, for the uv route
 
