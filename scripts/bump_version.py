@@ -186,6 +186,28 @@ def has_tags(root: Path) -> bool:
     return bool(out.stdout.strip())
 
 
+def set_by_hand(root: Path, manifest: Manifest) -> bool:
+    """Whether this commit already carries a version somebody chose.
+
+    The no-flag run raises the patch number, which is right for every
+    ordinary commit and wrong for the one that names a release: `--set
+    0.1.0` followed by a commit came out as 0.1.1, and release.yml refuses
+    to build when the tag and the manifest disagree. So a manifest that
+    differs from the one in HEAD is left alone."""
+    out = subprocess.run(
+        ["git", "show", f"HEAD:{manifest.path.relative_to(root).as_posix()}"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    # No HEAD yet, or the file is new: nothing to compare, so bump as usual.
+    if out.returncode != 0:
+        return False
+    before = manifest.match.re.search(out.stdout)
+    return bool(before) and before.group(1) != manifest.version
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -223,6 +245,10 @@ def main(argv: list[str] | None = None) -> int:
         # asked not to be stopped.
         if not args.force and has_tags(root):
             print("tagged repository: versions come from releases now")
+            return 0
+        chosen = find_manifest(root)
+        if not args.force and chosen is not None and set_by_hand(root, chosen):
+            print(f"version {chosen.version} was set by hand: leaving it alone")
             return 0
         args.patch = True
         args.stage = True
