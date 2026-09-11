@@ -141,8 +141,15 @@ promise, and the sentence next to it says so.
    icon on a video, confirm the POST to 127.0.0.1 goes through.
 4. Submit to the Chrome Web Store, then to Edge with the same zip and the
    same texts.
-5. Once a store listing is live, put its link in `README.md` and in the
-   website's getting-started page, above the manual install.
+5. Once a store listing is live, fill its address into `storeLinks` in
+   `website/src/lib/shared.ts`. The official badges are already in
+   `website/public/badges/` and appear on the landing page as soon as the
+   matching address is there — not before. Google's branding terms
+   require the badge to link to a page that exists and to come down
+   whenever the extension is not in the store, so an empty address means
+   no badge rather than a broken one.
+6. Put the same link in `README.md` and in the website's getting-started
+   page, above the manual install.
 
 ## Not in any store
 
