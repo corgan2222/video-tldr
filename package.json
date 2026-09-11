@@ -1,6 +1,6 @@
 {
   "name": "video-tldr",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Watch it. Vault it. One click turns the YouTube video in the active tab into a summary with pictures, as a note, PDF or Word file.",
   "type": "module",
   "license": "MIT",

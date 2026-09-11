@@ -180,6 +180,12 @@ jobs:
         if: needs.changes.outputs.python == 'true'
         run: uv run video-tldr --home /tmp/video-tldr models stt
 
+      # `working-directory: .`, against the default of this job: when there
+      # is nothing to check the checkout above is skipped too, so `service/`
+      # does not exist and bash cannot start in it. The job then failed with
+      # "No such file or directory" for the one step whose whole purpose is
+      # to do nothing.
       - name: Nothing to check
         if: needs.changes.outputs.python != 'true'
+        working-directory: .
         run: echo "Nothing under service/ changed -- nothing here to check."
