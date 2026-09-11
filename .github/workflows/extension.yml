@@ -34,16 +34,23 @@ jobs:
       # output, so dist/ is the directory a browser loads.
       - run: npm run build
 
-      # web-ext is Mozilla's own linter. It checks the manifest against the
-      # WebExtensions schema both browsers share, so a Chrome-only mistake
-      # (a key Firefox does not know, for example) surfaces here too.
-      - name: Lint the packed extension
-        run: npx web-ext lint --source-dir dist
+      # One zip per store, each with the manifest that store reads: Firefox
+      # keeps background.scripts and the gecko block, Chromium keeps the
+      # service worker.
+      - name: Pack one per store
+        run: python scripts/package.py
 
-      - name: Zip the extension
-        run: cd dist && zip -r ../video-tldr.zip .
+      # web-ext is Mozilla's own linter, and what it should see is the file
+      # Mozilla gets, not the shared build directory: dist/ carries both
+      # background forms at once and always draws a warning for the half
+      # Firefox ignores. The Firefox package alone must lint clean.
+      - name: Lint the Firefox package
+        run: |
+          mkdir -p .lint
+          unzip -q packages/*-firefox.zip -d .lint
+          npx web-ext lint --source-dir .lint
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: video-tldr
-          path: video-tldr.zip
+          path: packages/*.zip

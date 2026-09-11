@@ -24,3 +24,8 @@ service/dist
 # The service's own data directory, when VIDEO_TLDR_HOME points inside the
 # checkout: config.json carries API keys, models/ runs to ten gigabytes.
 /data/
+
+# One zip per store, built by scripts/package.py. What CI builds from the
+# tag is attached to the release, never committed.
+/packages
+/.lint
