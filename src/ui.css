@@ -359,6 +359,57 @@ details {
   margin-top: var(--gap-l);
 }
 
+/* Everything a first run leaves empty. Shut, it is one line; open, it is
+   a section like any other. The summary reads as a switch rather than as
+   a heading: sentence case, and the triangle carries the colour. */
+#advanced {
+  border-top: 0;
+  margin: 32px 0 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+#advanced > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  list-style: none;
+}
+
+/* The default marker sits outside the box and cannot be styled; this one
+   is text, so it takes the accent. */
+#advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+#advanced > summary::before {
+  content: '▸';
+  color: var(--violet);
+  font-size: 11px;
+}
+
+#advanced[open] > summary::before {
+  content: '▾';
+}
+
+#advanced[open] > summary {
+  margin-bottom: 20px;
+}
+
+#advanced > summary:hover {
+  border-color: var(--violet);
+  color: var(--ink);
+}
+
 summary {
   cursor: pointer;
   font-size: 12px;

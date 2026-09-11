@@ -35,24 +35,9 @@
   <body>
     <img class="banner" src="img/banner.png" alt="video-tldr" />
 
-    <div class="side-by-side">
-      <div class="field">
-        <label for="service-url" data-i18n="serviceUrl"></label>
-        <input
-          id="service-url"
-          type="url"
-          placeholder="http://127.0.0.1:8765"
-        />
-      </div>
-      <div class="field">
-        <label for="token" data-i18n="token"></label>
-        <input
-          id="token"
-          type="password"
-          autocomplete="off"
-          data-i18n-placeholder="tokenPlaceholder"
-        />
-      </div>
+    <div class="field">
+      <label for="service-url" data-i18n="serviceUrl"></label>
+      <input id="service-url" type="url" placeholder="http://127.0.0.1:8765" />
     </div>
     <div class="row">
       <button id="connect" data-i18n="connect"></button>
@@ -94,43 +79,6 @@
       <div class="field">
         <label data-i18n="outputs"></label>
         <div id="formats" class="checks"></div>
-      </div>
-      <div class="field">
-        <label for="download-dir" data-i18n="downloadDir"></label>
-        <div class="row">
-          <input id="download-dir" type="text" />
-          <button id="pick-download" type="button" data-i18n="browse"></button>
-        </div>
-        <p class="help" data-i18n="downloadDirHelp"></p>
-      </div>
-      <div class="side-by-side">
-        <div class="field">
-          <label for="obsidian-vault" data-i18n="obsidianVault"></label>
-          <div class="row">
-            <input id="obsidian-vault" type="text" />
-            <button id="pick-vault" type="button" data-i18n="browse"></button>
-          </div>
-        </div>
-        <div class="field">
-          <label for="obsidian-folder" data-i18n="obsidianFolder"></label>
-          <input id="obsidian-folder" type="text" placeholder="Videos" />
-        </div>
-      </div>
-      <div class="field">
-        <label for="browser" data-i18n="browserForPdf"></label>
-        <div class="row">
-          <input id="browser" type="text" />
-          <button id="pick-browser" type="button" data-i18n="browse"></button>
-        </div>
-        <p class="help" data-i18n="browserHelp"></p>
-      </div>
-      <div class="field">
-        <label for="pdf-template" data-i18n="pdfTemplate"></label>
-        <div class="row">
-          <input id="pdf-template" type="text" />
-          <button id="pick-template" type="button" data-i18n="browse"></button>
-        </div>
-        <p class="help" data-i18n="pdfTemplateHelp"></p>
       </div>
 
       <hr />
@@ -200,6 +148,68 @@
         <select id="stt"></select>
         <p class="help" data-i18n="sttHelp"></p>
       </div>
+
+      <!-- Everything that is empty until someone fills it in. A first run
+           needs none of it, and a page of empty fields reads as a page of
+           work. load() opens this by itself once one of them has a value,
+           so a setting can never hide behind a closed lid. -->
+      <details id="advanced">
+        <summary data-i18n="advanced"></summary>
+        <div class="field">
+          <label for="token" data-i18n="token"></label>
+          <input
+            id="token"
+            type="password"
+            autocomplete="off"
+            data-i18n-placeholder="tokenPlaceholder"
+          />
+        </div>
+        <div class="field">
+          <label for="download-dir" data-i18n="downloadDir"></label>
+          <div class="row">
+            <input id="download-dir" type="text" />
+            <button
+              id="pick-download"
+              type="button"
+              data-i18n="browse"
+            ></button>
+          </div>
+          <p class="help" data-i18n="downloadDirHelp"></p>
+        </div>
+        <div class="side-by-side">
+          <div class="field">
+            <label for="obsidian-vault" data-i18n="obsidianVault"></label>
+            <div class="row">
+              <input id="obsidian-vault" type="text" />
+              <button id="pick-vault" type="button" data-i18n="browse"></button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="obsidian-folder" data-i18n="obsidianFolder"></label>
+            <input id="obsidian-folder" type="text" placeholder="Videos" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="browser" data-i18n="browserForPdf"></label>
+          <div class="row">
+            <input id="browser" type="text" />
+            <button id="pick-browser" type="button" data-i18n="browse"></button>
+          </div>
+          <p class="help" data-i18n="browserHelp"></p>
+        </div>
+        <div class="field">
+          <label for="pdf-template" data-i18n="pdfTemplate"></label>
+          <div class="row">
+            <input id="pdf-template" type="text" />
+            <button
+              id="pick-template"
+              type="button"
+              data-i18n="browse"
+            ></button>
+          </div>
+          <p class="help" data-i18n="pdfTemplateHelp"></p>
+        </div>
+      </details>
     </fieldset>
 
     <hr />
