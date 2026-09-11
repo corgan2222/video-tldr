@@ -266,6 +266,15 @@
   "advanced": {
     "message": "Erweitert: Token, Ordner, Browser und Aussehen des PDF"
   },
+  "foldHistory": {
+    "message": "Verlauf: was deine eigenen Läufe hier gebraucht haben"
+  },
+  "foldBench": {
+    "message": "Benchmark: dasselbe Video durch mehrere Modelle"
+  },
+  "foldLinks": {
+    "message": "Alle Links öffnen: gesperrte Hosts, geöffnete Links"
+  },
   "modelHelp": {
     "message": "Liest das Transkript und schreibt die Notiz. Zwei Dinge zu wählen: wo es läuft (das Backend) und welches Modell dort. Gründlich fragt stattdessen das stärkste Modell des Backends."
   },
@@ -342,7 +351,7 @@
     "message": "Benchmark läuft…"
   },
   "blocklist": {
-    "message": "Alle Links öffnen: gesperrte Hosts, einer je Zeile (Unterdomains eingeschlossen)"
+    "message": "Gesperrte Hosts, einer je Zeile (Unterdomains eingeschlossen)"
   },
   "seen": {
     "message": "Bereits geöffnete Links"
