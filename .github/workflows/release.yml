@@ -44,10 +44,19 @@ jobs:
 
       - run: npm run build
 
-      - run: npx web-ext lint --source-dir dist
+      # One zip per store; the manifest differs, the code does not. See
+      # scripts/package.py for which key belongs to which store.
+      - name: Pack one per store
+        run: python scripts/package.py
 
-      - name: Pack
-        run: cd dist && zip -r "../video-tldr-${GITHUB_REF_NAME#v}.zip" .
+      # The linter sees what Mozilla gets, not the shared build directory:
+      # dist/ carries both background forms and always warns about the half
+      # Firefox ignores.
+      - name: Lint the Firefox package
+        run: |
+          mkdir -p .lint
+          unzip -q packages/*-firefox.zip -d .lint
+          npx web-ext lint --source-dir .lint
 
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
@@ -79,4 +88,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "$GITHUB_REF_NAME" \
-            video-tldr-*.zip *.whl overrides.txt constraints-gpu.txt constraints-cpu.txt
+            packages/*-firefox.zip packages/*-chrome.zip packages/*-edge.zip \
+            *.whl overrides.txt constraints-gpu.txt constraints-cpu.txt
