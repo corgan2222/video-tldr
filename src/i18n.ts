@@ -9,11 +9,33 @@ export function t(key: string, ...args: string[]): string {
   return text || key;
 }
 
+// A message may mark commands and addresses with backticks, the way
+// Markdown does: `video-tldr serve`. Built through the DOM rather than
+// innerHTML — a store reviewer sees UNSAFE_VAR_ASSIGNMENT for the latter,
+// and every other part arrives as text that cannot turn into markup.
+function setWithCode(node: HTMLElement, text: string): void {
+  node.replaceChildren();
+  text.split('`').forEach((part, index) => {
+    if (!part) return;
+    if (index % 2 === 0) {
+      node.append(part);
+      return;
+    }
+    const code = document.createElement('code');
+    code.textContent = part;
+    node.append(code);
+  });
+}
+
 // Every element with data-i18n gets its text, data-i18n-placeholder its
 // placeholder, data-i18n-title its tooltip. Called once per page load.
 export function translate(root: ParentNode = document): void {
   root.querySelectorAll<HTMLElement>('[data-i18n]').forEach((node) => {
-    node.textContent = t(node.dataset.i18n!);
+    const text = t(node.dataset.i18n!);
+    // textContent unless there is something to mark up: it is the cheaper
+    // path and the one that cannot be argued with.
+    if (text.includes('`')) setWithCode(node, text);
+    else node.textContent = text;
   });
   root
     .querySelectorAll<HTMLInputElement>('[data-i18n-placeholder]')
