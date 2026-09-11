@@ -189,8 +189,11 @@ function show(): void {
       element.value = config ? value : '';
     }
   }
+  // Only what the service actually found. Falling back to the help text
+  // printed the same sentence twice, once greyed inside the field and once
+  // under it.
   (field('browser') as HTMLInputElement).placeholder =
-    config?.browser_found || t('browserHelp');
+    config?.browser_found ?? '';
   (field('download_dir') as HTMLInputElement).placeholder =
     config?.download_found ?? '';
   const chosen = new Set(
