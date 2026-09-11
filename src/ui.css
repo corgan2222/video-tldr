@@ -103,15 +103,27 @@ a {
 
 /* ------------------------------------------------------ blocks, labels */
 
+/* A section heading is a bar of its own, not a grey line above the
+   fields: on a page with seven sections the eye needs to see where one
+   ends. Mono and violet mark it as a label rather than content. */
 h2 {
-  font-size: 12px;
-  font-weight: 600;
+  font:
+    600 11px/1.4 ui-monospace,
+    monospace;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  margin: 24px 0 var(--gap);
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--line);
+  letter-spacing: 0.14em;
+  color: var(--violet-soft);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--violet);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  margin: 36px 0 var(--gap-l);
+}
+
+/* The first one sits right under the banner and needs no extra air. */
+h2:first-of-type {
+  margin-top: 0;
 }
 
 fieldset {
