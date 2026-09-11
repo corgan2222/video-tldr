@@ -101,6 +101,13 @@ loses its own section heading, it takes over what that heading said:
 **Callout.** Surface with a 3px left border in the tone. For the one
 thing that follows from everything above it.
 
+**Advanced lid.** A `details` whose summary is one line on a surface, a
+violet triangle in front, sentence case — a switch, not a heading. What
+goes behind it is every field a fresh install leaves empty: none of them
+is needed for a first run, and a page of empty fields reads as a page of
+work. **It opens itself whenever one of those fields carries a value.** A
+setting nobody can find again is worse than a field nobody needs.
+
 **Primary button.** Violet fill, white text, 8px radius, an arrow after
 the label. At most one per screen: it is the way onward, and a second one
 beside it makes both a question.
