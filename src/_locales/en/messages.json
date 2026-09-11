@@ -266,6 +266,15 @@
   "advanced": {
     "message": "Advanced: token, folders, the browser and the look of the PDF"
   },
+  "foldHistory": {
+    "message": "History: what your own runs took on this machine"
+  },
+  "foldBench": {
+    "message": "Benchmark: the same video through several models"
+  },
+  "foldLinks": {
+    "message": "Open all links: blocked hosts, links already opened"
+  },
   "modelHelp": {
     "message": "Reads the transcript and writes the note. Choose where it runs (the backend) and which model there; Thorough asks for the strongest model of the backend instead."
   },
@@ -342,7 +351,7 @@
     "message": "Benchmark running…"
   },
   "blocklist": {
-    "message": "Open all links: blocked hosts, one per line (subdomains included)"
+    "message": "Blocked hosts, one per line (subdomains included)"
   },
   "seen": {
     "message": "Links already opened"
