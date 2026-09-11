@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { appName, gitConfig } from "@/lib/shared";
+import { appName, basePath, gitConfig } from "@/lib/shared";
 
 // What the extension does, in the order someone new needs it: what comes
 // out, what it costs in attention, and where the thinking happens. The
@@ -27,12 +27,13 @@ const points = [
 export default function HomePage() {
   return (
     <main className="hero-wash flex flex-1 flex-col items-center px-4 py-20">
-      <h1 className="text-balance text-center text-4xl font-bold tracking-tight sm:text-6xl">
-        {appName}
-      </h1>
-      <p className="mt-4 text-center text-2xl font-medium text-fd-muted-foreground">
-        Watch it. Vault it.
-      </p>
+      {/* The banner carries the name and the tagline, so the page does
+          not say them again — see docs/design-system.md. */}
+      <img
+        src={`${basePath}/banner.png`}
+        alt={`${appName} — Watch it. Vault it.`}
+        className="w-full max-w-3xl rounded-xl border border-fd-border"
+      />
       <p className="mt-6 max-w-2xl text-balance text-center text-lg text-fd-muted-foreground">
         Too long to read? A Firefox and Chrome extension with a local service
         that turns the YouTube video in the active tab into a summary with
@@ -82,8 +83,8 @@ export default function HomePage() {
 
       <p className="mt-16 max-w-2xl text-balance text-center text-sm text-fd-muted-foreground">
         Free software under the MIT licence. The extension needs a companion
-        service on your machine; it installs with one command, and the
-        extension shows that command when it cannot find it.
+        service on your machine; it installs with one command, and the extension
+        shows that command when it cannot find it.
       </p>
     </main>
   );
