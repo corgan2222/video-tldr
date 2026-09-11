@@ -227,9 +227,6 @@
   "tokenPlaceholder": {
     "message": "leer, solange config.json kein Token setzt"
   },
-  "summaryHeading": {
-    "message": "Zusammenfassung"
-  },
   "languageOfNote": {
     "message": "Sprache der Zusammenfassung"
   },
@@ -266,9 +263,6 @@
   "pdfTemplateHelp": {
     "message": "Eine HTML-Datei mit dem Platzhalter {{content}} oder eine CSS-Datei. Leer heißt: das eingebaute Aussehen."
   },
-  "modelHeading": {
-    "message": "Sprachmodell"
-  },
   "modelHelp": {
     "message": "Liest das Transkript und schreibt die Notiz. Zwei Dinge zu wählen: wo es läuft (das Backend) und welches Modell dort. Gründlich fragt stattdessen das stärkste Modell des Backends."
   },
@@ -283,9 +277,6 @@
   },
   "openaiBaseUrlHelp": {
     "message": "Leer heißt OpenAI selbst. Trage eine Adresse ein, um stattdessen einen kompatiblen Server zu erreichen, etwa Azure OpenAI, OpenRouter oder einen auf diesem Rechner. Sie gilt für das Sprachmodell und für das Audiomodell openai."
-  },
-  "sttHeading": {
-    "message": "Transkription: Sprache zu Text"
   },
   "sttHelp": {
     "message": "Macht aus dem Ton Text und läuft nur, wenn YouTube keine Untertitel hat oder hier ein Modell statt auto gewählt ist. Diese Modelle laufen auf diesem Rechner oder bei OpenAI; sie sind keine Sprachmodelle und können keine Notiz schreiben. Gründlich transkribiert immer mit whisper-large."
@@ -326,9 +317,6 @@
   "colTokensPerSecond": {
     "message": "Tokens/s"
   },
-  "benchHeading": {
-    "message": "Benchmark"
-  },
   "benchHelp": {
     "message": "Schickt dasselbe Video durch mehrere Modelle des aktuellen Backends und vergleicht, was jedes gebraucht hat."
   },
@@ -347,11 +335,8 @@
   "benchRunning": {
     "message": "Benchmark läuft…"
   },
-  "linksHeading": {
-    "message": "Alle Links öffnen"
-  },
   "blocklist": {
-    "message": "Gesperrte Hosts, einer je Zeile (Unterdomains eingeschlossen)"
+    "message": "Alle Links öffnen: gesperrte Hosts, einer je Zeile (Unterdomains eingeschlossen)"
   },
   "seen": {
     "message": "Bereits geöffnete Links"
