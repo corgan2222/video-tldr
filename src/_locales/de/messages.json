@@ -263,6 +263,9 @@
   "pdfTemplateHelp": {
     "message": "`dark`, `paper` oder `compact` für ein mitgeliefertes Aussehen. Oder der Pfad zu einer eigenen CSS-Datei, oder zu einer HTML-Datei mit dem Platzhalter `{{content}}`. Leer heißt: das eingebaute Aussehen."
   },
+  "advanced": {
+    "message": "Erweitert: Token, Ordner, Browser und Aussehen des PDF"
+  },
   "modelHelp": {
     "message": "Liest das Transkript und schreibt die Notiz. Zwei Dinge zu wählen: wo es läuft (das Backend) und welches Modell dort. Gründlich fragt stattdessen das stärkste Modell des Backends."
   },

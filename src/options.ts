@@ -43,6 +43,7 @@ const modelHint = pick<HTMLElement>('#model-hint');
 const backendInfo = pick<HTMLElement>('#backend-info');
 const statsBox = pick<HTMLElement>('#stats');
 const statsNote = pick<HTMLElement>('#stats-note');
+const advanced = pick<HTMLDetailsElement>('#advanced');
 const benchModels = pick<HTMLElement>('#bench-models');
 const benchStatus = pick<HTMLElement>('#bench-status');
 const benchResult = pick<HTMLElement>('#bench-result');
@@ -68,6 +69,12 @@ const FIELDS: Record<string, string> = {
   ollama_url: '#ollama-url',
   stt: '#stt',
 };
+
+// The settings behind the advanced lid: every one of them is empty in a
+// fresh config, and a first run works without any of them. The token is
+// in there too, but it belongs to the connection rather than to the
+// service's settings, so it is not on this list.
+const ADVANCED = ['download_dir', 'obsidian_vault', 'browser', 'pdf_template'];
 
 // How long the page waits before it asks a restarted service again: the
 // old process needs a moment to let go of the port.
@@ -206,6 +213,12 @@ function show(): void {
   );
   showModelChoice([]);
   showBackendFields();
+  // The advanced fields are the ones a first run leaves empty, so they
+  // start out of the way. Anything already set opens the lid: a value
+  // nobody can see is worse than a field nobody needs.
+  advanced.open =
+    ADVANCED.some((key) => field(key).value.trim() !== '') ||
+    tokenBox.value.trim() !== '';
 }
 
 function table(head: string[], rows: string[][]): HTMLTableElement {
