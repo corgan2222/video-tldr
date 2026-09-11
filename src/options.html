@@ -9,21 +9,16 @@
         max-width: 720px;
         margin: 0 auto;
       }
-      .brand img {
-        width: auto;
-        height: 40px;
-      }
-      /* The logo comes in two versions; the browser's scheme picks one. */
-      .brand .dark {
-        display: none;
-      }
-      @media (prefers-color-scheme: dark) {
-        .brand .light {
-          display: none;
-        }
-        .brand .dark {
-          display: block;
-        }
+      /* The banner carries the name and the tagline, so this page does
+         not repeat them — see docs/design-system.md. */
+      .banner {
+        display: block;
+        width: 100%;
+        max-width: 420px;
+        height: auto;
+        margin: 0 0 24px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
       }
       .side-by-side {
         display: grid;
@@ -38,13 +33,7 @@
     </style>
   </head>
   <body>
-    <div class="brand">
-      <img class="light" src="logo-light.png" alt="video-tldr" />
-      <img class="dark" src="logo-dark.png" alt="video-tldr" />
-      <div>
-        <p class="tagline" data-i18n="tagline"></p>
-      </div>
-    </div>
+    <img class="banner" src="img/banner.png" alt="video-tldr" />
 
     <h2 data-i18n="connect"></h2>
     <div class="side-by-side">
