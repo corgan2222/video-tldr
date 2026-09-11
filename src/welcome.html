@@ -280,6 +280,41 @@
         border: 1px solid var(--line);
         border-left: 3px solid var(--violet);
         border-radius: 8px;
+        display: flex;
+        gap: 24px;
+        align-items: flex-end;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+      .after-text {
+        min-width: 22rem;
+        flex: 1;
+      }
+
+      /* The one way onward from this page, so it looks like a button and
+         not like a word in a sentence. */
+      .manual {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #fff;
+        background: var(--violet);
+        border: 1px solid var(--violet);
+        border-radius: 8px;
+        padding: 11px 20px;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .manual::after {
+        content: '→';
+        font-size: 1.05em;
+      }
+      .manual:hover {
+        background: var(--violet-soft);
+        border-color: var(--violet-soft);
       }
       .after h2 {
         font-size: 0.95rem;
@@ -400,8 +435,17 @@
       </p>
 
       <div class="after">
-        <h2 data-i18n="welcomeThenTitle"></h2>
-        <p data-i18n="welcomeThen"></p>
+        <div class="after-text">
+          <h2 data-i18n="welcomeThenTitle"></h2>
+          <p data-i18n="welcomeThen"></p>
+        </div>
+        <a
+          id="to-manual"
+          class="manual"
+          target="_blank"
+          rel="noopener"
+          data-i18n="welcomeManual"
+        ></a>
       </div>
 
       <div class="foot">
