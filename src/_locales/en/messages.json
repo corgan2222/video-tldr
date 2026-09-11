@@ -45,7 +45,7 @@
     "message": "Delete work files"
   },
   "cleanupHelp": {
-    "message": "Remove the intermediate files under work/ once the outputs are written."
+    "message": "Delete the intermediate files under work/ once the outputs are there."
   },
   "language": {
     "message": "Language"
@@ -138,7 +138,7 @@
     "message": "No access to the local service yet."
   },
   "noAccessHelp": {
-    "message": "video-tldr talks to a service on your own machine, at 127.0.0.1. Nothing else is reached. Allow it once, and this window keeps working."
+    "message": "video-tldr talks to a service on your own machine, at 127.0.0.1. It reaches nothing else. Allow it once, and this window keeps working."
   },
   "grantAccess": {
     "message": "Allow access"
@@ -198,7 +198,7 @@
     "message": "Restart the service"
   },
   "restartServiceHelp": {
-    "message": "Starts the service fresh. Worth a try when a light stays red although the machine is fine: a process that lost its graphics card at the wrong moment keeps that loss until it is started again."
+    "message": "Starts the service fresh. Worth a try when a light stays red although the machine is fine: a process that lost its graphics card at the wrong moment never finds it again on its own."
   },
   "restarting": {
     "message": "the service is restarting…"
@@ -234,7 +234,7 @@
     "message": "The note, its sections and captions come out in this language. Quotes and technical terms stay as spoken in the video."
   },
   "styleHelp": {
-    "message": "How the note is worded. \"all\" writes one note per style, for comparing them."
+    "message": "How the note sounds. \"all\" writes one note per style, so you can compare them."
   },
   "outputs": {
     "message": "Outputs besides the summary (none chosen falls back to md)"
@@ -276,7 +276,7 @@
     "message": "Open all links: blocked hosts, links already opened"
   },
   "modelHelp": {
-    "message": "Reads the transcript and writes the note. Choose where it runs (the backend) and which model there; Thorough asks for the strongest model of the backend instead."
+    "message": "The model reads the transcript and writes the note. Choose where it runs (the backend) and which model there; Thorough asks for the strongest model of the backend instead."
   },
   "backend": {
     "message": "Backend"
@@ -288,10 +288,10 @@
     "message": "Stars stand for a stored key; leave them to keep it, clear the field to remove it."
   },
   "openaiBaseUrlHelp": {
-    "message": "Empty means OpenAI itself. Enter an address to reach a compatible server instead, for example Azure OpenAI, OpenRouter or one on this machine. It serves the language model and the openai transcriber alike."
+    "message": "Empty means OpenAI itself. Enter an address to reach a compatible server instead, for example Azure OpenAI, OpenRouter or one on this machine. The same address serves the language model and the openai transcriber."
   },
   "sttHelp": {
-    "message": "Turns the audio into text, and only runs when YouTube has no captions or when a model is chosen here instead of auto. These models run on this machine or at OpenAI; they are not language models and cannot write the note. Thorough always transcribes with whisper-large."
+    "message": "Turns the audio into text, and only runs when YouTube has no captions or when you pick a model here instead of auto. These models run on this machine or at OpenAI; they are not language models and cannot write the note. Thorough always transcribes with whisper-large."
   },
   "transcriber": {
     "message": "Transcriber"
@@ -407,7 +407,7 @@
     "message": "Your own model in Ollama, free and offline. Give it a context of 32768 or more; `ollama pull` a vision model for labelled pictures."
   },
   "modelAdvice": {
-    "message": "Good: a vision model (LM Studio calls it vlm) with 32768 tokens of context or more. Poor: a Whisper or embedding model, which cannot write at all; a model under 32768 tokens, which runs out mid-transcript; a heavily quantised one, which is eight times slower here."
+    "message": "Good: a vision model (LM Studio calls it vlm) with 32768 tokens of context or more. Poor: a Whisper or embedding model, which cannot write at all; a model under 32768 tokens, which runs out mid-transcript; a heavily quantised one, which takes many times longer."
   },
   "checkModel": {
     "message": "Check the model"
