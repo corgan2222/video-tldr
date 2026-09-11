@@ -456,5 +456,11 @@
   },
   "welcomeTerminalHint": {
     "message": "No terminal open? In this order:"
+  },
+  "welcomeManual": {
+    "message": "Read the manual"
+  },
+  "welcomeManualUrl": {
+    "message": "https://corgan2222.github.io/video-tldr/docs"
   }
 }

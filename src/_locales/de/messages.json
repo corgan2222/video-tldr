@@ -456,5 +456,11 @@
   },
   "welcomeTerminalHint": {
     "message": "Kein Terminal offen? Der Reihe nach:"
+  },
+  "welcomeManual": {
+    "message": "Zum Handbuch"
+  },
+  "welcomeManualUrl": {
+    "message": "https://corgan2222.github.io/video-tldr/docs/de"
   }
 }
