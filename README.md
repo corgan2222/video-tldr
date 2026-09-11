@@ -9,16 +9,16 @@ _[Deutsche Fassung](docs/README_DE.md)_
 Too long to read? A Firefox and Chrome extension with a local service that
 turns the YouTube video in the active tab into a summary with pictures.
 
-## What It Can Do
+## What it can do
 
 - **Video summary.** The toolbar icon opens a small window with two
-  buttons. Fast and Thorough hand the video to a local service, which
-  fetches title, description, chapters and captions, transcribes the
-  audio when there are no captions, has a language model sort and
-  summarise the content, pulls still frames at the moments worth seeing,
-  reads the commands off those pictures and the installation steps out of
-  linked GitHub repositories, and writes the result as Markdown, as a note
-  in an Obsidian vault with the video embedded, as PDF and as a Word file.
+  buttons. Fast and Thorough hand the video to a local service. It fetches
+  title, description, chapters and captions, transcribes the audio when
+  there are none, and has a language model sort and summarise what was
+  said. It then pulls still frames at the moments worth seeing, reads the
+  commands off those pictures and the installation steps out of linked
+  GitHub repositories, and writes the result as Markdown, as a note in an
+  Obsidian vault with the video embedded, as PDF and as a Word file.
 - **What the window shows.** Every step with the seconds it took, a
   progress bar and an estimate from your earlier runs, the model and the
   transcriber, the service log, and buttons that open the note in
@@ -52,17 +52,15 @@ uv tool install video-tldr-service
 git clone https://github.com/corgan2222/video-tldr.git
 ```
 
-The script picks the right extra for the machine and puts the command on
-your PATH. `uv tool install` is shorter if you already have uv. The clone
-is what works before any release exists, and what a contributor wants
-anyway.
+The script puts the command on your PATH and picks the CUDA libraries when
+the machine has an NVIDIA card, the smaller ONNX runtime when it has none.
+`uv tool install` is shorter if you already have uv. The clone is what
+works before any release exists, and what a contributor wants anyway.
 
-That picks the CUDA libraries when the machine has a card and the ONNX
-runtime alone when it has none, puts `video-tldr` on your PATH, and
-registers no autostart. You start the service yourself with
-`video-tldr serve`; whenever it is not answering, the extension shows
+The install script registers no autostart. You start the service yourself
+with `video-tldr serve`; whenever it is not answering, the extension shows
 that command with a button that copies it. Add `-Autostart` and a task
-starts it at every logon instead — `video-tldr autostart on|off|status`
+starts it at every logon instead. `video-tldr autostart on|off|status`
 switches that later, without reinstalling. `-Root D:\video-tldr` keeps
 the program, its environment and its data under one directory instead of
 three standard places. The speech models download on first use, several
