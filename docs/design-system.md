@@ -84,6 +84,10 @@ key. For things the reader presses: `Win`, `Enter`.
 **Callout.** Surface with a 3px left border in the tone. For the one
 thing that follows from everything above it.
 
+**Primary button.** Violet fill, white text, 8px radius, an arrow after
+the label. At most one per screen: it is the way onward, and a second one
+beside it makes both a question.
+
 ## Motion, and what it says
 
 Pointing at one of several parallel options dims the others to 40%,
