@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "video-tldr",
-  "version": "0.1.93",
+  "version": "0.1.95",
   "description": "Watch it. Vault it. One click turns the YouTube video in the active tab into a summary with pictures, as a note, PDF or Word file.",
   "icons": {
     "16": "icons/16.png",

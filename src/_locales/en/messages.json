@@ -227,9 +227,6 @@
   "tokenPlaceholder": {
     "message": "empty unless config.json sets a token"
   },
-  "summaryHeading": {
-    "message": "Summary"
-  },
   "languageOfNote": {
     "message": "Language the summary is written in"
   },
@@ -266,9 +263,6 @@
   "pdfTemplateHelp": {
     "message": "An HTML file with a {{content}} placeholder, or a CSS file. Empty means the built-in look."
   },
-  "modelHeading": {
-    "message": "Language model"
-  },
   "modelHelp": {
     "message": "Reads the transcript and writes the note. Choose where it runs (the backend) and which model there; Thorough asks for the strongest model of the backend instead."
   },
@@ -283,9 +277,6 @@
   },
   "openaiBaseUrlHelp": {
     "message": "Empty means OpenAI itself. Enter an address to reach a compatible server instead, for example Azure OpenAI, OpenRouter or one on this machine. It serves the language model and the openai transcriber alike."
-  },
-  "sttHeading": {
-    "message": "Transcription: speech to text"
   },
   "sttHelp": {
     "message": "Turns the audio into text, and only runs when YouTube has no captions or when a model is chosen here instead of auto. These models run on this machine or at OpenAI; they are not language models and cannot write the note. Thorough always transcribes with whisper-large."
@@ -326,9 +317,6 @@
   "colTokensPerSecond": {
     "message": "Tokens/s"
   },
-  "benchHeading": {
-    "message": "Benchmark"
-  },
   "benchHelp": {
     "message": "Runs the same video through several models of the current backend and compares what each took."
   },
@@ -347,11 +335,8 @@
   "benchRunning": {
     "message": "Benchmark running…"
   },
-  "linksHeading": {
-    "message": "Open all links"
-  },
   "blocklist": {
-    "message": "Blocked hosts, one per line (subdomains included)"
+    "message": "Open all links: blocked hosts, one per line (subdomains included)"
   },
   "seen": {
     "message": "Links already opened"

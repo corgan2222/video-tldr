@@ -81,19 +81,22 @@ things you type must be distinguishable at a glance.
 **Key caps.** Mono in `--surface-2`, bottom border 2px so it reads as a
 key. For things the reader presses: `Win`, `Enter`.
 
-**Section heading.** On a page with several sections the heading is a bar
-of its own: mono, uppercase, violet, on a surface with a 3px left border.
-A grey line above the fields is not enough separation once there are more
-than three sections — the eye has to find where one ends.
+**Section break.** A form's sections are separated, not titled: 32px of
+air and a 1px rule, nothing else. A heading over a field label said the
+same thing twice — "Summary" above "Language of the summary" — and two
+labels of different sizes above one field is one label too many.
 
 **Field label.** Small caps, 10.5px, letter-spacing `0.1em`, in
-`--ink-3`. A label is metadata, not content: at the size and weight of
-the value beneath it, the two read as one block and nobody can tell the
-question from the answer. Labels beside a checkbox are the exception —
-there the text _is_ the value, so it keeps the text size.
+`--violet-soft`. A label is metadata, not content: at the size, weight
+and colour of the value beneath it, the two read as one block and nobody
+can tell the question from the answer. Violet is what marks a label
+everywhere else here, so anything standing over a line of its own carries
+it. Labels beside a checkbox are the exception — there the text _is_ the
+value, so it keeps the text size and the text colour.
 
-**Three levels, never two.** Section bar, field label, value. A form that
-uses only two of them looks like a list of sentences.
+**Two levels, told apart by colour.** Label and value. Where the label
+loses its own section heading, it takes over what that heading said:
+`Blocked hosts` becomes `Open all links: blocked hosts`.
 
 **Callout.** Surface with a 3px left border in the tone. For the one
 thing that follows from everything above it.

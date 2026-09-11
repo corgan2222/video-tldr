@@ -103,27 +103,13 @@ a {
 
 /* ------------------------------------------------------ blocks, labels */
 
-/* A section heading is a bar of its own, not a grey line above the
-   fields: on a page with seven sections the eye needs to see where one
-   ends. Mono and violet mark it as a label rather than content. */
-h2 {
-  font:
-    600 11px/1.4 ui-monospace,
-    monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--violet-soft);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--violet);
-  border-radius: var(--radius);
-  padding: 9px 12px;
-  margin: 36px 0 var(--gap-l);
-}
-
-/* The first one sits right under the banner and needs no extra air. */
-h2:first-of-type {
-  margin-top: 0;
+/* Sections are separated, not titled. A heading over a field label said
+   the same thing twice — "Summary" above "Language of the summary" — so
+   the rule carries the break and the labels below it carry the meaning. */
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 32px 0 24px;
 }
 
 fieldset {
@@ -133,9 +119,11 @@ fieldset {
   min-width: 0;
 }
 
-/* A field label is metadata, not content: small caps, spaced, quiet. At
-   the same size and weight as the value under it, the two read as one
-   block and nobody can tell the question from the answer. */
+/* A field label is metadata, not content: small caps, spaced, violet. At
+   the same size, weight and colour as the value under it, the two read as
+   one block and nobody can tell the question from the answer. Violet is
+   what marks a label on every other surface of this project, so anything
+   standing over a line of its own carries it here too. */
 label {
   display: block;
   margin: 0 0 6px;
@@ -143,7 +131,7 @@ label {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--ink-3);
+  color: var(--violet-soft);
 }
 
 /* Fields stand further apart than a label from its own field: what
