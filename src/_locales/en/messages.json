@@ -290,6 +290,9 @@
   "statsConnect": {
     "message": "Connect to see what your runs took."
   },
+  "modelsConnect": {
+    "message": "Connect to see this backend's models."
+  },
   "colStep": {
     "message": "Step"
   },
