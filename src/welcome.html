@@ -105,7 +105,11 @@
       @media (min-width: 60rem) {
         .ways {
           grid-template-columns: repeat(3, 1fr);
-          align-items: stretch;
+          grid-template-rows: auto auto 1fr auto;
+        }
+        .way {
+          grid-row: span 4;
+          grid-template-rows: subgrid;
         }
       }
 
@@ -115,9 +119,9 @@
         border-top: 3px solid var(--tone, var(--violet));
         border-radius: 10px;
         padding: 20px 20px 18px;
-        display: flex;
-        flex-direction: column;
+        display: grid;
         gap: 10px;
+        align-content: start;
       }
       /* Pointing at one card dims the others: the three are alternatives,
          and a row of equal boxes reads like a list of steps. */
@@ -197,7 +201,7 @@
         background: var(--ground);
         border: 1px solid var(--line);
         border-radius: 7px;
-        padding: 12px 13px 40px;
+        padding: 12px 44px 12px 13px;
       }
       .cmd code {
         font-family: var(--mono);
@@ -215,19 +219,30 @@
       .cmd button {
         position: absolute;
         right: 8px;
-        bottom: 8px;
-        font-family: var(--sans);
-        font-size: 0.76rem;
-        color: var(--ink-2);
+        top: 8px;
+        display: grid;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        color: var(--ink-3);
         background: var(--surface-2);
         border: 1px solid var(--line);
-        border-radius: 5px;
-        padding: 4px 10px;
+        border-radius: 6px;
+        padding: 0;
         cursor: pointer;
       }
       .cmd button:hover {
-        color: var(--ink);
+        color: var(--tone, var(--violet));
         border-color: var(--tone, var(--violet));
+      }
+      .cmd button svg {
+        width: 15px;
+        height: 15px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
 
       .hint {
@@ -348,7 +363,7 @@
           <p data-i18n="welcomeScriptHelp"></p>
           <div class="cmd">
             <code id="cmd-script"></code>
-            <button data-copy="cmd-script" data-i18n="copyCommand"></button>
+            <button data-copy="cmd-script"></button>
           </div>
         </div>
 
@@ -361,7 +376,7 @@
           <p data-i18n="welcomeUvHelp"></p>
           <div class="cmd">
             <code id="cmd-uv"></code>
-            <button data-copy="cmd-uv" data-i18n="copyCommand"></button>
+            <button data-copy="cmd-uv"></button>
           </div>
         </div>
 
@@ -374,7 +389,7 @@
           <p data-i18n="welcomeSourceHelp"></p>
           <div class="cmd">
             <code id="cmd-source"></code>
-            <button data-copy="cmd-source" data-i18n="copyCommand"></button>
+            <button data-copy="cmd-source"></button>
           </div>
         </div>
       </div>

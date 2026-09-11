@@ -62,7 +62,17 @@ says what the option costs, not what it is: `easiest`, `needs PyPI`,
 **Command block.** Ground inside a surface, mono at 0.79rem, a `$` in the
 tone before it. **It wraps, it does not scroll.** A horizontal scrollbar
 inside a card reads as a defect, and a command that gets copied does not
-need to be one line. The copy button sits bottom right, inside.
+need to be one line. The copy control is a 28px icon button at the top
+right, inside — two overlapping sheets, the sign every editor uses. It
+carries `title` and `aria-label`, because an icon alone says nothing to a
+screen reader.
+
+**Cards in a row share their rows.** The grid declares
+`grid-template-rows: auto auto 1fr auto` and each card takes
+`grid-row: span 4` with `grid-template-rows: subgrid`. Title, text and
+command block then sit on one line across all of them, however long the
+text above happens to be. Without it each card stacks on its own and the
+command blocks start at three different heights.
 
 **Inline code.** Violet on `--violet-bg` with a 1px border, `nowrap`.
 Every command, path, port and address in running text gets it — prose and

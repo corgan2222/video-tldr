@@ -144,13 +144,13 @@
     "message": "Zugriff erlauben"
   },
   "welcomeIntro": {
-    "message": "Ein kleiner Dienst läuft auf diesem Rechner und macht die Arbeit: das Video holen, es transkribieren, ein Sprachmodell fragen. Die Erweiterung spricht mit ihm über `127.0.0.1` und sonst nirgendwohin. Nimm den Weg, der dir passt — alle drei führen zum selben Programm."
+    "message": "Ein kleiner Dienst läuft auf diesem Rechner und macht die ganze Arbeit: das Video holen, es transkribieren und einem Sprachmodell übergeben."
   },
   "welcomeScriptTitle": {
     "message": "Das Installationsskript"
   },
   "welcomeScriptHelp": {
-    "message": "Wählt die CUDA-Bibliotheken, wenn eine NVIDIA-Karte da ist, sonst die kleinere ONNX-Laufzeit, und legt `video-tldr` auf den `PATH`. Lies es vorher, wenn du sehen willst, was ein Skript tut."
+    "message": "Wählt die CUDA-Bibliotheken, wenn eine NVIDIA-Karte vorhanden ist. Alternativ wird die kleinere ONNX-Laufzeit benutzt."
   },
   "welcomeUvTitle": {
     "message": "Mit uv"
