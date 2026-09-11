@@ -170,9 +170,15 @@ jobs:
         if: needs.changes.outputs.python == 'true'
         run: uv run pytest
 
-      - name: Probe
+      # Not `probe`: that one checks the machine a user sits at -- ffmpeg on
+      # the PATH, a language model backend that answers -- and a runner has
+      # neither, so it can only ever fail here. What this step is for is the
+      # install: the entry point starts, reads its config and prints a table
+      # the code carries. `config` would do as well, but it prints every
+      # setting, and one of them is an API key.
+      - name: The command starts and reads its settings
         if: needs.changes.outputs.python == 'true'
-        run: uv run video-tldr --home /tmp/video-tldr probe
+        run: uv run video-tldr --home /tmp/video-tldr models stt
 
       - name: Nothing to check
         if: needs.changes.outputs.python != 'true'

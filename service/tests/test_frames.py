@@ -424,6 +424,14 @@ def test_a_server_that_says_the_model_is_blind_is_believed_before_the_request(
 
     monkeypatch.setattr(frames_module, "download_clips", fake_download)
     monkeypatch.setattr(frames_module, "ffmpeg", fake_ffmpeg)
+    # The diagram draws with a real browser and a real ffmpeg, neither of
+    # which a CI runner has. Faking frames.ffmpeg alone missed it: the call
+    # comes from mermaid_png, which frames imported by name.
+    monkeypatch.setattr(
+        frames_module,
+        "mermaid_png",
+        lambda source, target, browser: Path(target).write_bytes(b"png"),
+    )
     monkeypatch.setattr(
         llm, "capabilities", lambda s: {"vision": False, "context": 8192}
     )
