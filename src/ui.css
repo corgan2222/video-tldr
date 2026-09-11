@@ -133,14 +133,23 @@ fieldset {
   min-width: 0;
 }
 
+/* A field label is metadata, not content: small caps, spaced, quiet. At
+   the same size and weight as the value under it, the two read as one
+   block and nobody can tell the question from the answer. */
 label {
   display: block;
-  margin: 0 0 4px;
-  font-weight: 500;
+  margin: 0 0 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
 }
 
+/* Fields stand further apart than a label from its own field: what
+   belongs together sits closer than what does not. */
 .field {
-  margin-bottom: var(--gap-l);
+  margin-bottom: 22px;
 }
 
 /* An explanation, not a label: smaller, quieter, tied to the field above
@@ -230,9 +239,13 @@ button.primary {
 .check {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   margin: 0;
+  font-size: 13px;
   font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
   white-space: nowrap;
 }
 
