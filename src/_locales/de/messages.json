@@ -144,22 +144,22 @@
     "message": "Zugriff erlauben"
   },
   "welcomeIntro": {
-    "message": "Ein kleiner Dienst läuft auf diesem Rechner und macht die Arbeit: das Video holen, es transkribieren, ein Sprachmodell fragen. Die Erweiterung spricht mit ihm über 127.0.0.1 und sonst nirgendwohin. Nimm den Weg, der dir passt — alle drei führen zum selben Programm."
+    "message": "Ein kleiner Dienst läuft auf diesem Rechner und macht die Arbeit: das Video holen, es transkribieren, ein Sprachmodell fragen. Die Erweiterung spricht mit ihm über `127.0.0.1` und sonst nirgendwohin. Nimm den Weg, der dir passt — alle drei führen zum selben Programm."
   },
   "welcomeScriptTitle": {
     "message": "Das Installationsskript"
   },
   "welcomeScriptHelp": {
-    "message": "Wählt die CUDA-Bibliotheken, wenn eine NVIDIA-Karte da ist, sonst die kleinere ONNX-Laufzeit, und legt den Befehl auf den PATH. Lies es vorher, wenn du sehen willst, was ein Skript tut."
+    "message": "Wählt die CUDA-Bibliotheken, wenn eine NVIDIA-Karte da ist, sonst die kleinere ONNX-Laufzeit, und legt `video-tldr` auf den `PATH`. Lies es vorher, wenn du sehen willst, was ein Skript tut."
   },
   "welcomeUvTitle": {
     "message": "Mit uv"
   },
   "welcomeUvHelp": {
-    "message": "Der kürzeste Weg für alle, auf deren Rechner uv schon liegt — sobald das Paket auf PyPI veröffentlicht ist."
+    "message": "Der kürzeste Weg für alle, auf deren Rechner `uv` schon liegt — sobald das Paket auf PyPI veröffentlicht ist."
   },
   "welcomeThen": {
-    "message": "video-tldr serve startet den Dienst, video-tldr autostart on startet ihn bei jeder Anmeldung. Dann ein YouTube-Video öffnen und auf das Symbol klicken. Beim ersten Klick fragt die Erweiterung einmal nach dem Zugriff auf 127.0.0.1."
+    "message": "`video-tldr serve` startet den Dienst. `video-tldr autostart on` startet ihn stattdessen bei jeder Anmeldung. Dann ein YouTube-Video öffnen und auf das Symbol klicken — beim ersten Klick fragt die Erweiterung einmal nach dem Zugriff auf `127.0.0.1`."
   },
   "welcomeSettings": {
     "message": "Einstellungen öffnen"
@@ -434,7 +434,7 @@
     "message": "Aus dem Quelltext"
   },
   "welcomeSourceHelp": {
-    "message": "Geht ohne jedes Release. Nach dem Klonen: npm ci && npm run build für die Erweiterung, uv sync --project service --extra gpu für den Dienst."
+    "message": "Geht ohne jedes Release. Nach dem Klonen: `npm ci && npm run build` für die Erweiterung, `uv sync --project service --extra gpu` für den Dienst."
   },
   "welcomeHeading": {
     "message": "Die eine Hälfte ist installiert. Hier ist die andere."
