@@ -261,7 +261,7 @@
     "message": "PDF design template"
   },
   "pdfTemplateHelp": {
-    "message": "An HTML file with a {{content}} placeholder, or a CSS file. Empty means the built-in look."
+    "message": "`dark`, `paper` or `compact` for a look that ships with the service. Or the path to a CSS file of your own, or to an HTML file with a `{{content}}` placeholder. Empty means the built-in look."
   },
   "modelHelp": {
     "message": "Reads the transcript and writes the note. Choose where it runs (the backend) and which model there; Thorough asks for the strongest model of the backend instead."

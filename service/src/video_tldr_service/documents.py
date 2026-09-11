@@ -19,6 +19,10 @@ from .analyze import stamp
 from .fetch import FetchError, ffmpeg
 
 MERMAID_JS = Path(__file__).parent / "assets" / "mermaid.min.js"
+# The looks a user can pick by name instead of by path. They ship inside
+# the wheel, so `pdf_template=dark` works on a machine that never saw this
+# repository.
+BUILT_IN_STYLES = Path(__file__).parent / "assets" / "pdf"
 # The diagram is drawn in a window this large at twice the pixel density
 # and cut to its content plus this margin, in pixels of the result.
 DIAGRAM_WINDOW = (1400, 1000)
@@ -99,11 +103,33 @@ class SafeTargets:
                     element.set(name, safe_target(target))
 
 
+def built_in_styles() -> list[str]:
+    """The looks that ship with the service, by the name that picks one."""
+    return sorted(path.stem for path in BUILT_IN_STYLES.glob("*.css"))
+
+
+def template_path(template: str) -> Path:
+    """The file `pdf_template` names. A bare word is one of the looks that
+    ship in `assets/pdf/`; anything with a separator or a suffix is a path
+    of the user's own."""
+    if not Path(template).suffix and "/" not in template and "\\" not in template:
+        built_in = BUILT_IN_STYLES / f"{template}.css"
+        if built_in.is_file():
+            return built_in
+        raise FetchError(
+            f"pdf_template {template!r} is not one of the looks that ship "
+            f"with the service ({', '.join(built_in_styles())}). "
+            "For a file of your own, give its path."
+        )
+    return Path(template).expanduser()
+
+
 def html(title: str, markdown_text: str, template: str = "") -> str:
-    """A complete page from the note's Markdown. `template` is the file
-    `pdf_template` names: an `.html` page with `{{content}}` and
-    `{{title}}` in it replaces this page, anything else is read as CSS and
-    follows STYLE, so a few overriding rules are the short way in."""
+    """A complete page from the note's Markdown. `template` is what
+    `pdf_template` names: one of `built_in_styles()`, or a file. An
+    `.html` file with `{{content}}` and `{{title}}` in it replaces this
+    page, anything else is read as CSS and follows STYLE, so a few
+    overriding rules are the short way in."""
     import markdown
 
     # The Markdown carries a video title and a channel name a stranger
@@ -125,7 +151,7 @@ def html(title: str, markdown_text: str, template: str = "") -> str:
     body = md.convert(markdown_text)
     style = STYLE
     if template:
-        path = Path(template).expanduser()
+        path = template_path(template)
         if not path.is_file():
             raise FetchError(f"pdf_template {path} does not exist")
         text = path.read_text(encoding="utf-8")
