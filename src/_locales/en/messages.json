@@ -144,22 +144,22 @@
     "message": "Allow access"
   },
   "welcomeIntro": {
-    "message": "One half is installed. The other is a small service that runs on this machine and does the work — fetching the video, transcribing it, asking a language model. Pick whichever way suits you; they end up at the same program."
+    "message": "A small service runs on this machine and does the work: fetching the video, transcribing it, asking a language model. The extension talks to it over 127.0.0.1 and nowhere else. Take whichever way suits you — all three end at the same program."
   },
   "welcomeScriptTitle": {
-    "message": "With the install script"
+    "message": "The install script"
   },
   "welcomeScriptHelp": {
-    "message": "Picks the CUDA libraries when the machine has an NVIDIA card, and the smaller ONNX runtime when it has none. Read it first if you would rather see what a script does before running it."
+    "message": "Picks the CUDA libraries when the machine has an NVIDIA card, the smaller ONNX runtime when it has none, and puts the command on your PATH. Read it first if you would rather see what a script does."
   },
   "welcomeUvTitle": {
-    "message": "With uv, if you already have it"
+    "message": "With uv"
   },
   "welcomeUvHelp": {
-    "message": "The shortest way for anyone with uv on the machine already, once the package is on PyPI."
+    "message": "The shortest way for anyone who already has uv on the machine — as soon as the package is published to PyPI."
   },
   "welcomeThen": {
-    "message": "Afterwards, `video-tldr serve` starts the service, and `video-tldr autostart on` has it start at every logon instead. Then open a YouTube video and click the toolbar icon."
+    "message": "video-tldr serve starts the service, video-tldr autostart on has it start at every logon instead. Then open a YouTube video and click the toolbar icon. The first click asks once for access to 127.0.0.1."
   },
   "welcomeSettings": {
     "message": "Open the settings"
@@ -434,6 +434,27 @@
     "message": "From the source"
   },
   "welcomeSourceHelp": {
-    "message": "Works today, before any release exists. Clone it, then `npm ci && npm run build` for this extension and `uv sync --project service --extra gpu` for the service."
+    "message": "Works before any release exists. After cloning: npm ci && npm run build for the extension, uv sync --project service --extra gpu for the service."
+  },
+  "welcomeHeading": {
+    "message": "One half is installed. Here is the other."
+  },
+  "welcomeBadgeEasy": {
+    "message": "easiest"
+  },
+  "welcomeBadgeSoon": {
+    "message": "needs PyPI"
+  },
+  "welcomeBadgeToday": {
+    "message": "works today"
+  },
+  "welcomeThenTitle": {
+    "message": "And then?"
+  },
+  "welcomePick": {
+    "message": "Three ways — one is enough"
+  },
+  "welcomeTerminalHint": {
+    "message": "No terminal open? In this order:"
   }
 }

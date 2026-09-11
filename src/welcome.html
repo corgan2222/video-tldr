@@ -3,85 +3,378 @@
   <head>
     <meta charset="utf-8" />
     <title>video-tldr</title>
-    <link rel="stylesheet" href="ui.css" />
     <style>
+      /* This page is dark on purpose, whatever the system says: the banner
+         is dark, and a welcome screen is a poster, not a control surface.
+         The palette comes out of the banner itself — the violet of the
+         play mark carries the accents. */
+      :root {
+        color-scheme: dark;
+        --ground: #0f0f16;
+        --surface: #16161f;
+        --surface-2: #1e1e2a;
+        --ink: #ededf2;
+        --ink-2: #a8a8b8;
+        --ink-3: #6e6e80;
+        --line: #2a2a38;
+        --violet: #7c5cff;
+        --violet-soft: #9b85ff;
+        --violet-bg: #1a1630;
+        --cyan: #4cc9f0;
+        --cyan-bg: #10222c;
+        --green: #4ade80;
+        --green-bg: #102318;
+        --sans:
+          'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial,
+          sans-serif;
+        --mono: ui-monospace, 'Cascadia Mono', Consolas, 'SF Mono', monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
       body {
-        max-width: 640px;
-        margin: 0 auto;
-        padding: 24px 16px 48px;
-      }
-      h1 {
         margin: 0;
-        font-size: 20px;
+        padding: 0 24px 64px;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 15.5px;
+        line-height: 1.62;
       }
-      .tagline {
-        color: var(--muted);
-        margin: 2px 0 20px;
+
+      .wrap {
+        max-width: 62rem;
+        margin: 0 auto;
+      }
+
+      /* The banner carries the name and the tagline, so the page does not
+         repeat them as a heading. */
+      .banner {
+        display: block;
+        width: 100%;
+        height: auto;
+        margin: 28px 0 40px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      .intro {
+        display: grid;
+        gap: 10px 44px;
+        margin-bottom: 32px;
+        align-items: start;
+      }
+      @media (min-width: 60rem) {
+        .intro {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        }
+      }
+
+      h1 {
+        font-size: clamp(1.6rem, 3.4vw, 2.1rem);
+        line-height: 1.15;
+        letter-spacing: -0.022em;
+        font-weight: 700;
+        margin: 0;
+        /* Without this the line breaks after "Hier", mid-sentence. */
+        text-wrap: balance;
+      }
+
+      .lead {
+        margin: 0;
+        color: var(--ink-2);
+        font-size: 1rem;
+      }
+
+      .pick {
+        margin: 0 0 14px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+
+      .ways {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: 1fr;
+      }
+      @media (min-width: 60rem) {
+        .ways {
+          grid-template-columns: repeat(3, 1fr);
+          align-items: stretch;
+        }
+      }
+
+      .way {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-top: 3px solid var(--tone, var(--violet));
+        border-radius: 10px;
+        padding: 20px 20px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      /* Pointing at one card dims the others: the three are alternatives,
+         and a row of equal boxes reads like a list of steps. */
+      .ways:hover .way {
+        opacity: 0.4;
+      }
+      .ways .way:hover {
+        opacity: 1;
+        border-color: var(--tone, var(--violet));
       }
       .way {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 12px 14px;
-        margin-bottom: 12px;
+        transition:
+          opacity 0.14s ease,
+          border-color 0.14s ease;
+      }
+      .way.a {
+        --tone: var(--violet);
+        --tone-bg: var(--violet-bg);
+      }
+      .way.b {
+        --tone: var(--cyan);
+        --tone-bg: var(--cyan-bg);
+      }
+      .way.c {
+        --tone: var(--green);
+        --tone-bg: var(--green-bg);
+      }
+
+      /* Number and badge share one line, the title gets its own: a title
+         that wraps beside the number leaves it sitting crooked. */
+      .way-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .num {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--tone);
+        border: 1px solid var(--tone);
+        border-radius: 4px;
+        padding: 1px 7px;
+        flex: none;
       }
       .way h2 {
-        font-size: 14px;
-        margin: 0 0 4px;
+        font-size: 1.05rem;
+        font-weight: 650;
+        margin: 0;
+        letter-spacing: -0.015em;
+        text-wrap: balance;
+      }
+      .badge {
+        font-family: var(--mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--tone);
+        background: var(--tone-bg);
+        border-radius: 3px;
+        padding: 2px 7px;
+        white-space: nowrap;
       }
       .way p {
-        margin: 0 0 8px;
-        color: var(--muted);
+        margin: 0;
+        color: var(--ink-2);
+        font-size: 0.93rem;
+        flex: 1;
       }
+
+      /* The install one-liner is long. It wraps instead of scrolling
+         sideways: a command you copy does not need to be one line, and a
+         horizontal scrollbar inside a card reads as a defect. */
       .cmd {
-        display: flex;
-        gap: 8px;
-        align-items: center;
+        position: relative;
+        background: var(--ground);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 12px 13px 40px;
       }
       .cmd code {
-        flex: 1;
-        overflow-x: auto;
-        white-space: nowrap;
+        font-family: var(--mono);
+        font-size: 0.79rem;
+        line-height: 1.55;
+        color: var(--ink);
+        white-space: pre-wrap;
+        word-break: break-all;
+        display: block;
+      }
+      .cmd code::before {
+        content: '$ ';
+        color: var(--tone, var(--violet));
+      }
+      .cmd button {
+        position: absolute;
+        right: 8px;
+        bottom: 8px;
+        font-family: var(--sans);
+        font-size: 0.76rem;
+        color: var(--ink-2);
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      .cmd button:hover {
+        color: var(--ink);
+        border-color: var(--tone, var(--violet));
+      }
+
+      .hint {
+        margin: 20px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        font-size: 0.9rem;
+        color: var(--ink-2);
+      }
+      .hint kbd {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        color: var(--ink);
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 5px;
+        padding: 2px 9px;
+      }
+      .hint code {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        color: var(--violet-soft);
+        background: var(--violet-bg);
+        border-radius: 4px;
+        padding: 3px 9px;
+      }
+
+      .after {
+        margin: 40px 0 0;
+        padding: 20px 22px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--violet);
+        border-radius: 8px;
+      }
+      .after h2 {
+        font-size: 0.95rem;
+        margin: 0 0 8px;
+        font-weight: 650;
+      }
+      .after p {
+        margin: 0;
+        color: var(--ink-2);
+        font-size: 0.93rem;
+        max-width: 68ch;
+      }
+      .after code {
+        font-family: var(--mono);
+        font-size: 0.86em;
+        background: var(--surface-2);
+        border-radius: 3px;
+        padding: 1px 5px;
+        color: var(--ink);
+      }
+
+      .foot {
+        margin-top: 28px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
+      .foot a {
+        color: var(--violet-soft);
+        text-decoration: none;
+        border-bottom: 1px solid transparent;
+      }
+      .foot a:hover {
+        border-bottom-color: var(--violet-soft);
+      }
+      #status {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        color: var(--green);
       }
     </style>
   </head>
   <body>
-    <h1>video-tldr</h1>
-    <p class="tagline">Watch it. Vault it.</p>
+    <div class="wrap">
+      <img class="banner" src="img/banner.png" alt="video-tldr" />
 
-    <p data-i18n="welcomeIntro"></p>
+      <div class="intro">
+        <h1 data-i18n="welcomeHeading"></h1>
+        <p class="lead" data-i18n="welcomeIntro"></p>
+      </div>
 
-    <div class="way">
-      <h2 data-i18n="welcomeScriptTitle"></h2>
-      <p data-i18n="welcomeScriptHelp"></p>
-      <div class="cmd">
-        <code id="cmd-script"></code>
-        <button data-copy="cmd-script" data-i18n="copyCommand"></button>
+      <p class="pick" data-i18n="welcomePick"></p>
+
+      <div class="ways">
+        <div class="way a">
+          <div class="way-top">
+            <span class="num">01</span>
+            <span class="badge" data-i18n="welcomeBadgeEasy"></span>
+          </div>
+          <h2 data-i18n="welcomeScriptTitle"></h2>
+          <p data-i18n="welcomeScriptHelp"></p>
+          <div class="cmd">
+            <code id="cmd-script"></code>
+            <button data-copy="cmd-script" data-i18n="copyCommand"></button>
+          </div>
+        </div>
+
+        <div class="way b">
+          <div class="way-top">
+            <span class="num">02</span>
+            <span class="badge" data-i18n="welcomeBadgeSoon"></span>
+          </div>
+          <h2 data-i18n="welcomeUvTitle"></h2>
+          <p data-i18n="welcomeUvHelp"></p>
+          <div class="cmd">
+            <code id="cmd-uv"></code>
+            <button data-copy="cmd-uv" data-i18n="copyCommand"></button>
+          </div>
+        </div>
+
+        <div class="way c">
+          <div class="way-top">
+            <span class="num">03</span>
+            <span class="badge" data-i18n="welcomeBadgeToday"></span>
+          </div>
+          <h2 data-i18n="welcomeSourceTitle"></h2>
+          <p data-i18n="welcomeSourceHelp"></p>
+          <div class="cmd">
+            <code id="cmd-source"></code>
+            <button data-copy="cmd-source" data-i18n="copyCommand"></button>
+          </div>
+        </div>
+      </div>
+
+      <p class="hint">
+        <span data-i18n="welcomeTerminalHint"></span>
+        <kbd>Win</kbd><code>terminal</code><kbd>Enter</kbd>
+      </p>
+
+      <div class="after">
+        <h2 data-i18n="welcomeThenTitle"></h2>
+        <p data-i18n="welcomeThen"></p>
+      </div>
+
+      <div class="foot">
+        <a id="to-settings" href="#" data-i18n="welcomeSettings"></a>
+        <span id="status"></span>
       </div>
     </div>
-
-    <div class="way">
-      <h2 data-i18n="welcomeUvTitle"></h2>
-      <p data-i18n="welcomeUvHelp"></p>
-      <div class="cmd">
-        <code id="cmd-uv"></code>
-        <button data-copy="cmd-uv" data-i18n="copyCommand"></button>
-      </div>
-    </div>
-
-    <div class="way">
-      <h2 data-i18n="welcomeSourceTitle"></h2>
-      <p data-i18n="welcomeSourceHelp"></p>
-      <div class="cmd">
-        <code id="cmd-source"></code>
-        <button data-copy="cmd-source" data-i18n="copyCommand"></button>
-      </div>
-    </div>
-
-    <p data-i18n="welcomeThen"></p>
-
-    <p><a id="to-settings" href="#" data-i18n="welcomeSettings"></a></p>
-
-    <p id="status" class="status"></p>
 
     <script type="module" src="welcome.js"></script>
   </body>
