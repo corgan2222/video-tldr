@@ -1,0 +1,205 @@
+/* video-tldr on as few pages as it takes.
+ *
+ * For a two-hour video, where the note runs long and the point is to have
+ * it, not to frame it. Small type, tight leading, narrow margins, pictures
+ * capped at a third of the page. A heading is a line, not a bar.
+ *
+ *     video-tldr config --set pdf_template=docs/pdf/compact.css
+ *
+ * For one video only:
+ *
+ *     VIDEO_TLDR_PDF_TEMPLATE=docs/pdf/compact.css video-tldr run <url>
+ */
+
+:root {
+  --paper: #ffffff;
+  --ink: #16161c;
+  --ink-2: #5a5a64;
+  --ink-3: #8a8a94;
+  --line: #d8d8de;
+  --violet: #5b3fd6;
+  --mono: Cascadia Mono, Consolas, SF Mono, monospace;
+}
+
+@page {
+  margin: 12mm 13mm;
+  size: A4;
+}
+
+html {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+body {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Segoe UI, Helvetica, Arial, sans-serif;
+  font-size: 9pt;
+  line-height: 1.38;
+}
+
+p {
+  margin: 5px 0;
+}
+
+/* The thumbnail is the one picture that earns no space here. */
+body > p:first-child {
+  display: none;
+}
+
+h1 {
+  margin: 0 0 3px;
+  font-size: 15pt;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+h1 + p {
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 7.5pt;
+}
+
+/* A rule with a word on it: the same break a bar makes, in one line
+ * instead of three. */
+h2 {
+  margin: 16px 0 7px;
+  padding: 0 0 3px;
+  border-bottom: 1px solid var(--violet);
+  color: var(--violet);
+  font-size: 8pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  page-break-after: avoid;
+}
+
+h3 {
+  margin: 11px 0 3px;
+  font-size: 10pt;
+  font-weight: 650;
+  page-break-after: avoid;
+}
+
+a {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+}
+
+h3 a,
+h1 + p a {
+  color: var(--violet);
+  border-bottom: 0;
+}
+
+/* Capped rather than full width: a screenshot at full width costs half a
+ * page and says no more than it does at a third. */
+img {
+  max-width: 62%;
+  max-height: 90mm;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  page-break-inside: avoid;
+}
+
+img + em,
+p > em:only-child {
+  display: block;
+  margin-top: -2px;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 7.5pt;
+  font-style: normal;
+}
+
+pre {
+  margin: 6px 0;
+  background: #f4f4f7;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--violet);
+  border-radius: 3px;
+  padding: 6px 8px;
+  page-break-inside: avoid;
+}
+
+pre code {
+  font-family: var(--mono);
+  font-size: 7.5pt;
+  line-height: 1.35;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+:not(pre) > code {
+  padding: 0 3px;
+  background: #f0eefb;
+  border-radius: 2px;
+  color: #3d2ba0;
+  font-family: var(--mono);
+  font-size: 0.86em;
+}
+
+ul,
+ol {
+  margin: 5px 0;
+  padding-left: 1.1em;
+}
+
+li {
+  margin: 1px 0;
+}
+
+li::marker {
+  color: var(--violet);
+}
+
+blockquote {
+  margin: 7px 0;
+  padding: 1px 0 1px 9px;
+  border-left: 2px solid var(--line);
+  color: var(--ink-2);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8pt;
+  page-break-inside: avoid;
+}
+
+th {
+  border-bottom: 1px solid var(--ink-3);
+  padding: 2px 8px 2px 0;
+  color: var(--ink-2);
+  font-weight: 700;
+  text-align: left;
+}
+
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 2px 8px 2px 0;
+}
+
+hr {
+  height: 0;
+  margin: 14px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+h2 + p,
+h3 + p,
+h2 + ul,
+h3 + ul {
+  page-break-before: avoid;
+}
