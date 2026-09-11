@@ -81,13 +81,29 @@ keeps the manifest description inside that, and both say the same thing):
 ## Screenshots
 
 One is the minimum, five the maximum; **1280x800** or **640x400**. Take
-them at the same size, on a light background, from a real run:
+them at the same size, from a real run. The product is dark, so the
+screenshots are: a light background beside a dark banner reads as two
+products.
+
+The ones in `docs/store/` are ready to upload:
+
+| File                       | Shows                                             |
+| -------------------------- | ------------------------------------------------- |
+| `4-settings-connected.png` | The settings connected: four green lights, values |
+| `5-settings-models.png`    | Backend, model, transcriber, the empty history    |
+| `6-welcome.png`            | The welcome page, three ways to install           |
+
+Three are still missing, and each needs a video to really run:
 
 1. The popup on a YouTube video, with the two buttons and the three lights.
 2. The popup mid-run: steps, elapsed seconds, progress bar.
 3. The finished note in Obsidian, with pictures and timestamps.
-4. The settings page: backends, models, the benchmark.
-5. The welcome page with the three ways to install the service.
+
+**Never shoot a page against your own service.** The settings show the
+data directory, the vault, the model paths and, one section further down,
+the address of whatever OpenAI-compatible server the config names. Point
+a service at a directory made for this instead, with a config that holds
+no key, no internal address and no personal path.
 
 Chrome also takes a promo tile at 440x280 and a marquee at 1400x560.
 Both are optional and neither is worth making before the listing is live.
