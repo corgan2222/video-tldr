@@ -40,8 +40,7 @@ language model you picked in the settings:
 - **LM Studio or Ollama** — the model runs on your machine, and nothing
   leaves it.
 
-Which one it is, is your choice and nobody else's default. `video-tldr
-config` prints the one in force.
+You pick it in the settings. `video-tldr config` prints the one in force.
 
 ## What it keeps, and where
 
@@ -56,7 +55,8 @@ Everything stays in the data directory, by default
 The finished summaries go where you told the settings to put them: the
 downloads folder, an Obsidian vault, or both. Nothing is deleted behind
 your back; `cleanup` in the settings empties the work files if you want
-that, and deleting the data directory removes every trace.
+that. Deleting the data directory removes the config, the work files and
+the models. The finished notes stay where you put them.
 
 The extension itself stores your connection settings and the recent runs
 in the browser's own extension storage. Uninstalling the extension takes

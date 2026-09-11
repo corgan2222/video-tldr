@@ -2,13 +2,13 @@ import Link from "next/link";
 import { appName, basePath, gitConfig, storeLinks } from "@/lib/shared";
 
 // What the extension does, in the order someone new needs it: what comes
-// out, what it costs in attention, and where the thinking happens. The
-// same four points carry README.md; a visitor who reads both should not
-// find two different products.
+// out, where it lands, which model writes it, and what the window shows
+// while it runs. The same four points carry README.md; a visitor who
+// reads both should not find two different products.
 const points = [
   {
     title: "A summary you can read",
-    body: "Title, description, chapters and captions, transcribed when there are none, sorted and summarised by a language model, with still frames from the moments worth seeing.",
+    body: "The service fetches title, description, chapters and captions, transcribes the audio when there are none, and has a language model sort and summarise it. Still frames come from the moments worth seeing.",
   },
   {
     title: "Where you keep things",
@@ -19,7 +19,7 @@ const points = [
     body: "The service runs locally. The Claude Code CLI, the Anthropic or OpenAI API, or LM Studio and Ollama, which never send a word off the machine.",
   },
   {
-    title: "One click, then it works",
+    title: "Fast or Thorough",
     body: "The toolbar icon offers Fast and Thorough. The window shows every step, the seconds it took and an estimate from your earlier runs.",
   },
 ];

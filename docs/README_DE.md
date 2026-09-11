@@ -58,13 +58,13 @@ uv tool install video-tldr-service
 git clone https://github.com/corgan2222/video-tldr.git
 ```
 
-Das Skript wählt das passende Extra für den Rechner und legt den Befehl
-auf den PATH. `uv tool install` ist kürzer, wenn du uv schon hast. Der
+Das Skript legt den Befehl auf den PATH und wählt die CUDA-Bibliotheken,
+wenn eine NVIDIA-Karte im Rechner steckt, sonst die kleinere
+ONNX-Laufzeit. `uv tool install` ist kürzer, wenn du uv schon hast. Der
 Klon geht ohne jedes Release und ist ohnehin das, was Beitragende wollen.
 
-Das wählt die CUDA-Bibliotheken, wenn eine Karte da ist, und sonst allein
-die ONNX-Laufzeit, legt `video-tldr` auf den PATH und trägt keinen
-Autostart ein. Den Dienst startest du selbst mit `video-tldr serve`;
+Einen Autostart trägt das Skript nicht ein. Den Dienst startest du selbst
+mit `video-tldr serve`;
 antwortet er nicht, zeigt die Erweiterung genau diesen Befehl und eine
 Schaltfläche, die ihn kopiert. Mit `-Autostart` legt der Installer
 stattdessen eine Aufgabe an, die ihn bei jeder Anmeldung startet;
