@@ -126,6 +126,15 @@ numbered and nothing dims.
   paint themselves; without it they arrive in the system blue, which
   belongs to somebody else's palette.
 
+## Borrowed marks
+
+The store badges in `website/public/badges/` are Mozilla's and Google's,
+downloaded from their own branding pages. They are the one place where
+this palette does not apply: **resize them, change nothing else.** Both
+vendors require the badge to link to a listing that exists, and Google
+requires it to disappear whenever the extension is not in the store —
+which is why they render off an address that is empty until then.
+
 ## Where this is implemented
 
 |                        |                                                         |
