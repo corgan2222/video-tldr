@@ -144,13 +144,13 @@
     "message": "Allow access"
   },
   "welcomeIntro": {
-    "message": "A small service runs on this machine and does the work: fetching the video, transcribing it, asking a language model. The extension talks to it over `127.0.0.1` and nowhere else. Take whichever way suits you — all three end at the same program."
+    "message": "A small service runs on this machine and does all the work: fetching the video, transcribing it, handing it to a language model."
   },
   "welcomeScriptTitle": {
     "message": "The install script"
   },
   "welcomeScriptHelp": {
-    "message": "Picks the CUDA libraries when the machine has an NVIDIA card, the smaller ONNX runtime when it has none, and puts `video-tldr` on your `PATH`. Read it first if you would rather see what a script does."
+    "message": "Picks the CUDA libraries when an NVIDIA card is present. Otherwise the smaller ONNX runtime is used."
   },
   "welcomeUvTitle": {
     "message": "With uv"
