@@ -86,6 +86,15 @@ of its own: mono, uppercase, violet, on a surface with a 3px left border.
 A grey line above the fields is not enough separation once there are more
 than three sections — the eye has to find where one ends.
 
+**Field label.** Small caps, 10.5px, letter-spacing `0.1em`, in
+`--ink-3`. A label is metadata, not content: at the size and weight of
+the value beneath it, the two read as one block and nobody can tell the
+question from the answer. Labels beside a checkbox are the exception —
+there the text _is_ the value, so it keeps the text size.
+
+**Three levels, never two.** Section bar, field label, value. A form that
+uses only two of them looks like a list of sentences.
+
 **Callout.** Surface with a 3px left border in the tone. For the one
 thing that follows from everything above it.
 
