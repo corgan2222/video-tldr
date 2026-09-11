@@ -293,9 +293,17 @@ async function loadModels(): Promise<void> {
     );
   } catch (error) {
     showModelChoice([]);
-    benchModels.replaceChildren();
+    benchModels.replaceChildren(hint(t('statsConnect')));
     modelHint.textContent = message(error);
   }
+}
+
+// The line that stands where a list would be once the service answers.
+function hint(text: string): HTMLElement {
+  const box = document.createElement('p');
+  box.className = 'help';
+  box.textContent = text;
+  return box;
 }
 
 // `soft` turns a failed light amber instead of red: a model that answers
@@ -451,6 +459,10 @@ async function load(): Promise<void> {
   seenCount.textContent = t('seenCount', String(seen.length));
   serviceUrlBox.value = stored.serviceUrl as string;
   tokenBox.value = stored.token as string;
+  light('service', t('lightService'));
+  light('llm', t('lightLlm'));
+  light('stt', t('lightStt'));
+  light('capabilities', t('lightCapabilities'), undefined, true);
   await loadService();
 }
 
