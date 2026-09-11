@@ -81,6 +81,11 @@ things you type must be distinguishable at a glance.
 **Key caps.** Mono in `--surface-2`, bottom border 2px so it reads as a
 key. For things the reader presses: `Win`, `Enter`.
 
+**Section heading.** On a page with several sections the heading is a bar
+of its own: mono, uppercase, violet, on a surface with a 3px left border.
+A grey line above the fields is not enough separation once there are more
+than three sections — the eye has to find where one ends.
+
 **Callout.** Surface with a 3px left border in the tone. For the one
 thing that follows from everything above it.
 
