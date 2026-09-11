@@ -142,6 +142,32 @@ def test_a_template_replaces_the_page_and_a_stylesheet_follows_the_style(tmp_pat
     assert "typo.css" in str(caught.value)
 
 
+def test_a_look_that_ships_is_picked_by_name():
+    # A user who installed the wheel has no checkout to point at, so the
+    # three looks answer to a bare word.
+    names = documents.built_in_styles()
+    assert names == ["compact", "dark", "paper"]
+    for name in names:
+        page = html("t", "# Head\n", name)
+        # The built-in style first, the chosen look after it.
+        assert page.index("Segoe UI") < page.index("print-color-adjust")
+
+    with pytest.raises(FetchError) as caught:
+        html("t", "# Head\n", "midnight")
+    # The message names the way out: what there is, and what else works.
+    assert "compact, dark, paper" in str(caught.value)
+    assert "path" in str(caught.value)
+
+
+def test_every_look_that_ships_prints_its_backgrounds():
+    # Chrome drops every background when it prints unless the page asks.
+    # A look that forgets the line arrives as black on white, which is the
+    # one thing none of the three is meant to be.
+    for name in documents.built_in_styles():
+        text = (documents.BUILT_IN_STYLES / f"{name}.css").read_text(encoding="utf-8")
+        assert "print-color-adjust: exact" in text, name
+
+
 def test_a_step_is_a_command_only_when_no_sentence_is_in_it():
     assert is_command("`pip install b`") and is_command("$ docker compose up")
     assert is_command("cd b") and is_command("> npm ci")

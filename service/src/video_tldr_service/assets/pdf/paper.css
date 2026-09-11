@@ -1,0 +1,208 @@
+/* video-tldr, set to be printed and read on paper.
+ *
+ * Light ground, a serif for the running text, one violet accent left over
+ * from the product. Toner-friendly: nothing but the headings, the
+ * captions and the code blocks carries a background at all.
+ *
+ *     video-tldr config --set pdf_template=docs/pdf/paper.css
+ *
+ * For one video only:
+ *
+ *     VIDEO_TLDR_PDF_TEMPLATE=docs/pdf/paper.css video-tldr run <url>
+ */
+
+:root {
+  --paper: #ffffff;
+  --ink: #1a1a20;
+  --ink-2: #55555f;
+  --ink-3: #86868f;
+  --line: #dcdce2;
+  --tint: #f5f4fb;
+  --violet: #5b3fd6;
+  --mono: Cascadia Mono, Consolas, SF Mono, monospace;
+}
+
+/* Chrome prints no background unless asked. Without this the tinted
+ * heading bars and the code blocks arrive as bare text. */
+@page {
+  margin: 18mm 20mm;
+  size: A4;
+}
+
+html {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+body {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Cambria, Georgia, 'Times New Roman', serif;
+  font-size: 11pt;
+  line-height: 1.5;
+}
+
+body > p:first-child img {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+h1 {
+  margin: 12px 0 4px;
+  font-family: Segoe UI, Helvetica, Arial, sans-serif;
+  font-size: 20pt;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+/* Channel, date, length, link, kind. */
+h1 + p {
+  margin: 0 0 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 8pt;
+  letter-spacing: 0.04em;
+}
+
+h2 {
+  margin: 24px 0 12px;
+  padding: 6px 10px;
+  background: var(--tint);
+  border-left: 3px solid var(--violet);
+  color: var(--violet);
+  font-family: Segoe UI, Helvetica, Arial, sans-serif;
+  font-size: 9pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  page-break-after: avoid;
+}
+
+h3 {
+  margin: 18px 0 5px;
+  font-family: Segoe UI, Helvetica, Arial, sans-serif;
+  font-size: 12pt;
+  font-weight: 650;
+  page-break-after: avoid;
+}
+
+/* On paper a link cannot be clicked, so it stays dark and only the
+ * underline says it was one. The timestamps keep the colour: they are
+ * the one link worth typing out. */
+a {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+}
+
+h3 a,
+h1 + p a {
+  color: var(--violet);
+  border-bottom: 0;
+}
+
+img {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  page-break-inside: avoid;
+}
+
+img + em,
+p > em:only-child {
+  display: block;
+  margin-top: -2px;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 8pt;
+  font-style: normal;
+}
+
+pre {
+  background: var(--tint);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--violet);
+  border-radius: 4px;
+  padding: 9px 11px;
+  page-break-inside: avoid;
+}
+
+pre code {
+  font-family: var(--mono);
+  font-size: 8.5pt;
+  line-height: 1.45;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+:not(pre) > code {
+  padding: 1px 4px;
+  background: var(--tint);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: #3d2ba0;
+  font-family: var(--mono);
+  font-size: 0.85em;
+}
+
+ul,
+ol {
+  padding-left: 1.2em;
+}
+
+li {
+  margin: 2px 0;
+}
+
+li::marker {
+  color: var(--violet);
+}
+
+blockquote {
+  margin: 12px 0;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid var(--line);
+  color: var(--ink-2);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: Segoe UI, Helvetica, Arial, sans-serif;
+  font-size: 9pt;
+  page-break-inside: avoid;
+}
+
+th {
+  border-bottom: 1px solid var(--ink-3);
+  padding: 4px 10px 4px 0;
+  color: var(--ink-2);
+  font-weight: 700;
+  text-align: left;
+}
+
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 4px 10px 4px 0;
+}
+
+hr {
+  height: 0;
+  margin: 22px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+h2 + p,
+h3 + p,
+h2 + ul,
+h3 + ul {
+  page-break-before: avoid;
+}
