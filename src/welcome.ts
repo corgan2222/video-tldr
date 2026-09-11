@@ -70,6 +70,9 @@ document
       say(t('copied'));
     });
   });
+const manual = document.querySelector<HTMLAnchorElement>('#to-manual');
+if (manual) manual.href = t('welcomeManualUrl');
+
 document.querySelector('#to-settings')?.addEventListener('click', (event) => {
   event.preventDefault();
   void api.runtime.openOptionsPage();
