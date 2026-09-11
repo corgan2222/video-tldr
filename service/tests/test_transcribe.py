@@ -369,6 +369,15 @@ def test_the_audio_conversions_go_through_the_helper_with_the_longer_limit(
     assert "no such encoder" in str(caught.value)
 
 
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason=(
+        "Windows only. The test sets os.name to nt, and pathlib reads that "
+        "same attribute when it builds a Path: on Linux the next Path() "
+        "call raises, because a WindowsPath cannot be instantiated there. "
+        "What is under test, os.add_dll_directory, exists on Windows alone."
+    ),
+)
 def test_the_dll_directories_are_added_once_per_process(tmp_path, monkeypatch):
     """Every GET /health asked for them, the popup asks every two seconds,
     and each call grew PATH and the process's DLL directory list until
