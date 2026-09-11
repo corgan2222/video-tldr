@@ -55,32 +55,32 @@ keeps the manifest description inside that, and both say the same thing):
 >
 > Click the toolbar icon on a video and pick Fast or Thorough. A small
 > service on your own machine fetches the title, description, chapters
-> and captions, transcribes the audio when there are no captions, has a
-> language model sort and summarise what was said, pulls still frames at
-> the moments worth seeing, reads the commands off those pictures and the
-> installation steps out of any linked GitHub repository, and writes the
-> result as Markdown, as a note in an Obsidian vault with the video
-> embedded, as PDF and as a Word file.
+> and captions, transcribes the audio when there are none, and has a
+> language model sort and summarise what was said. It then pulls still
+> frames at the moments worth seeing, reads the commands off those
+> pictures and the installation steps out of any linked GitHub
+> repository, and writes the result as Markdown, as a note in an Obsidian
+> vault with the video embedded, as PDF and as a Word file.
 >
 > The window shows every step with the seconds it took, a progress bar
 > estimated from your earlier runs, the model and the transcriber in use,
 > and the service log. A second video queues behind the first, and a run
 > can be cancelled.
 >
-> You choose where the thinking happens: the Claude Code CLI, the
+> You choose which model does the summarising: the Claude Code CLI, the
 > Anthropic or OpenAI API, or LM Studio and Ollama, which keep everything
 > on your machine. The transcriber is Whisper, Parakeet, Canary or
 > OpenAI. The settings show what each took on your hardware and let you
 > benchmark several against the same video.
 >
-> There is a second, smaller thing it does: select text, pick "Open all
-> links" from the context menu, and every link in the selection opens as
-> a tab — YouTube redirects unwrapped, sponsor and affiliate hosts
-> skipped, and links you already opened skipped the next time.
+> It also opens links in bulk: select text, pick "Open all links" from the
+> context menu, and every link in the selection opens as a tab. The
+> extension unwraps YouTube redirects, skips sponsor and affiliate hosts,
+> and skips a link it opened before.
 >
-> The extension needs a companion service on your machine. It is free
-> software, it installs with one command, and the extension shows that
-> command when it cannot find it.
+> The extension needs a companion service on your machine. The service is
+> free software and installs with one command; the extension shows that
+> command when it cannot find the service.
 
 **Category:** Productivity
 

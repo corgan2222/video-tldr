@@ -28,14 +28,14 @@ PATH. Die Sprachmodelle kommen beim ersten Lauf dazu, mehrere Gigabyte.
 uv tool install video-tldr-service
 ```
 
-Der kürzeste Weg, wenn uv schon auf dem Rechner liegt — sobald das Paket
-auf PyPI steht.
+Sobald das Paket auf PyPI steht, ist das der kürzeste Weg für jeden, der
+uv schon hat.
 
 ```bash
 git clone https://github.com/corgan2222/video-tldr.git
 ```
 
-Geht heute, ohne jedes Release. Danach `uv sync --project service --extra
+Dieser Weg braucht kein Release. Danach `uv sync --project service --extra
 gpu` für den Dienst.
 
 `-Root D:\video-tldr` legt Programm, Umgebung und Daten unter ein
@@ -74,8 +74,8 @@ und Sprache, Ausgaben und Modell wählen. Ein YouTube-Video öffnen, auf das
 Symbol klicken, „Schnell" oder „Gründlich" drücken.
 
 Beim ersten Klick fragt der Browser einmal nach dem Zugriff auf
-127.0.0.1. Ohne diese Erlaubnis erreicht die Erweiterung den Dienst nicht;
-sie fragt danach und erklärt, wofür.
+127.0.0.1, und die Erweiterung erklärt daneben, wofür. Ohne diese
+Erlaubnis erreicht sie den Dienst nicht.
 
 Antwortet der Dienst nicht, sagt die Erweiterung das und zeigt den Befehl
 mit einer Schaltfläche, die ihn kopiert.
