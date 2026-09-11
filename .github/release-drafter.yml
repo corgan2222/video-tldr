@@ -131,16 +131,24 @@ autolabeler:
     branch:
       - '/chore\/.+/'
 
-# release.yml attaches the packed extension to the published release; the
-# line below tells a reader what that file is for.
+# release.yml attaches one package per store and the service wheel; the
+# lines below tell a reader which file is for what. Keep the names in step
+# with scripts/package.py, which writes them.
 template: |
   ## Changes
 
   $CHANGES
 
-  `video-tldr-$RESOLVED_VERSION.zip` is the packed extension, for a
-  manual install or a store upload. The store listings are the supported
-  way to install it.
+  The extension ships as one zip per store, each with the manifest that
+  store reads. The code in all three is the same.
+
+  | File | For |
+  | --- | --- |
+  | `video-tldr-$RESOLVED_VERSION-firefox.zip` | Firefox, and a manual install through `about:debugging` |
+  | `video-tldr-$RESOLVED_VERSION-chrome.zip` | Chrome, Brave, Opera, Vivaldi |
+  | `video-tldr-$RESOLVED_VERSION-edge.zip` | Edge |
+
+  The store listings are the supported way to install it.
 
   The service is the `.whl`, and `install.ps1` in the repository fetches
   it along with `overrides.txt` and the `constraints-*.txt` that pin the
