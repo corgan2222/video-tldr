@@ -9,8 +9,12 @@
     }
   },
   "rules": [
-    { "type": "deletion" },
-    { "type": "non_fast_forward" },
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
     {
       "type": "pull_request",
       "parameters": {
@@ -26,7 +30,14 @@
       "type": "required_status_checks",
       "parameters": {
         "strict_required_status_checks_policy": true,
-        "required_status_checks": [{ "context": "check" }]
+        "required_status_checks": [
+          {
+            "context": "check"
+          },
+          {
+            "context": "service"
+          }
+        ]
       }
     }
   ]
