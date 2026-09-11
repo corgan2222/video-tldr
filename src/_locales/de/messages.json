@@ -45,7 +45,7 @@
     "message": "Arbeitsdateien löschen"
   },
   "cleanupHelp": {
-    "message": "Löscht die Zwischendateien unter work/, sobald die Ausgaben geschrieben sind."
+    "message": "Löscht die Zwischendateien unter work/, sobald die Ausgaben dastehen."
   },
   "language": {
     "message": "Sprache"
@@ -138,7 +138,7 @@
     "message": "Noch kein Zugriff auf den lokalen Dienst."
   },
   "noAccessHelp": {
-    "message": "video-tldr spricht mit einem Dienst auf deinem eigenen Rechner, unter 127.0.0.1. Mehr wird nicht erreicht. Einmal erlauben, dann arbeitet dieses Fenster."
+    "message": "video-tldr spricht mit einem Dienst auf deinem eigenen Rechner, unter 127.0.0.1. Mehr erreicht es nicht. Einmal erlauben, dann arbeitet dieses Fenster."
   },
   "grantAccess": {
     "message": "Zugriff erlauben"
@@ -198,7 +198,7 @@
     "message": "Dienst neu starten"
   },
   "restartServiceHelp": {
-    "message": "Startet den Dienst frisch. Einen Versuch wert, wenn eine Lampe rot bleibt, obwohl am Rechner alles stimmt: ein Prozess, der im falschen Moment die Grafikkarte verloren hat, behält diesen Verlust bis zum Neustart."
+    "message": "Startet den Dienst frisch. Einen Versuch wert, wenn eine Lampe rot bleibt, obwohl am Rechner alles stimmt: ein Prozess, der im falschen Moment die Grafikkarte verloren hat, findet sie von allein nicht wieder."
   },
   "restarting": {
     "message": "der Dienst startet neu…"
@@ -234,7 +234,7 @@
     "message": "Notiz, Abschnitte und Bildunterschriften kommen in dieser Sprache. Zitate und Fachbegriffe bleiben, wie sie im Video gesprochen werden."
   },
   "styleHelp": {
-    "message": "Wie die Notiz formuliert ist. „alle\" schreibt je Stil eine Notiz zum Vergleichen."
+    "message": "Wie die Notiz klingt. „alle“ schreibt je Stil eine Notiz, dann kannst du vergleichen."
   },
   "outputs": {
     "message": "Ausgaben neben der Zusammenfassung (ohne Auswahl bleibt md)"
@@ -276,7 +276,7 @@
     "message": "Alle Links öffnen: gesperrte Hosts, geöffnete Links"
   },
   "modelHelp": {
-    "message": "Liest das Transkript und schreibt die Notiz. Zwei Dinge zu wählen: wo es läuft (das Backend) und welches Modell dort. Gründlich fragt stattdessen das stärkste Modell des Backends."
+    "message": "Das Modell liest das Transkript und schreibt die Notiz. Zwei Dinge zu wählen: wo es läuft (das Backend) und welches Modell dort. Gründlich fragt stattdessen das stärkste Modell des Backends."
   },
   "backend": {
     "message": "Backend"
@@ -288,10 +288,10 @@
     "message": "Sterne stehen für einen gespeicherten Schlüssel; stehen lassen behält ihn, Feld leeren löscht ihn."
   },
   "openaiBaseUrlHelp": {
-    "message": "Leer heißt OpenAI selbst. Trage eine Adresse ein, um stattdessen einen kompatiblen Server zu erreichen, etwa Azure OpenAI, OpenRouter oder einen auf diesem Rechner. Sie gilt für das Sprachmodell und für das Audiomodell openai."
+    "message": "Leer heißt OpenAI selbst. Trage eine Adresse ein, um stattdessen einen kompatiblen Server zu erreichen, etwa Azure OpenAI, OpenRouter oder einen auf diesem Rechner. Dieselbe Adresse gilt für das Sprachmodell und für das Audiomodell openai."
   },
   "sttHelp": {
-    "message": "Macht aus dem Ton Text und läuft nur, wenn YouTube keine Untertitel hat oder hier ein Modell statt auto gewählt ist. Diese Modelle laufen auf diesem Rechner oder bei OpenAI; sie sind keine Sprachmodelle und können keine Notiz schreiben. Gründlich transkribiert immer mit whisper-large."
+    "message": "Macht aus dem Ton Text und läuft nur, wenn YouTube keine Untertitel hat oder du hier ein Modell statt auto wählst. Diese Modelle laufen auf diesem Rechner oder bei OpenAI; sie sind keine Sprachmodelle und können keine Notiz schreiben. Gründlich transkribiert immer mit whisper-large."
   },
   "transcriber": {
     "message": "Transkribierer"
@@ -407,7 +407,7 @@
     "message": "Dein eigenes Modell in Ollama, kostenlos und offline. Gib ihm 32768 Kontext oder mehr; für beschriftete Bilder ein Bildmodell mit `ollama pull` holen."
   },
   "modelAdvice": {
-    "message": "Gut: ein Bildmodell (LM Studio nennt es vlm) mit 32768 Token Kontext oder mehr. Schlecht: ein Whisper- oder Embedding-Modell, das gar nicht schreiben kann; ein Modell unter 32768 Token, dem mitten im Transkript der Platz ausgeht; ein stark quantisiertes, das hier achtmal langsamer läuft."
+    "message": "Gut: ein Bildmodell (LM Studio nennt es vlm) mit 32768 Token Kontext oder mehr. Schlecht: ein Whisper- oder Embedding-Modell, das gar nicht schreiben kann; ein Modell unter 32768 Token, dem mitten im Transkript der Platz ausgeht; ein stark quantisiertes, das ein Vielfaches der Zeit braucht."
   },
   "checkModel": {
     "message": "Modell prüfen"
