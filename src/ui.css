@@ -1,35 +1,45 @@
-/* One look for the popup and the settings. The browser's own colours
-   (Canvas, CanvasText, LinkText) carry the light and the dark theme, so
-   there is no second palette to keep in step. Spacing is a scale of
-   four: 4, 8, 12, 16, 24. */
+/* One look for the popup and the settings, the same one the welcome page
+   and the site carry: the palette of docs/design-system.md, read off the
+   banner. Not the browser's Canvas/CanvasText any more — those follow the
+   system theme, and half a product in light mode beside a dark banner
+   looks like two products. Spacing is a scale of four: 4, 8, 12, 16, 24. */
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
+
+  --ground: #0f0f16;
+  --surface: #16161f;
+  --surface-2: #1e1e2a;
+  --ink: #ededf2;
+  --ink-2: #a8a8b8;
+  --ink-3: #6e6e80;
+  --rule: #2a2a38;
+  --violet: #7c5cff;
+  --violet-soft: #9b85ff;
+  --violet-bg: #1a1630;
+
   --gap: 8px;
   --gap-l: 16px;
   --radius: 6px;
-  --line: color-mix(in srgb, CanvasText 20%, transparent);
-  --sunken: color-mix(in srgb, CanvasText 6%, transparent);
-  --muted: color-mix(in srgb, CanvasText 65%, transparent);
-  --accent: #1a73e8;
-  --good: #188038;
-  /* Amber for what still works but not fully: a model that answers and
-     cannot read pictures is not the same as a server that is silent. */
-  --warn: #b25f00;
-  --bad: #d93025;
-}
-
-/* The signal colours carry text as well as dots, and a dark window
-   swallows them: each gets a lighter shade there. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --good: #6dd58c;
-    --warn: #fcad70;
-    --bad: #f28b82;
-  }
+  --line: var(--rule);
+  --sunken: var(--surface-2);
+  --muted: var(--ink-2);
+  --accent: var(--violet);
+  /* The signal colours are the dark-window shades: on this ground the
+     light-theme ones disappear. Amber for what works but not fully — a
+     model that answers and cannot read pictures is not a silent server. */
+  --good: #4ade80;
+  --warn: #d6a159;
+  --bad: #e08a83;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Checkboxes, radios and progress bars paint themselves; without this
+   they arrive in the system blue, which belongs to another palette. */
+:root {
+  accent-color: var(--violet);
 }
 
 /* Nothing may push the window wider than it is: a flex or grid child
@@ -43,12 +53,14 @@ body {
 
 body {
   font:
-    13px/1.5 system-ui,
+    13px/1.55 'Segoe UI',
+    system-ui,
+    -apple-system,
     sans-serif;
   margin: 0;
   padding: var(--gap-l);
-  background: Canvas;
-  color: CanvasText;
+  background: var(--ground);
+  color: var(--ink);
 }
 
 /* ------------------------------------------------------------- header */
@@ -85,7 +97,7 @@ body {
 }
 
 a {
-  color: LinkText;
+  color: var(--violet-soft);
   cursor: pointer;
 }
 
@@ -144,8 +156,8 @@ select {
   font:
     12px/1.4 ui-monospace,
     monospace;
-  color: CanvasText;
-  background: Canvas;
+  color: var(--ink);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
@@ -160,8 +172,8 @@ textarea:focus {
 button {
   font: inherit;
   padding: 5px 12px;
-  color: CanvasText;
-  background: var(--sunken);
+  color: var(--ink);
+  background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   cursor: pointer;
@@ -291,7 +303,7 @@ th {
 
 td {
   padding: 3px 8px 3px 0;
-  border-bottom: 1px solid color-mix(in srgb, CanvasText 8%, transparent);
+  border-bottom: 1px solid #22222e;
 }
 
 th.n,

@@ -103,10 +103,14 @@ numbered and nothing dims.
   the name and the tagline, the page below does not say them again.
 - **A number on screen carries a unit and, where it was measured, a
   date.**
-- **Dark is the design, not a mode.** Pages that carry the banner are
-  dark whatever the system asks for; a dark banner on a light page looks
-  like a mistake. Surfaces the user works in — popup, settings — follow
-  the system instead.
+- **Dark is the design, not a mode.** Every surface, whatever the system
+  asks for — the welcome page, the settings, the popup. Half a product in
+  light mode beside a dark banner reads as two products. There is no
+  light theme to keep in step either, which is one palette fewer to
+  maintain.
+- **`accent-color` on the root.** Checkboxes, radios and progress bars
+  paint themselves; without it they arrive in the system blue, which
+  belongs to somebody else's palette.
 
 ## Where this is implemented
 
@@ -115,4 +119,4 @@ numbered and nothing dims.
 | `src/welcome.html`     | the reference: palette, cards, command blocks, key caps |
 | `docs/diagrams/*.html` | archify at its `editorial` preset, same tone            |
 | `website/`             | the documentation site                                  |
-| `src/ui.css`           | popup and settings, which follow the system theme       |
+| `src/ui.css`           | popup and settings, the same palette                    |
