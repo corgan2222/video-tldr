@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { appName, basePath, gitConfig } from "@/lib/shared";
+import { appName, basePath, gitConfig, storeLinks } from "@/lib/shared";
 
 // What the extension does, in the order someone new needs it: what comes
 // out, what it costs in attention, and where the thinking happens. The
@@ -60,6 +60,31 @@ export default function HomePage() {
           Source on GitHub
         </a>
       </div>
+
+      {(storeLinks.firefox || storeLinks.chrome) && (
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+          {storeLinks.firefox && (
+            <a href={storeLinks.firefox}>
+              <img
+                src={`${basePath}/badges/firefox-get-the-addon.png`}
+                alt="Get the add-on for Firefox"
+                width={172}
+                height={60}
+              />
+            </a>
+          )}
+          {storeLinks.chrome && (
+            <a href={storeLinks.chrome}>
+              <img
+                src={`${basePath}/badges/chrome-web-store.png`}
+                alt="Available in the Chrome Web Store"
+                width={170}
+                height={48}
+              />
+            </a>
+          )}
+        </div>
+      )}
 
       <p className="mt-4 text-sm text-fd-muted-foreground">
         <Link href="/docs/de" className="underline underline-offset-4">
